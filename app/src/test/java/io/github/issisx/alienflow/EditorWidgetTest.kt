@@ -20,7 +20,7 @@ class EditorWidgetTest {
     private fun evidence(edit: EditText): EditorSnapshot {
         val info = edit.createAccessibilityNodeInfo()
         return EditorEvidence.fromNode(4, EditorEvidence.NodeText(info.text?.toString(),
-            info.isShowingHintText, info.textSelectionStart, info.textSelectionEnd), true, false).snapshot!!
+            info.isShowingHintText, info.textSelectionStart, info.textSelectionEnd), false).snapshot!!
     }
     private fun keyboard(connection: InputConnection): EditorEvidence.KeyboardText {
         val text = connection.getSurroundingText(100000, 100000, InputConnection.GET_TEXT_WITH_STYLES)!!
@@ -45,7 +45,6 @@ class EditorWidgetTest {
         assertTrue(raw.isShowingHintText)
         assertEquals(edit.hint.toString(), raw.text.toString())
         assertEquals("", input.text)
-        // This was the exact false mismatch in the 0.1.1 bridge, not a fabricated error.
         assertNotEquals(input.text, raw.text.toString())
         val initial = evidence(edit)
         assertNotNull(EditorEvidence.corroborate(initial, input).snapshot)

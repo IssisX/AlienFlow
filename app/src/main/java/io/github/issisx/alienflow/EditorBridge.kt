@@ -58,7 +58,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         val showingHint = target.isShowingHintText
         val read = EditorEvidence.fromNode(generation,
             EditorEvidence.NodeText(text?.toString(), showingHint, target.textSelectionStart, target.textSelectionEnd),
-            service.compositionKnown, service.composing || (!showingHint && hasComposition(text)))
+            service.composing || (!showingHint && hasComposition(text)))
         val snapshot = read.snapshot ?: return rejected(read.error!!)
         if (snapshot.text.isEmpty() && !snapshot.composing) service.confirmEmptyComposition()
         return snapshot
@@ -95,8 +95,6 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 }
                 val connection = service.inputMethod?.currentInputConnection
                     ?: run { fail("[AF-E04] Android detached the keyboard connection"); return@launch }
-                // Calling this on Main can block the SAME app's editor from replying.
-                // Also keep the bubble responsive when another app is slow to reply.
                 val surrounding = withContext(Dispatchers.IO) {
                     connection.getSurroundingText(100000, 100000, InputConnection.GET_TEXT_WITH_STYLES)
                 }
@@ -112,7 +110,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 }
                 val evidence = EditorEvidence.corroborate(before, EditorEvidence.KeyboardText(
                     surrounding.text.toString(), surrounding.selectionStart, surrounding.selectionEnd, surrounding.offset))
-                if (evidence.snapshot == null || hasComposition(surrounding.text)) {
+                if (evidence.snapshot == null || hasComposition(surrounding.text) || service.composing) {
                     fail(evidence.error ?: "[AF-E08] The keyboard is still composing a word")
                     owner.invalidate(); return@launch
                 }
@@ -121,13 +119,12 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 connection.commitText(value, 1, null)
                 delay(100)
                 if (!current()) return@launch
-                // Re-read, never retry the mutation. A stale completion cannot regain ownership.
                 val after = withContext(Dispatchers.IO) {
                     connection.getSurroundingText(100000, 100000, InputConnection.GET_TEXT_WITH_STYLES)
                 }
                 if (!current()) return@launch
                 val afterNode = snapshotNode()
-                val confirmation = if (after != null && afterNode != null && !hasComposition(after.text)) {
+                val confirmation = if (after != null && afterNode != null && !hasComposition(after.text) && !service.composing) {
                     EditorEvidence.corroborate(afterNode, EditorEvidence.KeyboardText(
                         after.text.toString(), after.selectionStart, after.selectionEnd, after.offset))
                 } else null
