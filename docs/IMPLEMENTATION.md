@@ -16,7 +16,16 @@ Date: 2026-10-10.
 
 [Actions run 38058270344](https://github.com/IssisX/AlienFlow/actions/runs/38058270344) completed successfully. All 36 tests passed; release lint had zero errors and 18 warnings; release assembly, identity checks, native alignment checks and delivery upload passed. The downloaded bundle and every manifest-listed entry matched their hashes. The privately signed APK verified with the permanent certificate. See [machine-readable release evidence](RELEASE_VERIFICATION.json) and [actual signature output](APK_SIGNATURE.txt).
 
-Independent review found no remaining blocking or important source defect for a **first test APK**, including the final manifest/resources. Installation, cold bubble microphone startup, live provider behavior, cross-editor compatibility and signed update preservation require the actual phone. This checkpoint does not declare the entire product specification complete.
+Independent review found no remaining blocking or important source defect for a **first test APK**, including the final manifest/resources. The owner has since reported opening the installed app and passing its key/session check; the phone observation below records the narrower evidence. Cold bubble microphone startup, live provider behavior, cross-editor compatibility and signed update preservation still require phone verification. This checkpoint does not declare the entire product specification complete.
+
+## Phone setup observation · 2026-10-10
+
+- **Owner report:** the installed app opens and **Check key & transcription model** finds the model and reports session availability. The installed APK hash was not independently read from the phone.
+- **Observed screenshots:** Android's accessibility list shows **AlienFlow dictation** and **Termux:X11 KeyInterceptor** disabled with **Controlled by Restricted Setting**. The screenshots establish an OS activation restriction, not a running-service failure. They do not establish when or why Termux:X11's restriction changed.
+- **Source boundary:** `DictationCoordinator.testKey()` requests a client secret via `OpenAiClient.clientSecret()` and reports session availability. It does not connect WebRTC, capture microphone audio, connect the accessibility service or insert text. Successful provider access can therefore coexist with the observed permission blocker.
+- **Supported remedy:** **Settings → Apps → AlienFlow → ⋮ / More → Allow restricted settings**, complete the phone confirmation, then **Settings → Accessibility → Installed apps → AlienFlow dictation → On**. This is the [official Android per-app unlock](https://support.google.com/android/answer/12623953?hl=en). Termux:X11 has its own per-app setting; the screenshots do not support AlienFlow having changed it.
+- **Change scope:** promoted the existing device-checklist instructions into README phone setup. No application code, package identity, signing identity or APK changed; a rebuild does not remove this OS-owned permission prerequisite. The current onboarding UI opens accessibility settings without showing the restricted-setting help; adding that guidance remains a usability follow-up.
+- **Pending acceptance:** the owner must perform the unlock on the phone, enable the service and confirm bubble appearance, real microphone capture and live words in a focused note. Those outcomes remain unverified. No dictation runtime check is promoted by the key/session test.
 
 ## What the APK contains
 
@@ -88,4 +97,4 @@ SDK correction: use published stable API 36 for compile/target and explicit SDK 
 - APK Signature Scheme v3 verified successfully, one signer, certificate SHA-256 `d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f`. Private key and password are excluded from the repository and Actions.
 - ARM64, Android 13/API 33 minimum, compile/target API 36; release is not debuggable. Native ELF and APK alignment checks passed for 16 KiB pages in CI.
 - Remaining lint warnings concern version-update suggestions, the ARM64 target, English UI, absolute overlay coordinates, small draw allocations and launcher resource/themed-icon polish. They were inspected and retained; no error baseline was added.
-- No device install, microphone, provider request, live editor, accuracy/latency or upgrade test is represented as passed. Those require the user's phone and API account.
+- At this artifact-delivery checkpoint, no device install, microphone, provider request, live editor, accuracy/latency or upgrade test was represented as passed. The later phone setup observation above records the owner's installation/key-check report and the screenshot-confirmed restriction separately.

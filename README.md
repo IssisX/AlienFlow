@@ -6,7 +6,7 @@ Personal native Android dictation with a movable alien bubble, live text in the 
 
 The first APK has been built, independently reviewed, privately signed and verified. The implementation is on `build/first-apk`; [Actions run 38058270344](https://github.com/IssisX/AlienFlow/actions/runs/38058270344) passed all 36 tests, release lint with zero errors, APK assembly and package checks. The signed APK is provided in the development-session handoff. Its exact source revision, hashes and signature are recorded in [release verification](docs/RELEASE_VERIFICATION.json).
 
-This is ready for the first phone test. Installation, real microphone/provider behavior and compatibility with everyday editors still need to be exercised on the device. See [implementation status and remaining work](docs/IMPLEMENTATION.md).
+The owner reports that the app opens and its key/session check succeeds. The current phone blocker is Android's **Controlled by Restricted Setting** gate on accessibility; the per-app unlock is below. Microphone capture, live provider transcription and compatibility with everyday editors still need to be exercised on the device. See [implementation status and remaining work](docs/IMPLEMENTATION.md).
 
 [Pull request #1](https://github.com/IssisX/AlienFlow/pull/1) preserves the reviewed implementation and its open phone-acceptance checklist. A future development session should start from this branch and read `AGENTS.md`.
 
@@ -25,7 +25,15 @@ Appearance and main behavior settings live in the app. This is an original perso
 
 ## Phone setup
 
-Use a **signed APK** from the release delivery, then open AlienFlow, enter your own API key, allow the microphone and enable the clearly labelled AlienFlow accessibility service. Leave Gboard selected and start with an empty note. API keys are entered and encrypted on the phone; no key is bundled in the APK or repository.
+Install **AlienFlow-0.1.0.apk**, the signed APK from the release delivery. The `unsigned-release-bundle` is an intermediate build artifact that requires signing before installation.
+
+Open AlienFlow, enter your own API key and allow the microphone. If Android's accessibility list shows **Controlled by Restricted Setting**, unlock the app first:
+
+1. Open **Settings → Apps → AlienFlow**.
+2. Open the **⋮ / More** menu at the top right and choose **Allow restricted settings**. Complete any phone confirmation.
+3. Return to **Settings → Accessibility → Installed apps → AlienFlow dictation** and turn it on.
+
+This is Android's per-app setting; see the [official instructions](https://support.google.com/android/answer/12623953?hl=en). A successful **Check key & transcription model** result tests OpenAI session access only; it does not establish accessibility or microphone readiness. Leave Gboard selected and start with an empty note. API keys are entered and encrypted on the phone; no key is bundled in the APK or repository.
 
 Follow [the first-phone checklist](docs/DEVICE_TESTS.md) to verify recording, text preservation, corrections, interruptions and updates on the real device.
 
