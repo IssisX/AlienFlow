@@ -44,3 +44,13 @@ Local Android SDK and kotlinc were absent; this worker has not represented stati
 ## Post-CI2 bounded fixes
 
 Added explicit lock/screen-off stop checks; cancellation-safe finalization rollback spanning the Main completion handoff; bounded cleanup cancellation checks around each blocking request; nullable/history-off and empty recovery preservation; visible failed audio deletion; outgoing unique commit IDs, empty-commit source coverage preservation and duplicate-ack guard. Current DictationLogicTest has14 cases (3 added since the11 that passed CI2). `git diff --check` continues to pass. No additional feature scope was started.
+
+## CI3 feedback and scoped lint fix
+
+Lead reported actual run38057983963/job114230255726 at33ba2d8f: application compilation, testDebugUnitTest and assembleRelease passed. Release lint found one WrongConstant error in EditorBridge.getSurroundingText flags. Replaced literal1 with imported InputConnection.GET_TEXT_WITH_STYLES, preserving the requested styled readback semantics. `git diff --check` passes. No other source changes made for this follow-up; repeat lint gate remains with the lead. The19 lint warnings are being reviewed by the lead, not represented as cleared here.
+
+## CI4 bounded manifest/resource finish
+
+Added android:dataExtractionRules pointing to res/xml/data_extraction_rules.xml while retaining allowBackup=false. Both cloud-backup and device-transfer explicitly exclude path"." for root, file, database, sharedpref, external, device_root, device_file, device_database and device_sharedpref. Verified schema and the OEM allowBackup/device-transfer distinction against the official Android Auto Backup guide: https://developer.android.com/identity/data/autobackup . This protects the current private settings/key ciphertext, text history and pending audio domains from both requested transfer modes.
+
+Added the app's own original alien adaptive launcher icon: drawable/alien_icon_foreground.xml, mipmap-anydpi-v26/ic_launcher.xml and values/colors.xml. Manifest icon/roundIcon reference that adaptive resource and application label uses @string/app_name. No runtime code/build/scripts changed for these resource fixes. All manifest/resource XML parsed successfully using Python ElementTree; both rule sections were checked for all documented domains and path"."; git diff --check passed. Android AAPT/lint verification remains in the lead's combined CI4 gate. Source frozen.

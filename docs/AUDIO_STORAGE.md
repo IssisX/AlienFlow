@@ -57,3 +57,26 @@ No Kotlin compiler or Android toolchain was available locally. These tests have 
 - Close waits for underlying file I/O to finish; it cannot both guarantee file cleanup and force a deadline on an unresponsive filesystem. It must stay off the main and urgent audio threads.
 - Sequential chunk transcription does not create a persistent per-part recovery checkpoint. Failure after earlier successful uploads keeps the entire original and a later retry can repeat those provider uploads. Durable per-part text and automatic reconnect/replay remain coordinator-level future work.
 - Silence detection is a local amplitude heuristic, not a guarantee that a boundary is linguistically complete. Provider access, recognition quality across boundaries, capture route formats, actual crash behavior, and physical-device timing remain untested.
+
+## Follow-up: CI-confirmed executor interrupt race
+
+The lead supplied concrete CI evidence for source commit `cf391cd212df6596d709ba06d148653d842771ff`, Actions run `38057441585`, job `114228696584`: the application compiled and 32 JVM tests ran, with one failure. `PendingAudioTest.validAuthoritativeHeaderExistsBeforeCloseAndActiveRepairIsRefused` failed during `finishOutput()` with `ClosedByInterruptException`, wrapped at `PendingAudio.kt:157` in that revision.
+
+### Cause and bounded repair
+
+`ThreadPoolExecutor.shutdown()` interrupts idle workers. A worker can retain that interrupt after its last task unlocks and `getTask()` observes SHUTDOWN with an empty queue. The worker then enters `terminated()` with its interrupt flag still set. Our termination hook performs interruptible FileChannel reads and syncs, so ordinary recording close could close the channel through interruption before final header verification/sync finished. A competing external-close explanation does not produce this worker's interrupt flag and would report a closed/asynchronously closed channel instead.
+
+The fix is confined to the executor termination hook: save and clear an inherited interrupt before owned WAV finalization, then restore it before signaling completion. The executor serializes its shutdown/termination hook under its termination lock, so its own idle-worker shutdown interrupts cannot arrive inside that protected cleanup interval. The hook may also run on a shutdown caller, so restoring the flag preserves the existing caller-interruption contract. Real file/storage exceptions remain failures; no exception is suppressed to make the original test pass.
+
+The original failing test is unchanged. A new deterministic regression, `inheritedWorkerInterruptCannotAbortFinalHeaderSyncAndCleanup`, adds a controlled final worker task through test-only reflection, starts close until the executor is SHUTDOWN, and then lets that task return with its interrupt flag set. This forces the failing termination ordering without relying on a race lottery. The test checks successful finalization, actual header and payload bytes, file-lock release, and exactly one channel close. The storage test file now contains 22 tests.
+
+### Executed mechanism evidence and remaining gate
+
+The local environment includes the JDK compiler module although no standalone javac executable was found. A small Java source-launcher reproducer at `/tmp/AlienFlowTerminationInterrupt.java` exercised the same ThreadPoolExecutor/FileChannel termination transition on Java 17.0.20. Its actual output was:
+
+```text
+ORIGINAL: inheritedInterrupt=true, failure=ClosedByInterruptException, channelClosed=true, interruptRestored=true
+PATCHED: inheritedInterrupt=true, failure=none, channelClosed=true, interruptRestored=true
+```
+
+The reproducer exited successfully and removed its temporary data file. This establishes runtime evidence for the named mechanism and the save/clear/finalize/restore repair. It does not establish that the Kotlin unit suite or Android app passes. The updated Kotlin source/test files were frozen when the lead requested the next CI checkpoint; the next CI result remains the compile/test gate. No Git, push, signing, provider calls, or unrelated source changes were performed for this follow-up.

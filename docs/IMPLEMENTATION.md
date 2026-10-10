@@ -12,9 +12,9 @@ Date: 2026-10-10.
 
 ## Current status
 
-The native application is implemented on `build/first-apk`, and the real GitHub Actions build has reached Kotlin compilation and unit tests. Independent review and test-driven repairs are in progress. The private permanent signing key has been created and its backup saved; the public certificate fingerprint is recorded in RELEASE.md.
+The native application is implemented on `build/first-apk`. Revision `33ba2d8f3f7f5d40747bfe532d1af43ea52a530e` passed Kotlin compilation and the unit-test task and assembled the unsigned release APK. Release lint found one error: an editor flag used a numeric literal instead of Android's named constant. That correction and explicit backup/launcher resources are being prepared for the next exact-source build.
 
-Revision `cf391cd212df6596d709ba06d148653d842771ff` compiled and executed 32 tests: 31 passed and one audio finalization test failed. This is not a passing release candidate. Release lint, final packaging, signing, installation, real API dictation and device compatibility have not yet been established for a deliverable APK.
+Independent review found no remaining important source blocker for a first test APK at the third compiler checkpoint, subject to rechecking later changes. This is not full product acceptance: final release checks, signing, installation, real API dictation and device compatibility are still pending. The private permanent signing key and backup exist; its public fingerprint is in RELEASE.md.
 
 ## Implementation decisions
 
@@ -39,3 +39,11 @@ SDK correction: use published stable API 36 for compile/target and explicit SDK 
 - [GitHub Actions run 38057441585](https://github.com/IssisX/AlienFlow/actions/runs/38057441585) installed the corrected SDK and compiled the app.
 - Unit tests: 32 executed, one failure in `PendingAudioTest.validAuthoritativeHeaderExistsBeforeCloseAndActiveRepairIsRefused`. WAV finalization encountered `ClosedByInterruptException`. The failure is assigned to the audio owner for a behavior fix and regression coverage; no test gate is being bypassed.
 - Separate review repairs address screen-lock microphone shutdown, cancellation during asynchronous history finalization, cancellation between paid cleanup chunks, and preserving local audio when the provider cannot confirm the committed buffer. These working changes require a subsequent exact-source CI run and review.
+
+## Third compiler checkpoint
+
+- Source: `33ba2d8f3f7f5d40747bfe532d1af43ea52a530e`; staged local tree and published Git tree both `f7861d0fdddc427d60d651e8a068efd87c3072f7`.
+- [GitHub Actions run 38057983963](https://github.com/IssisX/AlienFlow/actions/runs/38057983963) passed debug/release Kotlin compilation, `testDebugUnitTest` and `assembleRelease`. This revision contains 36 test cases: 14 dictation-logic and 22 audio-storage cases.
+- The original audio failure and its new deterministic interrupted-writer regression passed the unit-test task. An independent local Java reproducer also failed with `ClosedByInterruptException` before the repair and finalized successfully after the repair, while restoring the caller's interrupt status.
+- `lintRelease` failed with one `WrongConstant` error at `EditorBridge.getSurroundingText`: replace `1` with `InputConnection.GET_TEXT_WITH_STYLES`. No lint baseline or suppression is being added. Packaging and delivery upload were correctly skipped.
+- The 19 warnings were inspected. Explicit Android data-extraction exclusions and an actual launcher icon are being added. Remaining warnings concern deliberately pinned tool/dependency versions and SDK, the ARM64-only device target, English-only UI, small draw-time allocation, and intentionally absolute overlay coordinates. They remain visible in the lint report.

@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.text.Spanned
 import android.text.InputType
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.inputmethod.InputConnection
 
 /** The only component allowed to mutate editor text. A write is never blindly retried. */
 class EditorBridge(private val service: AlienAccessibilityService) {
@@ -39,7 +40,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         // Protected status is checked before requesting any text.
         if (isProtected(target)) return null
         val connection = service.inputMethod?.currentInputConnection ?: return null
-        val surrounding = connection.getSurroundingText(100000, 100000, 1) ?: return null
+        val surrounding = connection.getSurroundingText(100000, 100000, InputConnection.GET_TEXT_WITH_STYLES) ?: return null
         if (surrounding.offset != 0) return null // cannot prove the complete anchors
         val text = surrounding.text ?: return null
         if (text.toString() != target.text?.toString().orEmpty()) return null

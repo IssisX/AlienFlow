@@ -2,6 +2,8 @@
 
 This is the acceptance checklist for the first APK. Empty boxes are pending, not passes. Use a spare text note for the initial checks.
 
+If Android blocks the accessibility toggle as a restricted setting after APK installation, open Settings → Apps → AlienFlow → the More menu → Allow restricted settings, then return to AlienFlow's accessibility setup. The permission allows reading and editing the focused field. These are the [official Android instructions](https://support.google.com/android/answer/12623953?hl=en); menu wording can differ by device. Only enable it for the AlienFlow APK whose source and signing identity accompany this handoff.
+
 ## Setup and first dictation
 
 - [ ] Install the signed ARM64 APK on the Galaxy Z Fold6; record Android/One UI version.
