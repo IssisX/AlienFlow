@@ -11,8 +11,9 @@ import android.os.PowerManager
 class AlienApp : Application() {
     lateinit var store: LocalStore; private set
     lateinit var coordinator: DictationCoordinator; private set
+    lateinit var crashJournal: CrashJournal; private set
     override fun onCreate() {
-        super.onCreate(); store = LocalStore(this); coordinator = DictationCoordinator(this, store)
+        super.onCreate(); crashJournal = CrashJournal(this); crashJournal.install(); store = LocalStore(this); coordinator = DictationCoordinator(this, store)
         registerReceiver(object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 if (intent.action == Intent.ACTION_SCREEN_OFF) coordinator.screenUnavailable()

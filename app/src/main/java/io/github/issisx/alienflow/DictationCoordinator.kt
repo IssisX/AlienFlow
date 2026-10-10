@@ -63,25 +63,31 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     fun toggle() { if (active || finishing) stop() else start() }
     fun start() {
         if (active || finishing) return
+        app.crashJournal.mark("tap.received")
         if (!app.screenReady()) { update("Unlock the screen before starting dictation"); return }
         if (recoveryJob?.isActive == true) { update("Wait for audio recovery to finish before starting a new dictation"); return }
         if (app.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { update("Microphone permission is needed; open AlienFlow setup"); return }
         val key = try { store.apiKey() } catch (_: Exception) { update("Encrypted key could not be opened; save it again"); return }
         if (key.isNullOrBlank()) { update("Save an OpenAI API key first"); return }
         val bridge = service?.bridge ?: run { update("Enable AlienFlow accessibility first"); return }
+        app.crashJournal.mark("editor.begin")
         if (!bridge.begin()) { update(bridge.lastError); return }
+        app.crashJournal.mark("editor.ready")
         displayLive = store.prefs.getBoolean("live_display", true); cleanLive = store.prefs.getBoolean("live_cleanup", true); correctionMode = store.mode(); fillersEnabled = store.prefs.getBoolean("fillers", false); continueLocal = store.prefs.getBoolean("continue_local", true)
         session++; ledger = TranscriptLedger(); original = ""; result = ""; desired = ""; lastWritten = ""
         saved = false; liveFailed = false; microphoneConfirmed = false; interrupted = false; finalizing = false; audioClosing = false; corrections.clear(); cleaned.clear(); writing = false; commits = 0; completeItems.clear(); committedItems.clear(); seenErrors.clear(); editor = bridge; captureTarget = bridge
         active = true; finishing = false; update("Starting microphone and realtime connection…")
-        try { app.startForegroundService(Intent(app, CaptureService::class.java).setAction(CaptureService.START)) }
+        app.crashJournal.mark("service.start-requested")
+        try { app.startForegroundService(Intent(app, CaptureService::class.java).setAction(CaptureService.START)); app.crashJournal.mark("service.start-returned") }
         catch (_: Exception) { active = false; editor = null; update("Android denied background microphone start. Open AlienFlow and start a test; bubble start is not available in this permission state") }
     }
     fun microphoneServiceReady() {
         if (!active || transport != null) return
+        app.crashJournal.mark("microphone.setup")
         try {
             val key = store.apiKey() ?: error("Save an API key first")
             audio = PendingAudio(File(store.audioDir, "${System.currentTimeMillis()}.wav"))
+            app.crashJournal.mark("transport.start")
             transport = RealtimeTransport(app, audio!!, this).also {
                 it.silenceStopSeconds = store.prefs.getInt("silence_stop", 0)
                 it.onSilenceStop = { stop() }
@@ -102,7 +108,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         }, 500)
     }
     fun targetEvent() { if (interrupted && active) { if (captureTarget?.detachedTargetUnchanged() != true) stop(); return }; if (!interrupted && (active || finishing) && !writing && editor?.valid() != true) { liveFailed = true; editor?.invalidate(); editor = null; stop(); update("Focus or manual edit changed; result preserved") } }
-    override fun captured() { microphoneConfirmed = true; if (active) update("Listening • tap the alien to stop") }
+    override fun captured() { app.crashJournal.mark("microphone.frames"); microphoneConfirmed = true; if (active) update("Listening • tap the alien to stop") }
     override fun turnCommitted() { commits++ }
     override fun event(value: JSONObject) {
         if (!active && !finishing) return
@@ -174,6 +180,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     }
     fun stop() {
         if (!active) return
+        app.crashJournal.mark("dictation.stopping")
         active = false; finishing = true; stoppingAt = System.currentTimeMillis(); update("Finishing captured speech…")
         try { transport?.finishCapture() } catch (_: Exception) { failure("Could not finalize capture; pending audio preserved"); return }
         CaptureService.instance?.stopSelf()
@@ -221,6 +228,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                     // Acceptance is on the serialized UI owner, so cancel between the
                     // disk checkpoint and this handoff is still covered by finally.
                     accepted = true
+                    app.crashJournal.mark("dictation.finished")
                     audio = null; saved = storageOk; finalizing = false; finishing = false
                     update(if (!storageOk) "Storage failed; audio retained. Copy the visible result" else if (audioDeleteFailed) "Result saved, but audio deletion failed; discard it in pending recovery" else if (retainAudio) "Stopped • audio saved for recovery" else if (liveFailed) "Result saved • live insertion failed" else "Complete • ready for another dictation")
                     if (storageOk && keepAudio && interrupted && captured != null && continueLocal) recover(captured.file)

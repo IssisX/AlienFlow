@@ -7,13 +7,15 @@ import android.os.IBinder
 
 class CaptureService : Service() {
     companion object { const val START = "capture.start"; const val STOP = "capture.stop"; var instance: CaptureService? = null; private set }
-    override fun onCreate() { super.onCreate(); instance = this; getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("recording", "Dictation microphone", NotificationManager.IMPORTANCE_LOW)) }
+    override fun onCreate() { super.onCreate(); (application as AlienApp).crashJournal.mark("service.created"); instance = this; getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("recording", "Dictation microphone", NotificationManager.IMPORTANCE_LOW)) }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val coordinator = (application as AlienApp).coordinator
         if (intent?.action == STOP) { coordinator.stop(); stopSelf(); return START_NOT_STICKY }
         if (!coordinator.active) { stopSelf(); return START_NOT_STICKY }
         try {
+            (application as AlienApp).crashJournal.mark("service.promoting")
             startForeground(1, notification("Starting dictation…"), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+            (application as AlienApp).crashJournal.mark("service.promoted")
             coordinator.microphoneServiceReady()
         } catch (_: Exception) { coordinator.failure("Android denied microphone foreground service; check microphone permission and start restrictions"); stopSelf() }
         return START_NOT_STICKY

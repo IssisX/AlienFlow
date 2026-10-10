@@ -53,7 +53,9 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
             try {
                 val secret = withContext(Dispatchers.IO) { api!!.clientSecret(key, language, vocabulary) }
                 if (closed || !capturing || generation != connectionGeneration) return@launch
+                (context.applicationContext as AlienApp).crashJournal.mark("session.secret")
                 if (factory == null) {
+                    (context.applicationContext as AlienApp).crashJournal.mark("webrtc.initialize")
                     PeerConnectionFactory.initialize(PeerConnectionFactory.InitializationOptions.builder(context).createInitializationOptions())
                     device = JavaAudioDeviceModule.builder(context).setUseStereoInput(false).setAudioFormat(android.media.AudioFormat.ENCODING_PCM_16BIT)
                         .setUseHardwareAcousticEchoCanceler(true).setUseHardwareNoiseSuppressor(true)
@@ -75,10 +77,12 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
                                 inspect(samples.data, samples.sampleRate, samples.channelCount)
                             } catch (_: Exception) { main.post { if (!closed && capturing) listener.failure("Local audio storage failed; capture stopped") } }
                         }.createAudioDeviceModule()
+                    (context.applicationContext as AlienApp).crashJournal.mark("webrtc.factory")
                     factory = PeerConnectionFactory.builder().setAudioDeviceModule(device).createPeerConnectionFactory()
                     source = factory!!.createAudioSource(MediaConstraints())
                     track = factory!!.createAudioTrack("alienflow-microphone", source)
                 }
+                (context.applicationContext as AlienApp).crashJournal.mark("webrtc.peer")
                 val config = PeerConnection.RTCConfiguration(emptyList()).apply { sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN }
                 connection = factory!!.createPeerConnection(config, object : PeerConnection.Observer {
                     override fun onSignalingChange(s: PeerConnection.SignalingState) {}
@@ -101,10 +105,12 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
                 // During reconnect, the ADM's independent client demand keeps capture alive.
                 connection!!.setAudioRecording(false)
                 connection!!.addTrack(track, listOf("alienflow"))
+                (context.applicationContext as AlienApp).crashJournal.mark("webrtc.data-channel")
                 channel = connection!!.createDataChannel("oai-events", DataChannel.Init()).also { ch -> ch.registerObserver(object : DataChannel.Observer {
                     override fun onBufferedAmountChange(previousAmount: Long) {}
                     override fun onStateChange() { main.post {
                         if (!closed && capturing && generation == connectionGeneration && ch.state() == DataChannel.State.OPEN) {
+                            (context.applicationContext as AlienApp).crashJournal.mark("microphone.request")
                             connection?.setAudioRecording(true); device?.requestStartRecording(); localOnly = false
                             if (reconnect) listener.reconnected()
                         }
@@ -122,6 +128,7 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
                         catch (_: Exception) { main.post { if (!closed && generation == connectionGeneration) listener.failure("Invalid realtime event received") } }
                     }
                 }) }
+                (context.applicationContext as AlienApp).crashJournal.mark("webrtc.offer")
                 val offer = suspendCancellableCoroutine<SessionDescription> { cont -> connection!!.createOffer(object : SdpObserver {
                     override fun onCreateSuccess(s: SessionDescription) { if (cont.isActive) cont.resume(s) }
                     override fun onSetSuccess() {}
@@ -129,6 +136,7 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
                     override fun onSetFailure(message: String) {}
                 }, MediaConstraints()) }
                 setDescription(offer, true)
+                (context.applicationContext as AlienApp).crashJournal.mark("webrtc.answer")
                 val answer = withContext(Dispatchers.IO) { api!!.answer(secret, offer.description) }
                 if (!closed && capturing && generation == connectionGeneration) setDescription(SessionDescription(SessionDescription.Type.ANSWER, answer), false)
             } catch (_: CancellationException) { }

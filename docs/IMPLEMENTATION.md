@@ -50,3 +50,12 @@ Outstanding broader work remains in PRODUCT_SPEC.md and the historical checkpoin
 - AccessibilityInputConnection IPC/read contract: https://developer.android.com/reference/android/accessibilityservice/InputMethod.AccessibilityInputConnection
 - Overlay types and permission distinction: https://developer.android.com/reference/android/view/WindowManager.LayoutParams#TYPE_ACCESSIBILITY_OVERLAY
 - Robolectric published releases: https://github.com/robolectric/robolectric/releases
+
+## 0.1.3 crash diagnostic · 2026-10-10
+
+- Owner observed a full Android process exit with the system "app has a bug" popup when tapping the alien on 0.1.2. No crash stack, native tombstone, or on-device microphone startup trace is yet available; provider key/session validation is distinct from microphone operation.
+- The now-passing editor-readiness logic allows entry into foreground-service and WebRTC initialization. Competing causes include a foreground-service runtime failure, native-library initialization failure, or an exception in the presentation path. None is promoted to the cause without runtime evidence.
+- Added a **private, persistent crash journal** with fixed named startup checkpoints from tap through the editor, foreground service, realtime initialization, and microphone frames. Java/Kotlin uncaught failures record exception class and code locations only, with no exception messages, API keys, field text, audio, or requests. The existing Android crash mechanism still runs. Native crashes cannot be caught by this Java handler, but the last committed checkpoint remains available.
+- MainActivity displays the latest private crash report/checkpoint with explicit Refresh, Copy and Clear actions. No automatic transmission or global log collection. The user decides whether to share the sanitized diagnostic.
+- Source includes JVM tests verifying that private exception messages do not enter the report. No changes were made to the actual capture, transcription, correction, editor-write or authentication semantics. This update is diagnostic, **not a claim that the process crash is fixed**.
+- Version 0.1.3, versionCode 4, package and signing identity unchanged. Build/test/lint and phone observations remain gates; after collecting the on-device diagnostic, repair the precise exception and rerun the affected path.

@@ -53,6 +53,12 @@ class MainActivity : Activity() {
         result = text(screen, "No dictation yet", 17)
         button(screen, "Copy current result") { copy(app.coordinator.result) }
         button(screen, "Settings") { settings() }
+        title(screen, "Crash diagnostic (private)")
+        text(screen, "If dictation crashes, reopen AlienFlow and copy the diagnostic below. It excludes your speech, API key, and exception messages. Native crashes may only leave a startup checkpoint.")
+        val diagnostic = text(screen, app.crashJournal.diagnostic(), 13)
+        button(screen, "Refresh diagnostic") { diagnostic.text = app.crashJournal.diagnostic() }
+        button(screen, "Copy crash diagnostic") { copy(app.crashJournal.diagnostic()) }
+        button(screen, "Clear diagnostic") { app.crashJournal.clear(); diagnostic.text = app.crashJournal.diagnostic() }
         title(screen, "Recent text & pending recovery")
         text(screen, "Completed recordings are deleted. Text is kept for 7 days by default. Interrupted audio stays private for 24 hours; recovery never turns on the mic or edits a new field.")
         button(screen, "Refresh history") { refreshHistory() }
