@@ -207,6 +207,6 @@ class AlienAccessibilityService : AccessibilityService() {
             }
             return super.onTouchEvent(event)
         }
-        override fun performClick(): Boolean { super.performClick(); app.coordinator.toggle(); return true }
+        override fun performClick(): Boolean { super.performClick(); app.coordinator.toggle(); presentStatus(app.coordinator.status); return true }
     }
 }
