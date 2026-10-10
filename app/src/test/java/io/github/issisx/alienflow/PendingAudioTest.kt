@@ -19,6 +19,7 @@ import java.nio.channels.WritableByteChannel
 import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -87,6 +88,53 @@ class PendingAudioTest {
             assertArrayEquals(byteArrayOf(1, 2, 3, 4), payload(file))
         } finally { audio.close() }
         assertEquals(PendingAudio.WavInfo(44100, 1, 4), PendingAudio.repair(file))
+    }
+
+    @Test(timeout = 10000) fun inheritedWorkerInterruptCannotAbortFinalHeaderSyncAndCleanup() {
+        val file = path("termination-interrupt.wav")
+        val channel = AtomicReference<ProbeChannel>()
+        val finalTaskEntered = CountDownLatch(1)
+        val releaseFinalTask = CountDownLatch(1)
+        val closeDone = CountDownLatch(1)
+        val closeFailure = AtomicReference<Throwable?>()
+        val workerWasInterrupted = AtomicBoolean()
+        val audio = PendingAudio(file, 4) { ProbeChannel(openNew(it)).also(channel::set) }
+        // Inject only the executor's exit interrupt; all recording/finalization I/O is real.
+        // A task returning interrupted after SHUTDOWN makes getTask return null without
+        // clearing the flag, deterministically reproducing the idle-shutdown race.
+        val writerField = PendingAudio::class.java.getDeclaredField("writer").apply { isAccessible = true }
+        val writer = writerField.get(audio) as ThreadPoolExecutor
+        try {
+            audio.append(byteArrayOf(1, 2, 3, 4), 44100, 1)
+            writer.execute {
+                finalTaskEntered.countDown()
+                check(releaseFinalTask.await(5, TimeUnit.SECONDS))
+                Thread.currentThread().interrupt()
+                workerWasInterrupted.set(Thread.currentThread().isInterrupted)
+            }
+            assertTrue(finalTaskEntered.await(2, TimeUnit.SECONDS))
+            assertHeader(file, 44100, 1, 4)
+            Thread {
+                try { audio.close() } catch (e: Throwable) { closeFailure.set(e) }
+                finally { closeDone.countDown() }
+            }.start()
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+            while (!writer.isShutdown && System.nanoTime() < deadline) Thread.yield()
+            assertTrue("Close must stop the executor before the final task exits", writer.isShutdown)
+            releaseFinalTask.countDown()
+            assertTrue(closeDone.await(5, TimeUnit.SECONDS))
+            assertTrue(workerWasInterrupted.get())
+            assertNull("An executor shutdown interrupt must not fail WAV finalization", closeFailure.get())
+            assertFalse(channel.get().isOpen)
+            assertEquals(1, channel.get().closes.get())
+            assertHeader(file, 44100, 1, 4)
+            assertArrayEquals(byteArrayOf(1, 2, 3, 4), payload(file))
+            assertEquals(4L, PendingAudio.repair(file).dataBytes) // File lock is released.
+            audio.close()
+        } finally {
+            releaseFinalTask.countDown()
+            runCatching { audio.close() }
+        }
     }
 
     @Test(timeout = 10000) fun queueOverflowIsVisibleAndAlreadyAcceptedFramesStillDrain() {

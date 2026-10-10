@@ -131,7 +131,7 @@ class MainActivity : Activity() {
         retention.onItemSelectedListener = object : AdapterView.OnItemSelectedListener { override fun onNothingSelected(parent: AdapterView<*>?) {}; override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) { p.edit().putInt("retention", days[position]).apply() } }
         flag("Keep recording locally on connection loss (off: stop)", "continue_local", true)
         text(body, "Connection loss: keep audio locally until stop (or stop immediately when disabled). Manual recovery preserves the complete recording. Realtime reconnect retries automatically; gaps are recovered after stop, without typing into a changed field. Pending retention: 24 hours. History off does not disable recovery.")
-        text(body, "Supported microphone behavior: one native capture with a bounded local copy. Recovery never restarts the mic. No word quota.")
+        text(body, "Recordings stay private on this device until recovery. Recovery never restarts the microphone or types into a newly focused field. There is no app word allowance.")
         val scroll = ScrollView(this).apply { setBackgroundColor(Color.rgb(21, 29, 21)); addView(body) }
         AlertDialog.Builder(this).setTitle("AlienFlow settings").setView(scroll).setPositiveButton("Done") { _, _ -> app.coordinator.service?.refreshBubble() }.show()
     }

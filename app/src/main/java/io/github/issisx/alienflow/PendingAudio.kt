@@ -57,7 +57,16 @@ class PendingAudio internal constructor(
         ThreadFactory { task -> Thread(task, "AlienFlow-audio-writer").apply { isDaemon = true } },
     ) {
         override fun terminated() {
-            try { finishOutput() } finally { finished.countDown() }
+            // shutdown() interrupts idle workers. If getTask observes SHUTDOWN before
+            // consuming that interrupt, this hook inherits it. FileChannel would then
+            // close itself on the first finalization read/sync. The executor holds its
+            // termination lock here, so clear that inherited signal for owned cleanup,
+            // then restore it (the hook can also run on a shutdown caller).
+            val interrupted = Thread.interrupted()
+            try { finishOutput() } finally {
+                if (interrupted) Thread.currentThread().interrupt()
+                finished.countDown()
+            }
         }
     }
 

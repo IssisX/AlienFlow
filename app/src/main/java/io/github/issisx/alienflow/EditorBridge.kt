@@ -31,6 +31,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         return if (snapshot.composing) fail("Finish the keyboard's composing word before dictating") else true
     }
     private fun snapshot(): EditorSnapshot? {
+        if (!(service.application as AlienApp).screenReady()) return null
         val target = node ?: return null
         if (!target.refresh()) return null
         val current = focused() ?: return null

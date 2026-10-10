@@ -12,9 +12,9 @@ Date: 2026-10-10.
 
 ## Current status
 
-Source implementation and independent static review are in progress. The private permanent signing key has been created and its backup saved; the public certificate fingerprint is recorded in RELEASE.md. Remote branch build/first-apk is initialized at the baseline. Local build-file syntax and official wrapper checksum checks passed.
+The native application is implemented on `build/first-apk`, and the real GitHub Actions build has reached Kotlin compilation and unit tests. Independent review and test-driven repairs are in progress. The private permanent signing key has been created and its backup saved; the public certificate fingerprint is recorded in RELEASE.md.
 
-Application source implementation in progress. No APK compilation, signing, installation, real API dictation, or device compatibility has yet been verified.
+Revision `cf391cd212df6596d709ba06d148653d842771ff` compiled and executed 32 tests: 31 passed and one audio finalization test failed. This is not a passing release candidate. Release lint, final packaging, signing, installation, real API dictation and device compatibility have not yet been established for a deliverable APK.
 
 ## Implementation decisions
 
@@ -32,3 +32,10 @@ Application source implementation in progress. No APK compilation, signing, inst
 - Subsequent review fixes and the dedicated pending-audio test file are separate working changes. They must be compiled and tested on a subsequent exact revision before final delivery.
 
 SDK correction: use published stable API 36 for compile/target and explicit SDK channel 0. Exact Google repository metadata supplies platform revision 2; no API 37 platform package was published in the queried feed. See BUILD_EVIDENCE.md. This changes the compiler target, not the accessibility architecture (minimum API 33).
+
+## Second compiler checkpoint
+
+- Source: `cf391cd212df6596d709ba06d148653d842771ff`; staged local tree and published Git tree both `8948abf17adfe406511b9c34b1355eb2ab944487`.
+- [GitHub Actions run 38057441585](https://github.com/IssisX/AlienFlow/actions/runs/38057441585) installed the corrected SDK and compiled the app.
+- Unit tests: 32 executed, one failure in `PendingAudioTest.validAuthoritativeHeaderExistsBeforeCloseAndActiveRepairIsRefused`. WAV finalization encountered `ClosedByInterruptException`. The failure is assigned to the audio owner for a behavior fix and regression coverage; no test gate is being bypassed.
+- Separate review repairs address screen-lock microphone shutdown, cancellation during asynchronous history finalization, cancellation between paid cleanup chunks, and preserving local audio when the provider cannot confirm the committed buffer. These working changes require a subsequent exact-source CI run and review.

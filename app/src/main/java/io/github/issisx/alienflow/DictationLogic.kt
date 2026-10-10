@@ -1,5 +1,24 @@
 package io.github.issisx.alienflow
 
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+
+class AudioCoverage {
+    private val outstanding = linkedSetOf<String>()
+    private val acknowledged = mutableSetOf<String>()
+    var uncertain = false; private set
+    fun markUncertain() { uncertain = true }
+    fun sent(id: String) { outstanding.add(id) }
+    fun acknowledge(item: String) {
+        if (item.isNotBlank() && acknowledged.add(item)) outstanding.firstOrNull()?.let { outstanding.remove(it) }
+    }
+    fun rejectEmpty(clientEventId: String): Boolean {
+        // A server-side empty buffer cannot establish that local audio was empty.
+        uncertain = true
+        return outstanding.remove(clientEventId)
+    }
+}
+
 /** Transcripts are keyed by item identity; completion replaces provisional words. */
 class TranscriptLedger {
     data class Turn(val id: String, var previous: String?, var provisional: String = "", var final: String? = null)
@@ -51,7 +70,7 @@ object CorrectionGuard {
         if (mode == "A") return source == result
         if (mode == "C") {
             val protectedWords = setOf("not", "never", "no", "cannot", "without", "don't", "can't", "won't", "isn't", "didn't", "might", "maybe", "possibly", "perhaps", "probably", "could", "think", "fucking", "fuck", "shit", "bullshit", "damn", "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety", "hundred", "thousand", "million", "billion", "minus", "dollars", "euros", "grams", "kilograms", "miles", "kilometers")
-            fun protectedTokens(t: List<String>) = t.filter { token -> token in protectedWords || token.any { it.isDigit() || it in "\$_/@\\:" } }.groupingBy { it }.eachCount()
+            fun protectedTokens(t: List<String>) = t.filter { token -> token in protectedWords || token.any { it.isDigit() || it in "\$_/@\\:.-" } }.groupingBy { it }.eachCount()
             val names = Regex("\\b[A-Z][A-Za-z0-9]+\\b").findAll(source).map { it.value.lowercase() }.filter { it !in setOf("the", "this", "that", "it", "we", "you", "they", "he", "she", "a", "an") }.toSet()
             return protectedTokens(tokens(source)) == protectedTokens(tokens(result)) && names.all { name -> tokens(source).count { it == name || it.startsWith("$name'") } == tokens(result).count { it == name || it.startsWith("$name'") } }
         }
@@ -85,6 +104,19 @@ object CleanupChunks {
         }
         chunks.add(remaining); return chunks
     }
+}
+
+/** Cancellation is checked around every blocking provider request. */
+suspend fun cleanChunks(source: String, mode: String, fillers: Boolean, request: (String) -> String): String {
+    val output = StringBuilder()
+    for (chunk in CleanupChunks.split(source)) {
+        currentCoroutineContext().ensureActive()
+        val edited = if (chunk.isBlank() || chunk.length > 3500) chunk else request(chunk)
+        currentCoroutineContext().ensureActive()
+        val trailing = chunk.takeLastWhile { it.isWhitespace() }
+        output.append(if (CorrectionGuard.accepts(chunk, edited, mode, fillers)) edited.trimEnd() + trailing else chunk)
+    }
+    return output.toString()
 }
 
 data class EditorSnapshot(val generation: Long, val text: String, val start: Int, val end: Int, val composing: Boolean = false)

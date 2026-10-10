@@ -2,8 +2,26 @@ package io.github.issisx.alienflow
 
 import org.junit.Assert.*
 import org.junit.Test
+import kotlinx.coroutines.*
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 class DictationLogicTest {
+    @Test fun emptyProviderCommitNeverAuthorizesDeletingCapturedLocalAudio() {
+        val coverage = AudioCoverage()
+        coverage.sent("last-commit")
+        assertTrue(coverage.rejectEmpty("last-commit"))
+        assertTrue(coverage.uncertain)
+        assertFalse(coverage.rejectEmpty("last-commit")) // duplicate cannot decrement twice
+        assertTrue(coverage.uncertain)
+    }
+    @Test fun duplicateCommitAckCannotConsumeTheNextOutstandingCommit() {
+        val coverage = AudioCoverage()
+        coverage.sent("first"); coverage.acknowledge("item1"); coverage.sent("second")
+        coverage.acknowledge("item1")
+        assertTrue(coverage.rejectEmpty("second"))
+    }
     @Test fun completionReplacesProvisionalAndRejectsDuplicateOrStaleEvents() {
         val ledger = TranscriptLedger()
         assertTrue(ledger.event("d1", "one", delta = "I wan"))
@@ -73,6 +91,18 @@ class DictationLogicTest {
         assertTrue(chunks.size > 1)
         assertEquals(source, chunks.joinToString(""))
         assertTrue(chunks.dropLast(1).all { it.endsWith(" ") })
+    }
+    @Test fun cancelDuringFirstCleanupRequestCannotLaunchLaterChunkRequests() = runBlocking {
+        val started = CountDownLatch(1); val release = CountDownLatch(1); val calls = AtomicInteger()
+        val job = launch(Dispatchers.IO) {
+            cleanChunks("word ".repeat(2500), "B", false) { chunk ->
+                calls.incrementAndGet(); started.countDown(); check(release.await(5, TimeUnit.SECONDS)); chunk
+            }
+        }
+        try {
+            assertTrue(started.await(5, TimeUnit.SECONDS)); job.cancel(); release.countDown(); job.join()
+            assertEquals(1, calls.get())
+        } finally { release.countDown(); job.cancelAndJoin() }
     }
     @Test fun selectedTextCanBeReplacedWithoutTouchingAnchors() {
         val initial = EditorSnapshot(9, "before selected after", 7, 15)

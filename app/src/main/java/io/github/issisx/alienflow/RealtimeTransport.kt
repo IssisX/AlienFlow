@@ -32,13 +32,15 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
     private var silenceMs = 0L
     private var lastVoice = System.currentTimeMillis()
     private var connectionGeneration = 0
+    private var commitSequence = 0L
+    private val coverage = AudioCoverage()
     private var reconnectJob: Job? = null
     private var connectJob: Job? = null
     private var api: OpenAiClient? = null
     private var key = ""
     private var language = ""
     private var vocabulary = ""
-    var hasPendingCoverage = false; private set
+    val hasPendingCoverage get() = coverage.uncertain
     var silenceStopSeconds = 0
     var onSilenceStop: (() -> Unit)? = null
     fun connect(api: OpenAiClient, key: String, language: String, vocabulary: String) {
@@ -111,7 +113,12 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
                     override fun onMessage(buffer: DataChannel.Buffer) {
                         if (buffer.binary) return
                         val bytes = ByteArray(buffer.data.remaining()); buffer.data.get(bytes)
-                        try { val value = JSONObject(String(bytes, Charsets.UTF_8)).put("_connection_generation", generation); main.post { if (!closed && generation == connectionGeneration) listener.event(value) } }
+                        try { val value = JSONObject(String(bytes, Charsets.UTF_8)).put("_connection_generation", generation); main.post {
+                            if (!closed && generation == connectionGeneration) {
+                                if (value.optString("type") == "input_audio_buffer.committed") coverage.acknowledge(value.optString("item_id"))
+                                listener.event(value)
+                            }
+                        } }
                         catch (_: Exception) { main.post { if (!closed && generation == connectionGeneration) listener.failure("Invalid realtime event received") } }
                     }
                 }) }
@@ -152,21 +159,27 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
         if (silenceStopSeconds > 0 && System.currentTimeMillis() - lastVoice > silenceStopSeconds * 1000L) { lastVoice = System.currentTimeMillis(); main.post { if (capturing && !closed) onSilenceStop?.invoke() } }
     }
     fun commit(): Boolean {
-        if (closed || localOnly || channel?.state() != DataChannel.State.OPEN) { hasPendingCoverage = true; return false }
-        val ok = channel!!.send(DataChannel.Buffer(ByteBuffer.wrap("{\"type\":\"input_audio_buffer.commit\"}".toByteArray()), false))
-        if (ok) listener.turnCommitted() else hasPendingCoverage = true
+        if (closed || localOnly || channel?.state() != DataChannel.State.OPEN) { coverage.markUncertain(); return false }
+        val id = "commit-$connectionGeneration-${++commitSequence}"
+        val event = JSONObject().put("type", "input_audio_buffer.commit").put("event_id", id)
+        val ok = channel!!.send(DataChannel.Buffer(ByteBuffer.wrap(event.toString().toByteArray()), false))
+        if (ok) { coverage.sent(id); listener.turnCommitted() } else coverage.markUncertain()
         return ok
+    }
+    fun rejectEmptyCommit(clientEventId: String): Boolean {
+        // Empty server buffer does not prove an empty local recording or media coverage.
+        return coverage.rejectEmpty(clientEventId)
     }
     fun finishCapture(): Boolean {
         capturing = false; reconnectJob?.cancel(); connectJob?.cancel()
         connection?.setAudioRecording(false); device?.requestStopRecording()
-        if (channel?.state() != DataChannel.State.OPEN || localOnly) hasPendingCoverage = true
+        if (channel?.state() != DataChannel.State.OPEN || localOnly) coverage.markUncertain()
         main.postDelayed({ if (!closed && !localOnly) commit() }, 350)
         return !hasPendingCoverage
     }
     fun continueLocally() {
         if (closed || !capturing) return
-        hasPendingCoverage = true; localOnly = true
+        coverage.markUncertain(); localOnly = true
         device?.requestStartRecording()
         detachPeer(); scheduleReconnect()
     }

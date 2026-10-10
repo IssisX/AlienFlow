@@ -29,6 +29,8 @@ Follow [the first-phone checklist](docs/DEVICE_TESTS.md) to verify recording, te
 
 - [Product and engineering specification](docs/PRODUCT_SPEC.md): requirements, architecture, defaults and acceptance criteria.
 - [Implementation checkpoint](docs/IMPLEMENTATION.md): implemented behavior, evidence, known gaps and next steps.
+- [Native app implementation](docs/APP_IMPLEMENTATION.md): actual UI, dictation, correction, persistence and recovery behavior, with device-dependent limits.
+- [Audio recovery implementation](docs/AUDIO_STORAGE.md): durable recording, bounded upload chunks and regression coverage.
 - [Protocol evidence](docs/PROTOCOL.md): exact native WebRTC interfaces and provider integration assumptions.
 - [Build evidence](docs/BUILD_EVIDENCE.md): pinned versions, verified upstream sources and local checks.
 - [Build and release instructions](docs/RELEASE.md): GitHub Actions, signing identity and safe upgrades.
