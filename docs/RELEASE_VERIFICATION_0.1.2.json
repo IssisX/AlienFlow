@@ -1,0 +1,60 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version_name": "0.1.2",
+  "version_code": 3,
+  "source_sha": "c98d2a9d29adf6c1f83eafdf32b60ea2f002e6ee",
+  "branch": "build/first-apk",
+  "workflow_run_url": "https://github.com/IssisX/AlienFlow/actions/runs/38065273911",
+  "artifact_id": 11674927255,
+  "unsigned_bundle_sha256": "3ff3fb468200853336df457ea838e897937e346a668c0c10ea11fdbb27a24cfc",
+  "bundle_member_hashes_verified": 27,
+  "apk_filename": "AlienFlow-0.1.2.apk",
+  "apk_size_bytes": 17045689,
+  "apk_sha256": "0bb8c3b016cba5d373b4f3c67300330d40f8c0dc076a8500a53b1876d5848148",
+  "signing_certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+  "signing_scheme": "APK v3",
+  "tests": {
+    "executed": 54,
+    "total": 54,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "not run"
+  },
+  "test_suites": [
+    {
+      "name": "io.github.issisx.alienflow.DictationLogicTest",
+      "tests": "15",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.EditorEvidenceTest",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.EditorWidgetTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.PendingAudioTest",
+      "tests": "22",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "lint": {
+    "issues": 20,
+    "errors": 0
+  },
+  "phone_verification": "Not performed: live microphone/provider and Android accessibility broker need the phone",
+  "framework_test_boundary": "Robolectric widget/InputConnection tests at APIs 33 and 35; not a physical device test"
+}

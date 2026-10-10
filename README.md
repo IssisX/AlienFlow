@@ -2,62 +2,60 @@
 
 Personal native Android dictation with a movable alien bubble, live text in the focused field, very light corrections, and a user-supplied OpenAI API key.
 
-## Signed test builds · 0.1.0 and 0.1.1
+## Signed test build · 0.1.2
 
-Version **0.1.1** is a signed in-place update with the same package and certificate as 0.1.0. It changes the default bubble to **75% opaque** and shows a non-intercepting status notice beside the alien on every tap, including explicit editor/microphone startup errors. [CI run 38063401303](https://github.com/IssisX/AlienFlow/actions/runs/38063401303) passed all 37 tests, release lint and packaging. [Version 0.1.1 evidence](docs/RELEASE_VERIFICATION_0.1.1.json) records the exact signed APK. Live microphone/editor operation remains a phone gate: see [device tests](docs/DEVICE_TESTS.md).
+Version **0.1.2** repairs editor readiness and readback: empty-field placeholders are no longer mistaken for typed contents, documented unknown offsets can be corroborated against the complete field, and blocking keyboard reads no longer run on the main thread. [Actions run 38065273911](https://github.com/IssisX/AlienFlow/actions/runs/38065273911) passed **54 tests**, release lint with zero errors (20 warnings), assembly and package checks. This includes six Android-framework widget test executions at APIs 33 and 35 that reproduce the old placeholder mismatch and exercise insertion/revision. Those are Robolectric tests, not physical accessibility-service or microphone tests.
 
-The first APK has been built, independently reviewed, privately signed and verified. The implementation is on `build/first-apk`; [Actions run 38058270344](https://github.com/IssisX/AlienFlow/actions/runs/38058270344) passed all 36 tests, release lint with zero errors, APK assembly and package checks. The signed APK is provided in the development-session handoff. Its exact source revision, hashes and signature are recorded in [release verification](docs/RELEASE_VERIFICATION.json).
+The signed APK uses the original certificate and package ID, with versionCode 3. Install **AlienFlow-0.1.2.apk** over the previous version; do not uninstall or clear app data. The signed installer is delivered in the development conversation. [Version 0.1.2 verification](docs/RELEASE_VERIFICATION_0.1.2.json) records exact source, artifact and signed APK hashes; [signature output](docs/APK_SIGNATURE_0.1.2.txt) records the certificate verification.
 
-The owner reports that the app opens and its key/session check succeeds. The current phone blocker is Android's **Controlled by Restricted Setting** gate on accessibility; the per-app unlock is below. Microphone capture, live provider transcription and compatibility with everyday editors still need to be exercised on the device. See [implementation status and remaining work](docs/IMPLEMENTATION.md).
+The owner has enabled accessibility and passed the key/session check. Tap and long-press reach the bubble. The most recent phone report is an editor-readiness rejection in 0.1.1. The 0.1.2 repair is built and tested, but **live microphone capture and in-field transcription on the Fold6 still need device confirmation**. See [implementation status](docs/IMPLEMENTATION.md) and [device tests](docs/DEVICE_TESTS.md).
 
-[Pull request #1](https://github.com/IssisX/AlienFlow/pull/1) preserves the reviewed implementation and its open phone-acceptance checklist. A future development session should start from this branch and read `AGENTS.md`.
+Earlier release evidence remains available for [0.1.1](docs/RELEASE_VERIFICATION_0.1.1.json) and [0.1.0](docs/RELEASE_VERIFICATION.json). The historical review is tied to its recorded revision; it is not a review of every later update.
 
-The initial target is a Galaxy Z Fold6: ARM64, Android 13 or newer. Gboard stays selected. AlienFlow uses Android's accessibility input connection and a nonfocusable accessibility overlay to reach the active field.
+[Pull request #1](https://github.com/IssisX/AlienFlow/pull/1) contains the implementation and open phone-acceptance work. Future agents should start from `build/first-apk`, read `AGENTS.md`, and inspect current state before editing.
+
+The initial target is a Galaxy Z Fold6: ARM64, Android 13 or newer. The architecture keeps Gboard selected, using Android's accessibility input connection and a nonfocusable accessibility overlay.
 
 ## Defaults
 
-- A draggable alien bubble with a 32 dp visible image and a 48 dp touch target. Updated default is 75% opaque (25% transparent), adjustable in Settings.
-- Tap to start/stop; show live text directly in the focused field.
-- Very light live corrections that preserve wording, negation, numbers, names, slang and profanity.
-- Seven days of lightweight text history; successful recordings deleted; interrupted audio kept privately for recovery.
-- Keep recording locally on a connection loss and retry the live connection. Recover uncertain audio after stopping without writing into a newly focused field.
-- No AlienFlow word quota. The owner's OpenAI account, connectivity and available device storage determine practical limits.
+- A draggable alien bubble with a 32 dp visible image and at least 48 dp touch target. Idle default is **75% opaque (25% transparent)**, adjustable in Settings.
+- Tap to start/stop; live words directly in the focused field, with status beside the bubble.
+- Very light live corrections preserving wording, negation, numbers, names, slang and profanity.
+- Seven days of lightweight text history; completed audio deleted after successful processing; interrupted audio kept privately for recovery.
+- Local capture and reconnect attempts on a connection loss. Current recovery happens after Stop into history/copy; seamless inline gap replay remains unfinished.
+- No AlienFlow word quota. Provider limits, connectivity and device resources still apply.
 
-Appearance and main behavior settings live in the app. This is an original personal implementation inspired by the dictation workflow; it uses its own native UI and alien artwork.
+Appearance and main behavior settings are in the app. This is an original personal implementation inspired by the dictation workflow, with its own native UI and alien artwork.
 
 ## Phone setup
 
-Install **AlienFlow-0.1.0.apk**, the signed APK from the release delivery. The `unsigned-release-bundle` is an intermediate build artifact that requires signing before installation.
+Install the **signed APK**, not the unsigned APK inside the development bundle. Existing users should update in place and retain their saved key/settings.
 
-Open AlienFlow, enter your own API key and allow the microphone. If Android's accessibility list shows **Controlled by Restricted Setting**, unlock the app first:
+For a new installation, open AlienFlow, enter your own API key and allow the microphone. If Android's accessibility list shows **Controlled by Restricted Setting**, first open **Settings → Apps → AlienFlow → ⋮ / More → Allow restricted settings**, then return to **Settings → Accessibility → Installed apps → AlienFlow dictation** and enable it. See the [official Android instructions](https://support.google.com/android/answer/12623953?hl=en).
 
-1. Open **Settings → Apps → AlienFlow**.
-2. Open the **⋮ / More** menu at the top right and choose **Allow restricted settings**. Complete any phone confirmation.
-3. Return to **Settings → Accessibility → Installed apps → AlienFlow dictation** and turn it on.
+The accessibility overlay is distinct from an ordinary application overlay: it uses the enabled accessibility service rather than SYSTEM_ALERT_WINDOW / Appear on top. Do not request unrelated permissions as a substitute for diagnosing an editor failure. Microphone permission and actual foreground-service startup are separate requirements.
 
-This is Android's per-app setting; see the [official instructions](https://support.google.com/android/answer/12623953?hl=en). A successful **Check key & transcription model** result tests OpenAI session access only; it does not establish accessibility or microphone readiness. Leave Gboard selected and start with an empty note. API keys are entered and encrypted on the phone; no key is bundled in the APK or repository.
+A successful **Check key & transcription model** result establishes OpenAI session access only, not microphone or editor operation. Keep the existing keyboard selected, focus the empty test field or a new note, and tap the alien. Wait for actual Listening before speaking. If an error remains, record its AF-E code/message without including API keys or private text.
 
-Follow [the first-phone checklist](docs/DEVICE_TESTS.md) to verify recording, text preservation, corrections, interruptions and updates on the real device.
+Follow [the first-phone checklist](docs/DEVICE_TESTS.md) for text preservation, interruptions and updates. Real phone tests remain required even after CI succeeds.
 
 ## Development and handoff
 
-- [Product and engineering specification](docs/PRODUCT_SPEC.md): requirements, architecture, defaults and acceptance criteria.
-- [Implementation checkpoint](docs/IMPLEMENTATION.md): implemented behavior, evidence, known gaps and next steps.
-- [Native app implementation](docs/APP_IMPLEMENTATION.md): actual UI, dictation, correction, persistence and recovery behavior, with device-dependent limits.
-- [Audio recovery implementation](docs/AUDIO_STORAGE.md): durable recording, bounded upload chunks and regression coverage.
-- [Protocol evidence](docs/PROTOCOL.md): exact native WebRTC interfaces and provider integration assumptions.
-- [Build evidence](docs/BUILD_EVIDENCE.md): pinned versions, verified upstream sources and local checks.
-- [Build and release instructions](docs/RELEASE.md): GitHub Actions, signing identity and safe upgrades.
-- [Release verification](docs/RELEASE_VERIFICATION.json) and [signature output](docs/APK_SIGNATURE.txt): exact delivered bytes and signing identity.
-- [Independent code review](docs/CODE_REVIEW.md): repaired findings, exact reviewed source hashes, minor follow-ups and remaining phone checks.
-- [Agent contract](AGENTS.md): rules for future AI development agents.
+- [Product specification](docs/PRODUCT_SPEC.md): intended behavior and acceptance criteria.
+- [Current checkpoint](docs/IMPLEMENTATION.md): implementation, verification and remaining work.
+- [Historical checkpoint through 0.1.1](docs/history/IMPLEMENTATION_THROUGH_0.1.1.md): prior observations and release history, preserved verbatim.
+- [Original native implementation](docs/APP_IMPLEMENTATION.md), [audio storage](docs/AUDIO_STORAGE.md) and [protocol](docs/PROTOCOL.md): source interfaces and historical decisions.
+- [Build evidence](docs/BUILD_EVIDENCE.md) and [release instructions](docs/RELEASE.md): toolchain and permanent signing process. Current versions live in build configuration.
+- [0.1.2 verification](docs/RELEASE_VERIFICATION_0.1.2.json) and [signature output](docs/APK_SIGNATURE_0.1.2.txt): exact delivered bytes.
+- [Historical independent review](docs/CODE_REVIEW.md): findings at the exact revision stated there, not a blanket endorsement of later changes.
+- [Agent contract](AGENTS.md): rules for future development agents.
 
 ## Build
 
-GitHub Actions runs unit tests, release lint and release assembly. It produces an aligned **unsigned** release bundle with reports and source hashes. The permanent private key is kept separately; the final delivery is signed with that key and verified before being described as installable. See [RELEASE.md](docs/RELEASE.md).
+GitHub Actions requires passing unit tests, release lint and release assembly, then verifies source/package identity, native alignment and artifact hashes. It produces an aligned **unsigned** bundle with reports; the permanent private key stays outside the repository. Final installation APKs are privately signed and verified.
 
 ```bash
 bash gradlew :app:testDebugUnitTest :app:lintRelease :app:assembleRelease
 ```
 
-A successful CI run establishes compilation and static tests. Device behavior and provider account access require the phone checklist and real API calls.
+CI establishes the checks actually run there, not physical-device microphone/editor behavior or complete product acceptance.
