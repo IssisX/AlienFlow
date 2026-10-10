@@ -10,6 +10,12 @@
 
 The private signing backup is saved separately from this repository. It contains the permanent PKCS12 key, its password, certificate, and restore instructions. Keep that backup private. Every normal update must use this key and package ID, with a higher versionCode, to preserve the installed app and its private data.
 
+## Verified 0.1.0 test delivery
+
+The signed APK was delivered on 2026-10-10. [Release verification](RELEASE_VERIFICATION.json) records its source, run, size and hashes; [APK signature output](APK_SIGNATURE.txt) records successful verification with the permanent certificate. Exact compiled source: `c76b3ccffd7b3072da1a179ebf5f19b39cc7238e`. [Actions run 38058270344](https://github.com/IssisX/AlienFlow/actions/runs/38058270344) passed 36 tests, release lint with zero errors, assembly and package checks.
+
+This release requires Android 13 or newer on ARM64. It is a signed test build; phone installation, provider/account access, editor behavior and update preservation remain unverified. The Actions artifact is an unsigned bundle with a 14-day retention period; use the separately delivered signed APK for installation.
+
 ## Build pipeline
 
 The `Android release candidate` workflow runs on manual dispatch and intentional source pushes to `build/first-apk`. It pins the Java, Gradle, Android Gradle Plugin, Android SDK, native WebRTC library and workflow actions. The source of truth for versions is the version catalog, app build file, wrapper properties and workflow.

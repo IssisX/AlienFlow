@@ -1,0 +1,26 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version_name": "0.1.0",
+  "version_code": 1,
+  "file_name": "AlienFlow-0.1.0.apk",
+  "file_size_bytes": 17029305,
+  "sha256": "79e34f8abf7ddd8dce399b9742d55c6dc028a1d2984abb8c1dfa2bf7b516ed21",
+  "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+  "source_sha": "c76b3ccffd7b3072da1a179ebf5f19b39cc7238e",
+  "workflow_run_url": "https://github.com/IssisX/AlienFlow/actions/runs/38058270344",
+  "artifact_id": 11672260565,
+  "artifact_sha256": "bc881f7d35c63017d903439eb94234f4a8a147b44b6b53fddb9c378c910c453f",
+  "tests": {
+    "executed": 36,
+    "total": 36,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "not run"
+  },
+  "lint": {
+    "issues": 18,
+    "errors": 0
+  },
+  "device_verification": "Not yet performed; this is the first signed test APK"
+}

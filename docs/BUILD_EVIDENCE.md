@@ -1,10 +1,10 @@
 # Android build path implementation report
 
-**Current correction:** compile/target SDK 36 on stable channel 0. The initial SDK 37 configuration below is historical; the final section records the observed Actions failure and verified correction.
+**Verified delivery:** compile/target SDK 36 on stable channel 0. [Actions run 38058270344](https://github.com/IssisX/AlienFlow/actions/runs/38058270344) completed successfully for `c76b3ccffd7b3072da1a179ebf5f19b39cc7238e`: 36 tests passed, release lint had zero errors, assembly/package verification/upload passed. Private signing and downloaded artifact hashes were then verified. See IMPLEMENTATION.md and RELEASE_VERIFICATION.json. The initial SDK 37 configuration below is historical; the final section records the observed SDK failure and correction.
 
 ## Status
 
-Implemented Android Gradle configuration, verified Gradle wrapper, and the GitHub Actions unsigned release bundle path. No commit, push, workflow dispatch, signing operation, private key, or repository signing secret was created by this agent. Actual dependency resolution, compilation, unit tests, lint, and APK/package verification still require the lead's Actions run; local syntax checks do not establish those outcomes.
+Implemented Android Gradle configuration, verified Gradle wrapper, and the GitHub Actions unsigned release bundle path. No commit, push, workflow dispatch, signing operation, private key, or repository signing secret was created by this agent. The lead subsequently established dependency resolution, compilation, unit tests, lint and APK/package verification through the successful run above. The original local syntax checks alone did not establish those outcomes.
 
 The native source owner selected Android Views and direct encrypted/atomic JSON storage for the first APK, so the build intentionally has no Compose, Room, DataStore, KSP, or separate Kotlin Android plugin. The lead approved this implementation choice. App source remains owned by the source implementer.
 
@@ -14,9 +14,9 @@ The native source owner selected Android Views and direct encrypted/atomic JSON 
 | --- | --- | --- |
 | Android Gradle plugin | `com.android.application:9.4.0` | Exact Google Maven POM fetched successfully; official release table lists Gradle 9.6.0, JDK 17, SDK Build Tools 36.0.0, maximum API 37. |
 | Gradle | `9.6.0` | Upstream wrapper JAR and scripts fetched from `gradle/gradle` tag `v9.6.0`; distribution and wrapper checksums fetched from official distribution service. |
-| JDK | Temurin `17.0.20+101` | Official Adoptium latest Java 17 Linux/x64 JDK endpoint returned this exact version. Actual setup-java availability will be established by CI. |
+| JDK | Temurin `17.0.20+101` | Official Adoptium latest Java 17 Linux/x64 JDK endpoint returned this exact version. Exact setup-java provisioning succeeded in Actions. |
 | Built-in Kotlin | Expected `2.2.10` | Exact AGP 9.4.0 POM declares `org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.10` and stdlib 2.2.10. Bundle metadata explicitly describes this as expected from the published AGP POM, rather than an independently reported resolved compiler version. |
-| Android SDK | Compile/target `37`, min `33`, Build Tools `36.0.0` | AGP release compatibility table and explicit source configuration. SDK package availability/installation will be established by CI. |
+| Android SDK | Compile/target `36`, min `33`, Build Tools `36.0.0` | Exact Google SDK metadata and successful Actions installation after the documented API 37 package failure. |
 
 Primary source URLs:
 
@@ -80,7 +80,7 @@ Primary definitions:
 - https://raw.githubusercontent.com/actions/upload-artifact/cf430e030ddbb5b0abf93d22962f4752f3646cd9/action.yml
 - https://github.blog/changelog/2026-02-26-github-actions-now-supports-uploading-and-downloading-non-zipped-artifacts/
 
-The exact upload action definition supports `archive: false` for one file, uses that file's basename as the artifact name, and runs on Node 24. The Ubuntu 24.04 hosted runner is expected to support it; actual CI execution is the final check. A second redundant unsigned artifact is not configured.
+The exact upload action definition supports `archive: false` for one file, uses that file's basename as the artifact name, and runs on Node 24. The Ubuntu 24.04 hosted runner successfully executed it and uploaded the verified bundle. A second redundant unsigned artifact is not configured.
 
 ## Workflow and gates
 

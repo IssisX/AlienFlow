@@ -12,9 +12,40 @@ Date: 2026-10-10.
 
 ## Current status
 
-The native application is implemented on `build/first-apk`. Revision `33ba2d8f3f7f5d40747bfe532d1af43ea52a530e` passed Kotlin compilation and the unit-test task and assembled the unsigned release APK. Release lint found one error: an editor flag used a numeric literal instead of Android's named constant. That correction and explicit backup/launcher resources are being prepared for the next exact-source build.
+**AlienFlow 0.1.0 is built, signed, verified, and delivered as the first phone-test APK.** The implementation is on `build/first-apk`. The exact compiled source is `c76b3ccffd7b3072da1a179ebf5f19b39cc7238e`. Later documentation-only commits record delivery evidence without changing the compiled application.
 
-Independent review found no remaining important source blocker for a first test APK at the third compiler checkpoint, subject to rechecking later changes. This is not full product acceptance: final release checks, signing, installation, real API dictation and device compatibility are still pending. The private permanent signing key and backup exist; its public fingerprint is in RELEASE.md.
+[Actions run 38058270344](https://github.com/IssisX/AlienFlow/actions/runs/38058270344) completed successfully. All 36 tests passed; release lint had zero errors and 18 warnings; release assembly, identity checks, native alignment checks and delivery upload passed. The downloaded bundle and every manifest-listed entry matched their hashes. The privately signed APK verified with the permanent certificate. See [machine-readable release evidence](RELEASE_VERIFICATION.json) and [actual signature output](APK_SIGNATURE.txt).
+
+Independent review found no remaining blocking or important source defect for a **first test APK**, including the final manifest/resources. Installation, cold bubble microphone startup, live provider behavior, cross-editor compatibility and signed update preservation require the actual phone. This checkpoint does not declare the entire product specification complete.
+
+## What the APK contains
+
+| Area | Implemented behavior |
+| --- | --- |
+| Bubble and keyboard | Original alien overlay, 32 dp image, at least 48 dp touch area, 25% idle opacity, dragging, remembered folded/unfolded positions, and appearance settings. Existing Gboard selection is retained by the architecture. |
+| Dictation | Native WebRTC microphone transport to OpenAI, provisional/final transcript processing, guarded live insertion, tap or hold controls, optional silence stop and end-only display. No app word allowance. |
+| Corrections | A faithful; B very light by default; C optional rewrite. Live or end timing, optional filler removal, language and vocabulary settings. Conservative B guards preserve protected content and reject ambiguous edits. |
+| Private data | Android Keystore encryption for the runtime API key; private atomic text history with stable IDs and configurable retention; cloud/device transfer exclusions. No runtime key in source or CI. |
+| Recovery | Same-microphone bounded WAV capture, durable headers, source-preserving recovery chunks, disconnect capture and reconnect attempts, single-flight recovery after stopping, copy/history results. |
+| Release | Pinned build inputs, GitHub Actions test/lint/package checks, permanent private signing identity and a documented update process. |
+
+The [app implementation notes](APP_IMPLEMENTATION.md), [audio storage notes](AUDIO_STORAGE.md) and [protocol evidence](PROTOCOL.md) explain the actual interfaces and assumptions.
+
+## Remaining product work and first phone gate
+
+The next action is the [first-phone checklist](DEVICE_TESTS.md), starting with the app's own empty test field, then an empty note with the activity closed and Gboard still selected. Enter the API key on the phone. Confirm actual live words before Stop, final text after Stop, and microphone release. Test deliberate typing/caret/focus changes before using important drafts. Record Android/One UI version and the observed result, without publishing personal dictation or credentials.
+
+These are material limits of 0.1.0:
+
+- Reconnection retains capture and attempts a new live connection, but it does not resume inline editing across the gap. The whole recording is recovered after Stop into history/copy. Seamless live replay and durable per-part recovery checkpoints remain work; retrying a failed recovery can repeat earlier provider uploads.
+- Nonempty fields with unknown composing state and incomplete/inconsistent readback are conservatively refused. A keyboard composing word must be finished first. Uniform behavior across arbitrary custom editors remains an acceptance goal, not verified coverage.
+- Recovery recognition does not run the live correction pass. Recognition around file-chunk boundaries and trailing RTP audio need real speech tests.
+- Local image import/alien variants, edge snap, completed-audio history, configurable pending retention beyond the current 24 hours, usage/cost reporting and per-entry restore/compare remain unimplemented. Existing settings control actual behavior; absent features have no dummy switches.
+- One standard RIFF WAV has an approximately 4 GiB format ceiling. Audio queues/uploads are bounded; there is no speech-word counter or subscription gate. Network, provider, storage and file-format limits still apply.
+
+Future agents should resolve observed microphone/protocol/editor failures before dependent polish. Preserve the package ID and use the existing private signing backup for upgrades; increment versionCode. The complete intended behavior and acceptance criteria remain in PRODUCT_SPEC.md.
+
+The [independent review](CODE_REVIEW.md) also records two minor follow-ups: snapshot the language once for a multi-part recovery, and report that no audio was captured when startup stops before the first frame. They remain documented in this test build; they do not represent lost captured audio or a waived release error.
 
 ## Implementation decisions
 
@@ -47,3 +78,14 @@ SDK correction: use published stable API 36 for compile/target and explicit SDK 
 - The original audio failure and its new deterministic interrupted-writer regression passed the unit-test task. An independent local Java reproducer also failed with `ClosedByInterruptException` before the repair and finalized successfully after the repair, while restoring the caller's interrupt status.
 - `lintRelease` failed with one `WrongConstant` error at `EditorBridge.getSurroundingText`: replace `1` with `InputConnection.GET_TEXT_WITH_STYLES`. No lint baseline or suppression is being added. Packaging and delivery upload were correctly skipped.
 - The 19 warnings were inspected. Explicit Android data-extraction exclusions and an actual launcher icon are being added. Remaining warnings concern deliberately pinned tool/dependency versions and SDK, the ARM64-only device target, English-only UI, small draw-time allocation, and intentionally absolute overlay coordinates. They remain visible in the lint report.
+
+## Verified delivery checkpoint
+
+- Compiled source: `c76b3ccffd7b3072da1a179ebf5f19b39cc7238e`; local and remote tree: `c5eed8056f59e16399da70f06bd49b18714a9aa8`.
+- [Successful Actions run](https://github.com/IssisX/AlienFlow/actions/runs/38058270344): 36 executed tests, zero failures/errors/skips; zero release lint errors and 18 warnings; release assembly and package/upload checks passed.
+- Artifact `11672260565`, `AlienFlow-0.1.0-unsigned-release-bundle.zip`: SHA-256 `bc881f7d35c63017d903439eb94234f4a8a147b44b6b53fddb9c378c910c453f`. Retrieved bytes and all bundled file hashes were verified before signing.
+- Signed delivery: `AlienFlow-0.1.0.apk`, 17,029,305 bytes; SHA-256 `79e34f8abf7ddd8dce399b9742d55c6dc028a1d2984abb8c1dfa2bf7b516ed21`.
+- APK Signature Scheme v3 verified successfully, one signer, certificate SHA-256 `d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f`. Private key and password are excluded from the repository and Actions.
+- ARM64, Android 13/API 33 minimum, compile/target API 36; release is not debuggable. Native ELF and APK alignment checks passed for 16 KiB pages in CI.
+- Remaining lint warnings concern version-update suggestions, the ARM64 target, English UI, absolute overlay coordinates, small draw allocations and launcher resource/themed-icon polish. They were inspected and retained; no error baseline was added.
+- No device install, microphone, provider request, live editor, accuracy/latency or upgrade test is represented as passed. Those require the user's phone and API account.

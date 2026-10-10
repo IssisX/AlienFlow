@@ -30,9 +30,9 @@ Each valid temporary WAV uses a `.upload` suffix beside the source. This deliber
 
 Exact API, temporary suffix, actual callback-format validation, asynchronous close requirement, and zero-frame behavior were communicated to the native app owner. The reviewer examined the helper and reported no helper-specific static blocker before tests were added.
 
-## Verification prepared and current evidence
+## Original test coverage and subsequent evidence
 
-`PendingAudioTest.kt` contains 21 JVM tests using actual temporary files and controlled FileChannel failure points. Coverage includes:
+At the second compiler checkpoint, `PendingAudioTest.kt` contained 21 JVM tests using actual temporary files and controlled FileChannel failure points. Coverage includes:
 
 - Valid authoritative headers before close; active-file repair/upload rejection.
 - Callback return while file opening is deliberately stalled; copy ownership and accepted-frame drain.
@@ -47,7 +47,7 @@ Exact API, temporary suffix, actual callback-format validation, asynchronous clo
 - A real source over 20 MiB, streamed with bounded buffers into provider-sized files, with source digest preservation.
 - Invalid upload-size bounds rejected without source mutation.
 
-No Kotlin compiler or Android toolchain was available locally. These tests have been written but have NOT been compiled or executed by this task. CI compilation/test output and physical-device behavior remain required evidence. The lead was notified as soon as both files were on disk for its compile checkpoint.
+The worker initially prepared this suite without a local Kotlin/Android compiler. The follow-up below records the real CI-discovered failure and repair. The final CI4 source passed all 22 storage cases and 14 dictation cases; see IMPLEMENTATION.md for the exact source/run. Physical-device behavior remains unverified.
 
 ## Explicit first-slice limits
 
@@ -80,3 +80,7 @@ PATCHED: inheritedInterrupt=true, failure=none, channelClosed=true, interruptRes
 ```
 
 The reproducer exited successfully and removed its temporary data file. This establishes runtime evidence for the named mechanism and the save/clear/finalize/restore repair. It does not establish that the Kotlin unit suite or Android app passes. The updated Kotlin source/test files were frozen when the lead requested the next CI checkpoint; the next CI result remains the compile/test gate. No Git, push, signing, provider calls, or unrelated source changes were performed for this follow-up.
+
+## Final CI checkpoint
+
+Source `c76b3ccffd7b3072da1a179ebf5f19b39cc7238e` passed all 36 tests, including all 22 storage tests, in [Actions run 38058270344](https://github.com/IssisX/AlienFlow/actions/runs/38058270344). The original failing test and deterministic executor-interrupt regression passed. Build, lint, packaging and final APK signing evidence are recorded in IMPLEMENTATION.md and RELEASE_VERIFICATION.json.

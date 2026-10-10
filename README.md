@@ -2,9 +2,13 @@
 
 Personal native Android dictation with a movable alien bubble, live text in the focused field, very light corrections, and a user-supplied OpenAI API key.
 
-## First build
+## First signed test APK · 0.1.0
 
-The first implementation is being compiled and reviewed on `build/first-apk`. See [implementation status](docs/IMPLEMENTATION.md) for actual evidence and remaining work. A working installation, live OpenAI session and universal editor compatibility are not established by source code or a passing build alone.
+The first APK has been built, independently reviewed, privately signed and verified. The implementation is on `build/first-apk`; [Actions run 38058270344](https://github.com/IssisX/AlienFlow/actions/runs/38058270344) passed all 36 tests, release lint with zero errors, APK assembly and package checks. The signed APK is provided in the development-session handoff. Its exact source revision, hashes and signature are recorded in [release verification](docs/RELEASE_VERIFICATION.json).
+
+This is ready for the first phone test. Installation, real microphone/provider behavior and compatibility with everyday editors still need to be exercised on the device. See [implementation status and remaining work](docs/IMPLEMENTATION.md).
+
+[Pull request #1](https://github.com/IssisX/AlienFlow/pull/1) preserves the reviewed implementation and its open phone-acceptance checklist. A future development session should start from this branch and read `AGENTS.md`.
 
 The initial target is a Galaxy Z Fold6: ARM64, Android 13 or newer. Gboard stays selected. AlienFlow uses Android's accessibility input connection and a nonfocusable accessibility overlay to reach the active field.
 
@@ -34,6 +38,8 @@ Follow [the first-phone checklist](docs/DEVICE_TESTS.md) to verify recording, te
 - [Protocol evidence](docs/PROTOCOL.md): exact native WebRTC interfaces and provider integration assumptions.
 - [Build evidence](docs/BUILD_EVIDENCE.md): pinned versions, verified upstream sources and local checks.
 - [Build and release instructions](docs/RELEASE.md): GitHub Actions, signing identity and safe upgrades.
+- [Release verification](docs/RELEASE_VERIFICATION.json) and [signature output](docs/APK_SIGNATURE.txt): exact delivered bytes and signing identity.
+- [Independent code review](docs/CODE_REVIEW.md): repaired findings, exact reviewed source hashes, minor follow-ups and remaining phone checks.
 - [Agent contract](AGENTS.md): rules for future AI development agents.
 
 ## Build
