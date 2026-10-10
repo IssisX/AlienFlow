@@ -58,3 +58,12 @@ Require successful APK verification and the certificate fingerprint above. Recor
 4. Build, inspect the actual workflow results, and sign with the existing permanent key.
 5. Verify the certificate and install over the prior version on the test device. Confirm settings, history, pending recordings and bubble positions survive.
 6. Record what was tested and any remaining failures. Deliver the verified signed APK.
+
+## Signed 0.1.1 test update · 2026-10-10
+
+- Source: `a3d0aee38adb73b545b31db20e806d6f493d76e8` (the later documentation-only commit is not the compiled APK revision).
+- [Actions run 38063401303](https://github.com/IssisX/AlienFlow/actions/runs/38063401303) passed 37 tests, lint with zero errors, assembly and packaging.
+- Signed APK: `AlienFlow-0.1.1.apk`, versionCode `2`, same applicationId and release signing certificate as 0.1.0.
+- SHA-256: `438c9bb3b1fd6a876ac173a66bf58c376b20c679aab90d7523ff48f5a7dc9a0f`. Certificate SHA-256: `d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f`.
+- Use the **signed APK** delivered in the conversation for updates. The GitHub Actions bundle contains the unsigned intermediate APK, which is not installable until separately signed with the permanent key.
+- Phone tap feedback, cold mic capture and live editing are pending runtime observation. The user should report the new bubble status message if dictation still does not start.

@@ -48,3 +48,14 @@ A custom editor failure remains a product compatibility failure to investigate. 
 - [ ] Install a later APK over this one and confirm package/signature identity and data preservation.
 
 Record observed results in `IMPLEMENTATION.md` or a dated verification report. Do not include API keys, private dictation or recordings in the public repository.
+
+## 0.1.1 tap-to-start feedback check · pending phone observation
+
+- [ ] Install the signed `AlienFlow-0.1.1.apk` directly over 0.1.0; do not uninstall. Verify settings and saved key persist.
+- [ ] Focus a new empty note with Gboard selected; tap the alien once. Confirm a non-touchable status notice appears next to it. Record the exact notice (no API key or private dictated text).
+- [ ] If the notice reports a missing editor connection, verify whether the keyboard cursor is active and whether the in-app empty test field behaves differently. No blind editor writes are authorized.
+- [ ] If the notice reports a microphone start denial or foreground-service restriction, investigate the actual Android background start gate on the Fold6 before changing capture ownership or adding another permission.
+- [ ] If no status notice appears at all, diagnose overlay touch dispatch and movement threshold before investigating the network/provider.
+- [ ] Confirm that the idle bubble is 75% opaque by default, that 100% slider value looks fully solid, and that user-selected opacity persists after restarting the app.
+
+Source/CI/signature proof is in `RELEASE_VERIFICATION_0.1.1.json`; do not mark these phone observations as passed until actually reproduced.

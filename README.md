@@ -2,9 +2,9 @@
 
 Personal native Android dictation with a movable alien bubble, live text in the focused field, very light corrections, and a user-supplied OpenAI API key.
 
-## First signed test APK · 0.1.0
+## Signed test builds · 0.1.0 and 0.1.1
 
-The 0.1.1 maintenance update changes the default bubble to **75% opaque** and shows a non-intercepting status notice beside the bubble when tapped, including explicit editor/microphone startup errors. This update is not device-verified yet. Follow the status of the newest GitHub Actions run before installing; the 0.1.0 APK remains the previous signed release until the new build is signed and verified.
+Version **0.1.1** is a signed in-place update with the same package and certificate as 0.1.0. It changes the default bubble to **75% opaque** and shows a non-intercepting status notice beside the alien on every tap, including explicit editor/microphone startup errors. [CI run 38063401303](https://github.com/IssisX/AlienFlow/actions/runs/38063401303) passed all 37 tests, release lint and packaging. [Version 0.1.1 evidence](docs/RELEASE_VERIFICATION_0.1.1.json) records the exact signed APK. Live microphone/editor operation remains a phone gate: see [device tests](docs/DEVICE_TESTS.md).
 
 The first APK has been built, independently reviewed, privately signed and verified. The implementation is on `build/first-apk`; [Actions run 38058270344](https://github.com/IssisX/AlienFlow/actions/runs/38058270344) passed all 36 tests, release lint with zero errors, APK assembly and package checks. The signed APK is provided in the development-session handoff. Its exact source revision, hashes and signature are recorded in [release verification](docs/RELEASE_VERIFICATION.json).
 
