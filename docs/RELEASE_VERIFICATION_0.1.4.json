@@ -1,0 +1,39 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version_name": "0.1.4",
+  "version_code": 5,
+  "compiled_source_sha": "b39de2b1b73e89c29bb918dd5710a207084240e6",
+  "compiled_tree_sha": "5f7ee32ba2433e2ebaae585090ac40db0f3c47cc",
+  "branch": "build/first-apk",
+  "workflow_run_url": "https://github.com/IssisX/AlienFlow/actions/runs/38069975789",
+  "artifact_id": 11676427952,
+  "unsigned_bundle_sha256": "c68cb044ac4bd3641db173404bd771b77d8a51f56c51ab3dfb3c289bf4feade3",
+  "bundle_member_hashes_verified": 31,
+  "unsigned_apk_sha256": "af5f3e79583756b67a89ada2af95ad82fe946b46c660daa4c6b7050f7f4d1021",
+  "apk_filename": "AlienFlow-0.1.4.apk",
+  "apk_size_bytes": 17045689,
+  "apk_sha256": "4a5edca4562d4b72d7a3b069951191d0fd271047342d012449d76ac4264f8abf",
+  "unsigned_payload_entries_verified_after_signing": 25,
+  "signing_certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+  "signing_scheme": "APK v3",
+  "tests": {
+    "total": 58,
+    "executed": 58,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "not run"
+  },
+  "lint": {
+    "issues": 22,
+    "errors": 0
+  },
+  "phone_verification": "Pending: microphone crash and live editor behavior require Fold6 execution",
+  "change_summary": [
+    "remove independent JavaAudioDeviceModule recording demand",
+    "peer connection solely owns microphone start/stop",
+    "disable unneeded hardware AEC/noise suppression",
+    "require positive-length explicit composition evidence",
+    "replace bright green cartoon artwork with graphite/silver Gray alien"
+  ]
+}
