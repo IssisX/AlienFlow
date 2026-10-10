@@ -1,19 +1,23 @@
 package io.github.issisx.alienflow
 
-import android.accessibilityservice.AccessibilityService
 import android.text.Spanned
 import android.text.InputType
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.InputConnection
+import kotlinx.coroutines.*
 
-/** The only component allowed to mutate editor text. A write is never blindly retried. */
+/** Sole editor writer. State/edits stay on Main; blocking keyboard reads run on IO. */
 class EditorBridge(private val service: AlienAccessibilityService) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var node: AccessibilityNodeInfo? = null
     private var generation = 0L
+    private var writeSequence = 0L
     private var ownership: EditorOwnership? = null
     private var first = true
     private var detachedSnapshot: EditorSnapshot? = null
     var lastError = ""; private set
+    private val app get() = service.application as AlienApp
+
     private fun isProtected(node: AccessibilityNodeInfo): Boolean {
         fun password(input: Int): Boolean {
             val type = input and InputType.TYPE_MASK_CLASS
@@ -23,70 +27,137 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         }
         return node.isPassword || password(node.inputType) || password(service.inputMethod?.currentInputEditorInfo?.inputType ?: 0)
     }
-    fun focused(): AccessibilityNodeInfo? = service.rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable && !isProtected(it) }
+    fun focused(): AccessibilityNodeInfo? = service.rootInActiveWindow
+        ?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable && !isProtected(it) }
+
     fun begin(): Boolean {
-        generation++; ownership = null; first = true; lastError = ""
-        node = focused() ?: return fail("Tap a normal text box first. Password fields are excluded")
-        val snapshot = snapshot() ?: return fail(lastError.ifBlank { "This text box does not expose reliable editor information" })
+        generation++; writeSequence++; ownership = null; first = true; lastError = ""
+        node = focused() ?: return fail("[AF-E01] Tap inside a text box first. Password fields are excluded")
+        val snapshot = snapshotNode() ?: return false
+        if (service.inputMethod?.currentInputConnection == null) {
+            return fail("[AF-E04] Android has not attached the keyboard connection; tap the text box again")
+        }
+        if (snapshot.composing) return fail("[AF-E08] Finish the keyboard's composing word before dictating")
         ownership = EditorOwnership(snapshot)
-        return if (snapshot.composing) fail("Finish the keyboard's composing word before dictating") else true
+        return ownership?.certain == true
     }
-    private fun snapshot(): EditorSnapshot? {
-        if (!(service.application as AlienApp).screenReady()) return null
-        val target = node ?: return null
-        if (!target.refresh()) return null
-        val current = focused() ?: return null
-        if (current != target) return null
-        // Protected status is checked before requesting any text.
-        if (isProtected(target)) return null
-        val connection = service.inputMethod?.currentInputConnection
-            ?: run { fail("Android has not supplied the active keyboard connection. Tap the text field again"); return null }
-        val surrounding = connection.getSurroundingText(100000, 100000, InputConnection.GET_TEXT_WITH_STYLES)
-            ?: run { fail("The active text field did not provide its text and cursor position"); return null }
-        if (surrounding.offset != 0) return null // cannot prove the complete anchors
-        val text = surrounding.text ?: return null
-        if (text.toString() != target.text?.toString().orEmpty()) return null
-        if (text.isEmpty() && surrounding.selectionStart == 0 && surrounding.selectionEnd == 0) service.confirmEmptyComposition()
-        val composing = service.composing || !service.compositionKnown || (text as? Spanned)?.let { spans -> spans.getSpans(0, spans.length, Any::class.java).any { spans.getSpanFlags(it) and Spanned.SPAN_COMPOSING != 0 } } ?: false
-        if (surrounding.selectionStart != target.textSelectionStart || surrounding.selectionEnd != target.textSelectionEnd) return null
-        return EditorSnapshot(generation, text.toString(), surrounding.selectionStart, surrounding.selectionEnd, composing)
+
+    /** Fast metadata validation for focus events/polling. It never reads the keyboard synchronously. */
+    private fun snapshotNode(): EditorSnapshot? {
+        if (!app.screenReady()) return rejected("[AF-E02] Unlock the screen before dictating")
+        val target = node ?: return rejected("[AF-E01] Tap inside a text box first")
+        if (!target.refresh()) return rejected("[AF-E03] The original text box is no longer available")
+        val current = focused() ?: return rejected("[AF-E03] The text box lost focus; tap inside it again")
+        if (current != target) return rejected("[AF-E03] Focus moved to a different text box")
+        if (isProtected(target)) return rejected("[AF-E01] Password fields are excluded")
+        val editorInfo = service.inputMethod?.currentInputEditorInfo
+        if (editorInfo?.packageName != null && editorInfo.packageName != target.packageName?.toString()) {
+            return rejected("[AF-E05] The keyboard is attached to another app; tap this text box again")
+        }
+        val text = target.text
+        val showingHint = target.isShowingHintText
+        val read = EditorEvidence.fromNode(generation,
+            EditorEvidence.NodeText(text?.toString(), showingHint, target.textSelectionStart, target.textSelectionEnd),
+            service.compositionKnown, service.composing || (!showingHint && hasComposition(text)))
+        val snapshot = read.snapshot ?: return rejected(read.error!!)
+        if (snapshot.text.isEmpty() && !snapshot.composing) service.confirmEmptyComposition()
+        return snapshot
     }
+    private fun hasComposition(text: CharSequence?): Boolean = (text as? Spanned)?.let { spans ->
+        spans.getSpans(0, spans.length, Any::class.java).any {
+            spans.getSpanFlags(it) and Spanned.SPAN_COMPOSING != 0
+        }
+    } == true
+
     fun valid(): Boolean {
         val owner = ownership ?: return false
-        val snapshot = snapshot() ?: return false
+        val snapshot = snapshotNode() ?: return false
         return if (first) owner.canFirstWrite(snapshot) else owner.matches(snapshot)
     }
-    fun write(value: String, completion: (Boolean) -> Unit) {
+
+    fun write(value: String, completion: (Boolean) -> Unit) = writeOwned(value, false, completion)
+
+    private fun writeOwned(value: String, restoring: Boolean, completion: (Boolean) -> Unit) {
         val owner = ownership ?: return completion(false)
-        val before = snapshot()
-        if (before == null || !(if (first) owner.canFirstWrite(before) else owner.matches(before))) { owner.invalidate(); fail("The field changed; automatic edits stopped"); completion(false); return }
-        val connection = service.inputMethod?.currentInputConnection ?: run { completion(false); return }
-        val range = if (first) {
-            before.start until before.end
-        } else owner.range()
         val writeGeneration = generation
-        try {
-            connection.setSelection(range.first, range.last + 1)
-            connection.commitText(value, 1, null)
-            // IPC editor writes may complete asynchronously. Read once after dispatch, never retry the mutation.
-            service.handler.postDelayed({
-                if (generation != writeGeneration || ownership !== owner) { completion(false); return@postDelayed }
-                val evidence = snapshot()
-                val ok = evidence != null && owner.confirm(evidence, value)
+        val sequence = ++writeSequence
+        fun current(): Boolean = generation == writeGeneration && ownership === owner && sequence == writeSequence &&
+            app.coordinator.service === service && (restoring || app.coordinator.active || app.coordinator.finishing)
+        scope.launch {
+            var success = false
+            try {
+                if (!current()) return@launch
+                val before = snapshotNode()
+                if (before == null || !(if (first) owner.canFirstWrite(before) else owner.matches(before))) {
+                    owner.invalidate()
+                    if (before != null) fail("[AF-E13] The text or cursor changed; automatic edits stopped")
+                    return@launch
+                }
+                val connection = service.inputMethod?.currentInputConnection
+                    ?: run { fail("[AF-E04] Android detached the keyboard connection"); return@launch }
+                // Calling this on Main can block the SAME app's editor from replying.
+                // Also keep the bubble responsive when another app is slow to reply.
+                val surrounding = withContext(Dispatchers.IO) {
+                    connection.getSurroundingText(100000, 100000, InputConnection.GET_TEXT_WITH_STYLES)
+                }
+                if (!current()) return@launch
+                if (surrounding == null) {
+                    fail("[AF-E06] The keyboard did not return its text; recognized words remain in AlienFlow")
+                    owner.invalidate(); return@launch
+                }
+                val fresh = snapshotNode()
+                if (fresh != before) {
+                    fail("[AF-E13] The text box changed while checking it; no text was replaced")
+                    owner.invalidate(); return@launch
+                }
+                val evidence = EditorEvidence.corroborate(before, EditorEvidence.KeyboardText(
+                    surrounding.text.toString(), surrounding.selectionStart, surrounding.selectionEnd, surrounding.offset))
+                if (evidence.snapshot == null || hasComposition(surrounding.text)) {
+                    fail(evidence.error ?: "[AF-E08] The keyboard is still composing a word")
+                    owner.invalidate(); return@launch
+                }
+                val range = if (first) before.start until before.end else owner.range()
+                connection.setSelection(range.first, range.last + 1)
+                connection.commitText(value, 1, null)
+                delay(100)
+                if (!current()) return@launch
+                // Re-read, never retry the mutation. A stale completion cannot regain ownership.
+                val after = withContext(Dispatchers.IO) {
+                    connection.getSurroundingText(100000, 100000, InputConnection.GET_TEXT_WITH_STYLES)
+                }
+                if (!current()) return@launch
+                val afterNode = snapshotNode()
+                val confirmation = if (after != null && afterNode != null && !hasComposition(after.text)) {
+                    EditorEvidence.corroborate(afterNode, EditorEvidence.KeyboardText(
+                        after.text.toString(), after.selectionStart, after.selectionEnd, after.offset))
+                } else null
+                val confirmed = confirmation?.snapshot
+                success = confirmed != null && owner.confirm(confirmed, value)
                 first = false
-                if (!ok) { owner.invalidate(); fail("Insertion could not be confirmed; result preserved. No further edits") }
-                completion(ok)
-            }, 100)
-        } catch (_: Exception) { owner.invalidate(); fail("Editor rejected insertion; result preserved"); completion(false) }
+                if (!success) {
+                    owner.invalidate()
+                    fail(confirmation?.error ?: "[AF-E14] Insertion could not be confirmed; further edits stopped")
+                }
+            } catch (_: CancellationException) {
+                if (generation == writeGeneration && ownership === owner) owner.invalidate()
+            } catch (_: Exception) {
+                if (generation == writeGeneration && ownership === owner) {
+                    owner.invalidate(); fail("[AF-E15] Android rejected the editor operation; recognized words remain in AlienFlow")
+                }
+            } finally {
+                completion(success)
+            }
+        }
     }
     fun cancel(completion: (Boolean) -> Unit) {
         val owner = ownership ?: return completion(false)
         if (first) { completion(true); return }
         if (!valid()) { owner.invalidate(); completion(false); return }
-        write(owner.originalSelection(), completion)
+        writeOwned(owner.originalSelection(), true, completion)
     }
-    fun detachForCapture() { invalidate(); detachedSnapshot = snapshot() }
-    fun detachedTargetUnchanged() = detachedSnapshot?.let { it == snapshot() } == true
-    fun invalidate() { generation++; ownership?.invalidate() }
+    fun detachForCapture() { invalidate(); detachedSnapshot = snapshotNode() }
+    fun detachedTargetUnchanged() = detachedSnapshot?.let { it == snapshotNode() } == true
+    fun invalidate() { generation++; writeSequence++; ownership?.invalidate() }
+    private fun rejected(reason: String): EditorSnapshot? { fail(reason); return null }
     private fun fail(reason: String): Boolean { lastError = reason; return false }
 }

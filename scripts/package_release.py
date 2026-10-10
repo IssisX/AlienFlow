@@ -16,8 +16,8 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = "io.github.issisx.alienflow"
-VERSION_CODE = 2
-VERSION_NAME = "0.1.1"
+VERSION_CODE = 3
+VERSION_NAME = "0.1.2"
 MIN_SDK = 33
 TARGET_SDK = 36
 BUILD_TOOLS = "36.0.0"
@@ -54,7 +54,7 @@ def main() -> None:
     if bundle.exists():
         shutil.rmtree(bundle)
     (bundle / "reports").mkdir(parents=True)
-    apk = bundle / "AlienFlow-0.1.1-unsigned.apk"
+    apk = bundle / "AlienFlow-0.1.2-unsigned.apk"
     run(str(tools / "zipalign"), "-P", "16", "-f", "4", str(raw_apk), str(apk))
     run(str(tools / "zipalign"), "-c", "-P", "16", "4", str(apk))
 
@@ -147,9 +147,9 @@ def main() -> None:
         "The APK is deliberately unsigned. Never generate or store a private key in this bundle or repository.\n"
         "With Java 17, sign a COPY using an existing private keystore stored outside the repository:\n"
         "java -jar tooling/apksigner.jar sign --ks /private/path/release.jks --ks-key-alias alienflow "
-        "--out AlienFlow-0.1.1.apk AlienFlow-0.1.1-unsigned.apk\n"
+        "--out AlienFlow-0.1.2.apk AlienFlow-0.1.2-unsigned.apk\n"
         "Omit password options to use the private interactive password prompt.\n"
-        "java -jar tooling/apksigner.jar verify --verbose --print-certs AlienFlow-0.1.1.apk\n")
+        "java -jar tooling/apksigner.jar verify --verbose --print-certs AlienFlow-0.1.2.apk\n")
     versions = tomllib.loads((ROOT / "gradle/libs.versions.toml").read_text())["versions"]
     info = {
         "source_sha": source_sha,
@@ -177,7 +177,7 @@ def main() -> None:
                    for path in sorted(bundle.rglob("*")) if path.is_file()},
     }
     (bundle / "build-info.json").write_text(json.dumps(info, indent=2) + "\n")
-    zip_path = delivery / "AlienFlow-0.1.1-unsigned-release-bundle.zip"
+    zip_path = delivery / "AlienFlow-0.1.2-unsigned-release-bundle.zip"
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
         for path in sorted(bundle.rglob("*")):
             if path.is_file():
