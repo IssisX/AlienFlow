@@ -2,7 +2,13 @@
 
 Personal native Android dictation with a movable alien bubble, live text in the focused field, very light corrections, and a user-supplied OpenAI API key.
 
-## Signed test build · 0.1.2
+## Signed diagnostic build · 0.1.3
+
+Version **0.1.3** adds a private crash diagnostic, because the owner reports that tapping the alien in 0.1.2 causes an Android process crash. It records fixed startup checkpoints and sanitized Java/Kotlin crash source locations, without capturing key, speech, field text, or exception messages. Reopen the app after reproducing, tap **Copy crash diagnostic**, and send the result to the development agent. For a native crash the last checkpoint may remain even if there is no Java exception record. This update is **diagnostic only**; it does not claim the crash cause is fixed.
+
+[GitHub Actions run 38066975001](https://github.com/IssisX/AlienFlow/actions/runs/38066975001) passed 56 tests, release lint with zero errors, assembly and package verification for compiled source `972fbab4e28c8addd8f02ac55062d470a8e9964c`. The signed [0.1.3 verification record](docs/RELEASE_VERIFICATION_0.1.3.json) ties the actual installer to the existing signing certificate and package ID. Update over 0.1.2; do not clear saved settings or keys.
+
+## Previous test build · 0.1.2
 
 Version **0.1.2** repairs editor readiness and readback: empty-field placeholders are no longer mistaken for typed contents, documented unknown offsets can be corroborated against the complete field, and blocking keyboard reads no longer run on the main thread. [Actions run 38065273911](https://github.com/IssisX/AlienFlow/actions/runs/38065273911) passed **54 tests**, release lint with zero errors (20 warnings), assembly and package checks. This includes six Android-framework widget test executions at APIs 33 and 35 that reproduce the old placeholder mismatch and exercise insertion/revision. Those are Robolectric tests, not physical accessibility-service or microphone tests.
 

@@ -59,3 +59,12 @@ Record observed results in `IMPLEMENTATION.md` or a dated verification report. D
 - [ ] Confirm that the idle bubble is 75% opaque by default, that 100% slider value looks fully solid, and that user-selected opacity persists after restarting the app.
 
 Source/CI/signature proof is in `RELEASE_VERIFICATION_0.1.1.json`; do not mark these phone observations as passed until actually reproduced.
+
+## 0.1.3 crash capture · pending phone test
+
+- [ ] Install the signed 0.1.3 APK **over** 0.1.2, without uninstalling or clearing data. Confirm the key and settings remain.
+- [ ] Focus an empty note and tap the alien once. If Android reports an app crash, reopen AlienFlow.
+- [ ] Scroll to **Crash diagnostic (private)**, tap **Copy crash diagnostic**, and paste that text into the development chat. It omits exception messages and dictated text. If it reports only the last checkpoint, this does not establish a Java exception.
+- [ ] Use the evidence to identify the owner of the failure; fix that owner and rerun the actual device path before claiming crash resolution.
+
+No Java handler can promise to catch a native crash or an OS-level process kill. No ADB/Termux debugging setup is required for the initial attempt to collect an app-owned report.

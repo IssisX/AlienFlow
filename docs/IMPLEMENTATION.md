@@ -59,3 +59,10 @@ Outstanding broader work remains in PRODUCT_SPEC.md and the historical checkpoin
 - MainActivity displays the latest private crash report/checkpoint with explicit Refresh, Copy and Clear actions. No automatic transmission or global log collection. The user decides whether to share the sanitized diagnostic.
 - Source includes JVM tests verifying that private exception messages do not enter the report. No changes were made to the actual capture, transcription, correction, editor-write or authentication semantics. This update is diagnostic, **not a claim that the process crash is fixed**.
 - Version 0.1.3, versionCode 4, package and signing identity unchanged. Build/test/lint and phone observations remain gates; after collecting the on-device diagnostic, repair the precise exception and rerun the affected path.
+
+### 0.1.3 verified build and signed delivery
+
+- [Actions run 38066975001](https://github.com/IssisX/AlienFlow/actions/runs/38066975001) completed on compiled commit `972fbab4e28c8addd8f02ac55062d470a8e9964c`. All 56 tests executed with zero failed, errored or skipped; release lint zero errors and 21 issues/warnings; release assembly/package checks and artifact upload passed.
+- GitHub unsigned bundle artifact `11675465402` SHA-256 `1f5604a1112f3df83f1c2d5132747cf86ffdcbfc6ccd6c0aeeb04c94cc23af73`; every one of 29 listed member hashes verified after download.
+- Signed `AlienFlow-0.1.3.apk`, versionCode 4: SHA-256 `e29174db72a5e195b8d36a008bab874e1a3e9fb17ce6d2d9372b8aadc1b0e7d9`, 17,045,689 bytes. APK v3 verification passed with the original signing certificate `d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f`; all unsigned APK payload entries stayed identical after signing.
+- Real phone crash still **unresolved**. Next gate: install the update, reproduce once, reopen AlienFlow, tap **Copy crash diagnostic**, and inspect the exact failure class/location and checkpoint before changing startup code. Java diagnostic may be absent for a native SIGSEGV or system-level force-stop; preserve that distinction.

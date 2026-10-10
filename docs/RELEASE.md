@@ -67,3 +67,10 @@ Require successful APK verification and the certificate fingerprint above. Recor
 - SHA-256: `438c9bb3b1fd6a876ac173a66bf58c376b20c679aab90d7523ff48f5a7dc9a0f`. Certificate SHA-256: `d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f`.
 - Use the **signed APK** delivered in the conversation for updates. The GitHub Actions bundle contains the unsigned intermediate APK, which is not installable until separately signed with the permanent key.
 - Phone tap feedback, cold mic capture and live editing are pending runtime observation. The user should report the new bubble status message if dictation still does not start.
+
+## Signed 0.1.3 diagnostic update · 2026-10-10
+
+- Compiled source `972fbab4e28c8addd8f02ac55062d470a8e9964c` on `build/first-apk`, with only subsequent documentation changes.
+- [GitHub Actions run 38066975001](https://github.com/IssisX/AlienFlow/actions/runs/38066975001): 56 unit tests passed, release lint zero errors and 21 warnings/issues, APK assembly and identity/16-KiB alignment checks passed.
+- Signed `AlienFlow-0.1.3.apk` (versionCode 4), 17,045,689 bytes. SHA-256 `e29174db72a5e195b8d36a008bab874e1a3e9fb17ce6d2d9372b8aadc1b0e7d9`. Same original certificate SHA-256 `d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f`. No new keystore; private key was not put in the repo or Actions.
+- This diagnostic build preserves the installed package and data. It does NOT prove or fix the phone crash; see `IMPLEMENTATION.md` and `RELEASE_VERIFICATION_0.1.3.json` for the acceptance boundary.
