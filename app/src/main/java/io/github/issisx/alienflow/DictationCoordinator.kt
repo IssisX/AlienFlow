@@ -52,7 +52,14 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     private var stoppingAt = 0L
     private var saved = false
     private var liveFailed = false
-    private fun update(value: String? = null) { if (value != null) status = value; listener?.invoke(); service?.refreshBubble(); CaptureService.instance?.refresh(status) }
+    private fun update(value: String? = null) {
+        val changed = value != null && value != status
+        if (value != null) status = value
+        listener?.invoke()
+        service?.refreshBubble()
+        if (changed) service?.presentStatus(status)
+        CaptureService.instance?.refresh(status)
+    }
     fun toggle() { if (active || finishing) stop() else start() }
     fun start() {
         if (active || finishing) return

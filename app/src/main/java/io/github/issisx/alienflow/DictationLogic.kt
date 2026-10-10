@@ -3,6 +3,11 @@ package io.github.issisx.alienflow
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
+object BubbleOpacity {
+    const val DEFAULT_IDLE_PERCENT = 75
+    fun alpha(opaquePercent: Int): Float = opaquePercent.coerceIn(0, 100) / 100f
+}
+
 class AudioCoverage {
     private val outstanding = linkedSetOf<String>()
     private val acknowledged = mutableSetOf<String>()

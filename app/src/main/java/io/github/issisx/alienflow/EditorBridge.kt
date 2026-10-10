@@ -25,9 +25,9 @@ class EditorBridge(private val service: AlienAccessibilityService) {
     }
     fun focused(): AccessibilityNodeInfo? = service.rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable && !isProtected(it) }
     fun begin(): Boolean {
-        generation++; ownership = null; first = true
-        node = focused() ?: return fail("Focus a regular editable field; protected inputs are excluded")
-        val snapshot = snapshot() ?: return fail("This editor does not expose reliable text and selection")
+        generation++; ownership = null; first = true; lastError = ""
+        node = focused() ?: return fail("Tap a normal text box first. Password fields are excluded")
+        val snapshot = snapshot() ?: return fail(lastError.ifBlank { "This text box does not expose reliable editor information" })
         ownership = EditorOwnership(snapshot)
         return if (snapshot.composing) fail("Finish the keyboard's composing word before dictating") else true
     }
@@ -39,8 +39,10 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         if (current != target) return null
         // Protected status is checked before requesting any text.
         if (isProtected(target)) return null
-        val connection = service.inputMethod?.currentInputConnection ?: return null
-        val surrounding = connection.getSurroundingText(100000, 100000, InputConnection.GET_TEXT_WITH_STYLES) ?: return null
+        val connection = service.inputMethod?.currentInputConnection
+            ?: run { fail("Android has not supplied the active keyboard connection. Tap the text field again"); return null }
+        val surrounding = connection.getSurroundingText(100000, 100000, InputConnection.GET_TEXT_WITH_STYLES)
+            ?: run { fail("The active text field did not provide its text and cursor position"); return null }
         if (surrounding.offset != 0) return null // cannot prove the complete anchors
         val text = surrounding.text ?: return null
         if (text.toString() != target.text?.toString().orEmpty()) return null

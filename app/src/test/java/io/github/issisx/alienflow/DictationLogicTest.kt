@@ -8,6 +8,13 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class DictationLogicTest {
+    @Test fun alienDefaultsTo75PercentOpaqueAndSliderReflectsActualOpacity() {
+        assertEquals(75, BubbleOpacity.DEFAULT_IDLE_PERCENT)
+        assertEquals(.75f, BubbleOpacity.alpha(BubbleOpacity.DEFAULT_IDLE_PERCENT), .0001f)
+        assertEquals(1f, BubbleOpacity.alpha(100), .0001f)
+        assertEquals(.25f, BubbleOpacity.alpha(25), .0001f)
+    }
+
     @Test fun emptyProviderCommitNeverAuthorizesDeletingCapturedLocalAudio() {
         val coverage = AudioCoverage()
         coverage.sent("last-commit")

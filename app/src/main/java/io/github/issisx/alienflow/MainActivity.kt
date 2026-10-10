@@ -107,7 +107,8 @@ class MainActivity : Activity() {
         }
         text(body, "Choices apply to the next session. Bubble appearance applies now.")
         title(body, "Bubble")
-        slider("Alien size (dp)", "size", 32, 24, 64); slider("Idle opacity (%)", "opacity", 25, 10, 100); slider("Active opacity (%)", "active_opacity", 100, 50, 100)
+        text(body, "75% opaque = 25% transparent. 100% opaque = fully solid; lower values show more of the screen underneath.")
+        slider("Alien size (dp)", "size", 32, 24, 64); slider("Idle opacity (% opaque)", "opacity", BubbleOpacity.DEFAULT_IDLE_PERCENT, 10, 100); slider("Active opacity (% opaque)", "active_opacity", 100, 50, 100)
         flag("Always show alien (otherwise focused inputs)", "always", false)
         button(body, "Reset position / show hidden alien") { app.coordinator.service?.resetPosition() }
         title(body, "Dictation")

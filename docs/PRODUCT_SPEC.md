@@ -21,7 +21,7 @@ The user has supplied enough information to finish planning. Routine choices sho
 | Area | Agreed product behavior |
 | --- | --- |
 | Interaction | A small floating alien bubble, freely draggable, visually about the size of Gboard's voice button. |
-| Appearance | 25% idle opacity initially; adjustable size and opacity; remembered position. |
+| Appearance | 75% idle opacity (25% transparent) initially; adjustable size and opacity; remembered position. |
 | Keyboard | Continue using the currently selected keyboard, including Gboard. |
 | Text | Provisional words appear directly in the active input field during speech. |
 | Corrections | Very light correction, including live updates, is the default. |
@@ -72,7 +72,7 @@ An explicit selection at the start of dictation may be replaced as an ordinary t
 
 ### 2.3 Bubble behavior and states
 
-Use the alien artwork inside a small circular control. Idle opacity starts at 25%; a separate active indicator and clear status make recording visible. Active opacity defaults to 100% and is adjustable in the same appearance panel. At low opacity, the microphone indicator and notification must still communicate the true recording state.
+Use the alien artwork inside a small circular control. Idle opacity starts at 75% (25% transparent); a separate active indicator and clear status make recording visible. Active opacity defaults to 100% and is adjustable in the same appearance panel. At low opacity, the microphone indicator and notification must still communicate the true recording state.
 
 | State | Visible behavior | Tap behavior |
 | --- | --- | --- |
@@ -104,7 +104,7 @@ The main screen shows the current choices in six groups. Related controls open o
 
 | Group | Setting and initial value | User choices |
 | --- | --- | --- |
-| Bubble | Appearance: alien; 32 dp visible size; 25% idle / 100% active opacity. | Adjust size and both opacity states; choose bundled alien variants or a local image; reset appearance. |
+| Bubble | Appearance: alien; 32 dp visible size; 75% idle / 100% active opacity. | Adjust size and both opacity states; choose bundled alien variants or a local image; reset appearance. |
 | Bubble | Availability: focused input fields; freely positioned. | Always visible; show for input; temporarily hide. Optional edge snap and Reset position. |
 | Dictation | Recording: tap start / tap stop. | Tap toggle or hold to talk; optional silence stop, initially off. |
 | Dictation | Text display: live in the field. | Live or insert when finished. The latter is an explicit preference, never a hidden fallback counted as live support. |
@@ -497,7 +497,7 @@ The run summary includes the application version, source commit, run identifier,
 
 | ID | Requirement and passing evidence | Milestones |
 | --- | --- | --- |
-| AF-01 | Bubble has original alien art, starts near the requested visual size at 25% idle opacity, and the main appearance settings actually change it. | 1, 3, 4 |
+| AF-01 | Bubble has original alien art, starts near the requested visual size at 75% idle opacity (25% transparent), and the main appearance settings actually change it. | 1, 3, 4 |
 | AF-02 | Dragging does not record; tap toggles recording; remembered positions remain reachable after folding/rotation and process restart. | 1, 3, 4 |
 | AF-03 | Clean-start microphone capture works from another app with the existing keyboard selected and no hidden activity workaround. | 1 |
 | AF-04 | Real provisional words appear in the target input during speech, followed by correlated final revisions without duplicate insertion. | 1, 4 |

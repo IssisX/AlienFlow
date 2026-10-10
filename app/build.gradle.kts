@@ -11,8 +11,8 @@ android {
         applicationId = "io.github.issisx.alienflow"
         minSdk = 33
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
         ndk { abiFilters += "arm64-v8a" }
     }
     buildTypes {

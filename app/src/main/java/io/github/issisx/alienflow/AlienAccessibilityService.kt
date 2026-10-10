@@ -3,6 +3,7 @@ package io.github.issisx.alienflow
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.graphics.*
+import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
 import android.view.*
@@ -19,6 +20,8 @@ class AlienAccessibilityService : AccessibilityService() {
     private var bubble: AlienView? = null
     private var params: WindowManager.LayoutParams? = null
     private var menu: View? = null
+    private var statusNotice: TextView? = null
+    private val hideStatusNotice = Runnable { clearStatusNotice() }
     private var hidden = false
     private var imeBottom = 0
     private var safeTop = 0
@@ -68,6 +71,51 @@ class AlienAccessibilityService : AccessibilityService() {
         }
         restorePosition()
     }
+    /** Non-touchable feedback is visible in the app the owner is dictating into.
+     * Never contains user speech or editor contents, only coordinator status.
+     */
+    fun presentStatus(message: String) {
+        if (!::wm.isInitialized || bubble?.isAttachedToWindow != true) return
+        handler.removeCallbacks(hideStatusNotice)
+        val label = statusNotice ?: TextView(this).apply {
+            setTextColor(Color.WHITE)
+            textSize = 14f
+            maxLines = 4
+            setPadding(dp(12), dp(9), dp(12), dp(9))
+            background = GradientDrawable().apply {
+                setColor(Color.rgb(24, 35, 26))
+                cornerRadius = dp(12).toFloat()
+                setStroke(dp(1), Color.rgb(133, 190, 112))
+            }
+        }
+        label.text = message
+        val p = WindowManager.LayoutParams(
+            dp(280).coerceAtMost(bounds().width()), WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT
+        )
+        p.gravity = Gravity.TOP or Gravity.LEFT
+        val anchor = params
+        p.x = ((anchor?.x ?: 0) - dp(100)).coerceIn(0, (bounds().width() - p.width).coerceAtLeast(0))
+        p.y = ((anchor?.y ?: safeTop) - dp(88)).coerceIn(
+            safeTop, (safeTop + usableHeight() - dp(88)).coerceAtLeast(safeTop)
+        )
+        try {
+            if (statusNotice == null) {
+                wm.addView(label, p)
+                statusNotice = label
+            } else wm.updateViewLayout(label, p)
+            handler.postDelayed(hideStatusNotice, 5000L)
+        } catch (_: IllegalArgumentException) { statusNotice = null }
+    }
+    private fun clearStatusNotice() {
+        handler.removeCallbacks(hideStatusNotice)
+        statusNotice?.let { if (it.isAttachedToWindow) wm.removeView(it) }
+        statusNotice = null
+    }
     fun refreshBubble() {
         val view = bubble ?: return
         val insets = view.rootWindowInsets ?: wm.currentWindowMetrics.windowInsets
@@ -76,7 +124,7 @@ class AlienAccessibilityService : AccessibilityService() {
         clamp()
         val active = app.coordinator.active || app.coordinator.finishing
         view.contentDescription = "AlienFlow. ${app.coordinator.status}. Tap to start or stop; drag to move; long press for actions"
-        view.alpha = if (active) app.store.prefs.getInt("active_opacity", 100) / 100f else app.store.prefs.getInt("opacity", 25) / 100f
+        view.alpha = if (active) BubbleOpacity.alpha(app.store.prefs.getInt("active_opacity", 100)) else BubbleOpacity.alpha(app.store.prefs.getInt("opacity", BubbleOpacity.DEFAULT_IDLE_PERCENT))
         view.visibility = if (active || (!hidden && (app.store.prefs.getBoolean("always", false) || bridge.focused() != null))) View.VISIBLE else View.GONE
         val touch = dp(max(48, app.store.prefs.getInt("size", 32)))
         if (params?.width != touch) { params?.width = touch; params?.height = touch; clamp() }
@@ -120,7 +168,7 @@ class AlienAccessibilityService : AccessibilityService() {
         app.coordinator.targetEvent(); refreshBubble()
     }
     override fun onInterrupt() { if (app.coordinator.active) app.coordinator.failure("Accessibility feedback interrupted; recording stopped and audio preserved") }
-    override fun onDestroy() { closeMenu(); bubble?.let { wm.removeView(it) }; bubble = null; app.coordinator.serviceLost(); super.onDestroy() }
+    override fun onDestroy() { clearStatusNotice(); closeMenu(); bubble?.let { wm.removeView(it) }; bubble = null; app.coordinator.serviceLost(); super.onDestroy() }
     private inner class AlienView : View(this@AlienAccessibilityService) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         private var rawX = 0f; private var rawY = 0f; private var x0 = 0; private var y0 = 0
