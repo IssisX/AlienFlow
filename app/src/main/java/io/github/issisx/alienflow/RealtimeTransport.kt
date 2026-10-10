@@ -54,11 +54,22 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
                 if (factory == null) {
                     PeerConnectionFactory.initialize(PeerConnectionFactory.InitializationOptions.builder(context).createInitializationOptions())
                     device = JavaAudioDeviceModule.builder(context).setUseStereoInput(false).setAudioFormat(android.media.AudioFormat.ENCODING_PCM_16BIT)
-                        .setUseHardwareAcousticEchoCanceler(true).setUseHardwareNoiseSuppressor(true).setSamplesReadyCallback { samples ->
+                        .setUseHardwareAcousticEchoCanceler(true).setUseHardwareNoiseSuppressor(true)
+                        .setAudioRecordStateCallback(object : JavaAudioDeviceModule.AudioRecordStateCallback {
+                            override fun onWebRtcAudioRecordStart() { }
+                            override fun onWebRtcAudioRecordStop() { main.post { if (!closed && capturing) listener.failure("Microphone capture stopped unexpectedly; recording preserved") } }
+                        })
+                        .setAudioRecordErrorCallback(object : JavaAudioDeviceModule.AudioRecordErrorCallback {
+                            override fun onWebRtcAudioRecordInitError(message: String) { microphoneError("Microphone initialization failed") }
+                            override fun onWebRtcAudioRecordStartError(code: JavaAudioDeviceModule.AudioRecordStartErrorCode, message: String) { microphoneError("Microphone start failed") }
+                            override fun onWebRtcAudioRecordError(message: String) { microphoneError("Microphone capture failed") }
+                        })
+                        .setSamplesReadyCallback { samples ->
                             if (!capturing || closed) return@setSamplesReadyCallback
                             try {
+                                check(samples.audioFormat == android.media.AudioFormat.ENCODING_PCM_16BIT) { "Unsupported microphone PCM format" }
                                 audio.append(samples.data, samples.sampleRate, samples.channelCount)
-                                if (firstSample) { firstSample = false; main.post { if (!closed && capturing) listener.captured() } }
+                                if (firstSample) { firstSample = false; lastVoice = System.currentTimeMillis(); main.post { if (!closed && capturing) listener.captured() } }
                                 inspect(samples.data, samples.sampleRate, samples.channelCount)
                             } catch (_: Exception) { main.post { if (!closed && capturing) listener.failure("Local audio storage failed; capture stopped") } }
                         }.createAudioDeviceModule()
@@ -95,6 +106,7 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
                             connection?.setAudioRecording(true); device?.requestStartRecording(); localOnly = false
                             if (reconnect) listener.reconnected()
                         }
+                        else if (!closed && capturing && generation == connectionGeneration && ch.state() == DataChannel.State.CLOSED) listener.interrupted()
                     } }
                     override fun onMessage(buffer: DataChannel.Buffer) {
                         if (buffer.binary) return
@@ -118,6 +130,7 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
             }
         }
     }
+    private fun microphoneError(message: String) { main.post { if (!closed && capturing) listener.failure(message) } }
     private fun safeNetworkError(e: Exception) = if (e is SafeApiException) e.message!! else "Realtime connection failed; check network, key and model access"
     private suspend fun setDescription(description: SessionDescription, local: Boolean) {
         suspendCancellableCoroutine<Unit> { cont ->

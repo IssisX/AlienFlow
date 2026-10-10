@@ -70,7 +70,12 @@ class AlienAccessibilityService : AccessibilityService() {
     }
     fun refreshBubble() {
         val view = bubble ?: return
+        val insets = view.rootWindowInsets ?: wm.currentWindowMetrics.windowInsets
+        imeBottom = insets.getInsets(WindowInsets.Type.ime()).bottom
+        val system = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()); safeTop = system.top; safeBottom = system.bottom
+        clamp()
         val active = app.coordinator.active || app.coordinator.finishing
+        view.contentDescription = "AlienFlow. ${app.coordinator.status}. Tap to start or stop; drag to move; long press for actions"
         view.alpha = if (active) app.store.prefs.getInt("active_opacity", 100) / 100f else app.store.prefs.getInt("opacity", 25) / 100f
         view.visibility = if (active || (!hidden && (app.store.prefs.getBoolean("always", false) || bridge.focused() != null))) View.VISIBLE else View.GONE
         val touch = dp(max(48, app.store.prefs.getInt("size", 32)))

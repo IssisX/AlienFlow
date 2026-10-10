@@ -19,7 +19,7 @@ PACKAGE = "io.github.issisx.alienflow"
 VERSION_CODE = 1
 VERSION_NAME = "0.1.0"
 MIN_SDK = 33
-TARGET_SDK = 37
+TARGET_SDK = 36
 BUILD_TOOLS = "36.0.0"
 
 
@@ -161,7 +161,7 @@ def main() -> None:
         "version_name": VERSION_NAME,
         "min_sdk": MIN_SDK,
         "target_sdk": TARGET_SDK,
-        "compile_sdk": 37,
+        "compile_sdk": 36,
         "debuggable": False,
         "signing": "unsigned; private release signing required before installation",
         "native_abis": native_abis,

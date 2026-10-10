@@ -117,7 +117,7 @@ class MainActivity : Activity() {
         slider("Optional silence stop (0 = off; seconds)", "silence_stop", 0, 0, 30)
         text(body, "Language code: en, es, fr… Blank requests automatic detection.")
         val language = EditText(this).apply { setText(p.getString("language", "en")); setTextColor(Color.WHITE); isSingleLine = true; hint = "en" }; body.addView(language)
-        text(body, "Personal vocabulary (sent only as transcription guidance)")
+        text(body, "Personal vocabulary (first 4000 characters sent as guidance)")
         val vocabulary = EditText(this).apply { setText(p.getString("vocabulary", "")); setTextColor(Color.WHITE); minLines = 2 }; body.addView(vocabulary)
         button(body, "Save language & vocabulary") { p.edit().putString("language", language.text.toString().trim()).putString("vocabulary", vocabulary.text.toString()).apply() }
         title(body, "Corrections")

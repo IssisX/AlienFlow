@@ -23,3 +23,12 @@ Application source implementation in progress. No APK compilation, signing, inst
 - Build through GitHub Actions because the local environment has a Java runtime but no Android SDK/compiler, and the attempted Gradle distribution download was blocked by network policy.
 - Keep signing private material outside the public repository. If GitHub signing secrets are not provisioned, Actions may build an unsigned release candidate for private local signing with one persistent key; an unsigned artifact is never presented as installable.
 - Implement the first complete native dictation path before claiming later device-dependent milestones complete.
+
+## First compiler checkpoint
+
+- Source: `659088d25082f70ddd65dca1be2fbb1cd45a6cb4` (branch `build/first-apk`).
+- Remote tree exactly matched the staged local Git tree before the branch update.
+- [GitHub Actions run 38057134203](https://github.com/IssisX/AlienFlow/actions/runs/38057134203) was observed running for that SHA. Failed during SDK installation: `platforms;android-37` was unavailable. The app compiler, tests, lint and APK packaging did not run. Java provisioning and wrapper validation passed. The separate Gradle cache-cleanup success does not validate the app.
+- Subsequent review fixes and the dedicated pending-audio test file are separate working changes. They must be compiled and tested on a subsequent exact revision before final delivery.
+
+SDK correction: use published stable API 36 for compile/target and explicit SDK channel 0. Exact Google repository metadata supplies platform revision 2; no API 37 platform package was published in the queried feed. See BUILD_EVIDENCE.md. This changes the compiler target, not the accessibility architecture (minimum API 33).

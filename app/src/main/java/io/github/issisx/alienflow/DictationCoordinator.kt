@@ -20,7 +20,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     var result = ""; private set
     var original = ""; private set
     var listener: (() -> Unit)? = null
-    private var session = 0L
+    @Volatile private var session = 0L
     private var ledger = TranscriptLedger()
     private var transport: RealtimeTransport? = null
     private var audio: PendingAudio? = null
@@ -37,14 +37,17 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     private var finalizing = false
     private var audioClosing = false
     private var recoveryJob: Job? = null
+    private var keyTestJob: Job? = null
     private var recoveryFile: File? = null
     private var displayLive = true
     private var cleanLive = true
     private var correctionMode = "B"
     private var fillersEnabled = false
     private var continueLocal = true
+    private var microphoneConfirmed = false
     private var commits = 0
     private val completeItems = mutableSetOf<String>()
+    private val committedItems = mutableSetOf<String>()
     private var stoppingAt = 0L
     private var saved = false
     private var liveFailed = false
@@ -60,7 +63,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         if (!bridge.begin()) { update(bridge.lastError); return }
         displayLive = store.prefs.getBoolean("live_display", true); cleanLive = store.prefs.getBoolean("live_cleanup", true); correctionMode = store.mode(); fillersEnabled = store.prefs.getBoolean("fillers", false); continueLocal = store.prefs.getBoolean("continue_local", true)
         session++; ledger = TranscriptLedger(); original = ""; result = ""; desired = ""; lastWritten = ""
-        saved = false; liveFailed = false; interrupted = false; finalizing = false; audioClosing = false; corrections.clear(); cleaned.clear(); writing = false; commits = 0; completeItems.clear(); editor = bridge; captureTarget = bridge
+        saved = false; liveFailed = false; microphoneConfirmed = false; interrupted = false; finalizing = false; audioClosing = false; corrections.clear(); cleaned.clear(); writing = false; commits = 0; completeItems.clear(); committedItems.clear(); editor = bridge; captureTarget = bridge
         active = true; finishing = false; update("Starting microphone and realtime connection…")
         try { app.startForegroundService(Intent(app, CaptureService::class.java).setAction(CaptureService.START)) }
         catch (_: Exception) { active = false; editor = null; update("Android denied background microphone start. Open AlienFlow and start a test; bubble start is not available in this permission state") }
@@ -76,7 +79,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                 it.connect(api, key, store.language(), store.prefs.getString("vocabulary", "")!!)
             }
             val token = session
-            main.postDelayed({ if (session == token && active && status.startsWith("Starting")) failure("Microphone/realtime startup timed out") }, 30000)
+            main.postDelayed({ if (session == token && active && !microphoneConfirmed) failure("Microphone/realtime startup timed out") }, 30000)
             monitorTarget(token)
         } catch (e: Exception) { failure(e.message ?: "Microphone setup failed") }
     }
@@ -89,7 +92,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         }, 500)
     }
     fun targetEvent() { if (interrupted && active) { if (captureTarget?.detachedTargetUnchanged() != true) stop(); return }; if (!interrupted && (active || finishing) && !writing && editor?.valid() != true) { liveFailed = true; editor?.invalidate(); editor = null; stop(); update("Focus or manual edit changed; result preserved") } }
-    override fun captured() { if (active) update("Listening • tap the alien to stop") }
+    override fun captured() { microphoneConfirmed = true; if (active) update("Listening • tap the alien to stop") }
     override fun turnCommitted() { commits++ }
     override fun event(value: JSONObject) {
         if (!active && !finishing) return
@@ -98,7 +101,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         val id = "${value.optInt("_connection_generation")}:$rawId"
         val previous = value.optString("previous_item_id").takeIf { it.isNotEmpty() }?.let { "${value.optInt("_connection_generation")}:$it" }
         when (type) {
-            "conversation.item.created", "input_audio_buffer.committed" -> if (rawId.isNotBlank()) { ledger.event(value.optString("event_id"), id, previous); render(); tryFinish() }
+            "conversation.item.created", "input_audio_buffer.committed" -> if (rawId.isNotBlank()) { if (type == "input_audio_buffer.committed") committedItems.add(id); ledger.event(value.optString("event_id"), id, previous); render(); tryFinish() }
             "conversation.item.input_audio_transcription.delta" -> if (rawId.isNotBlank()) {
                 ledger.event(value.optString("event_id"), id, previous, delta = value.optString("delta")); render()
             }
@@ -171,13 +174,13 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
             try { capturedAudio?.close() } catch (_: Exception) { error = true }
             withContext(Dispatchers.Main) { if (session != token) return@withContext; audioClosing = false; if (error) failure("Audio finalization failed; recording retained") else tryFinish() }
         }
-        main.postDelayed({ if (session == token && finishing) { if (commits > completeItems.size || ledger.pending()) failure("Final transcription timed out; pending audio preserved") else tryFinish() } }, 15000)
+        main.postDelayed({ if (session == token && finishing) { if (commits > completeItems.size || commits > committedItems.size || ledger.pending()) failure("Final transcription timed out; pending audio preserved") else tryFinish() } }, 15000)
         main.postDelayed({ if (session == token) { scheduleCleanup(); tryFinish() } }, 1200)
     }
     private fun tryFinish() {
         if (audioClosing || finalizing) return
         if (interrupted && finishing) { finish(true); return }
-        if (!finishing || active || System.currentTimeMillis() - stoppingAt < 1000 || commits > completeItems.size || ledger.pending()) return
+        if (!finishing || active || System.currentTimeMillis() - stoppingAt < 1000 || commits > completeItems.size || commits > committedItems.size || ledger.pending()) return
         if (cleanup?.isActive == true || writing) return
         if (!displayLive && desired != lastWritten && editor != null) { pumpWrite(); return }
         finish(transport?.hasPendingCoverage == true)
@@ -187,20 +190,23 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         finalizing = true; active = false; finishing = true
         transport?.close(); transport = null; CaptureService.instance?.stopSelf()
         val captured = audio; val token = session; val source = original.ifBlank { ledger.text() }; val finalText = result
-        val outcome = if (keepAudio) "Incomplete • audio pending" else if (liveFailed) "Preserved • live insertion failed" else "Completed"
+        val retainAudio = keepAudio || (liveFailed && store.prefs.getInt("retention", 7) == -1)
+        val outcome = if (retainAudio) "Incomplete • audio pending" else if (liveFailed) "Preserved • live insertion failed" else "Completed"
         finalizationJob = io.launch {
             var storageOk = false
+            var checkpointId: String? = null
             try {
                 captured?.close()
                 ensureActive()
-                if (!saved) store.saveResult(source, finalText, outcome)
+                if (!saved) checkpointId = store.saveResult(source, finalText, outcome)
                 storageOk = true
-                if (!keepAudio) captured?.file?.delete()
+                if (!retainAudio) captured?.file?.delete()
             } catch (_: Exception) { }
+            finally { if (!isActive || session != token) checkpointId?.let { store.deleteHistory(it) } }
             withContext(Dispatchers.Main) {
                 if (session != token) return@withContext
                 audio = null; saved = storageOk; finalizing = false; finishing = false
-                update(if (!storageOk) "Storage failed; audio retained. Copy the visible result" else if (keepAudio) "Stopped • audio saved for recovery" else if (liveFailed) "Result saved • live insertion failed" else "Complete • ready for another dictation")
+                update(if (!storageOk) "Storage failed; audio retained. Copy the visible result" else if (retainAudio) "Stopped • audio saved for recovery" else if (liveFailed) "Result saved • live insertion failed" else "Complete • ready for another dictation")
                 if (storageOk && keepAudio && interrupted && captured != null && continueLocal) recover(captured.file)
             }
         }
@@ -210,7 +216,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         interrupted = true; cleanup?.cancel(); editor?.detachForCapture(); editor = null; liveFailed = true
         if (continueLocal) {
             transport?.continueLocally()
-            update("Connection lost • microphone continues locally. Tap stop, then recover saved audio")
+            update("Connection lost • recording continues locally while realtime reconnects. Tap stop to recover the complete recording")
         } else failure("Connection lost; recording stopped and audio saved")
     }
     override fun reconnected() { if (active && interrupted) update("Realtime reconnected • recording continues. Full recording will recover after stop") }
@@ -224,10 +230,17 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         finalizationJob?.cancel(); cleanup?.cancel(); transport?.close(); transport = null
         val bridge = editor; editor = null; active = false; finishing = false
         CaptureService.instance?.stopSelf(); val discarded = audio; audio = null
-        io.launch { try { discarded?.close(); discarded?.file?.delete() } catch (_: Exception) { } }
-        if (!writing && bridge != null) bridge.cancel { ok -> update(if (ok) "Canceled • owned text restored" else "Canceled • ownership uncertain, field left unchanged") }
-        else update("Canceled • in-flight edit cannot be undone safely")
         session++
+        val canceledToken = session
+        io.launch {
+            try { discarded?.close() } catch (_: Exception) { }
+            finally {
+                val deleted = discarded?.file?.let { !it.exists() || it.delete() } != false
+                if (!deleted) withContext(Dispatchers.Main) { if (session == canceledToken) update("Canceled, but saved audio could not be deleted; remove it in history") }
+            }
+        }
+        if (!writing && bridge != null) bridge.cancel { ok -> if (session == canceledToken && !active && !finishing) update(if (ok) "Canceled • owned text restored" else "Canceled • ownership uncertain, field left unchanged") }
+        else update("Canceled • in-flight edit cannot be undone safely")
     }
     fun serviceLost() { if (active || finishing) failure("Accessibility disconnected; recording stopped and audio preserved"); service = null }
     fun captureServiceLost() { if (active) failure("Microphone service stopped unexpectedly; audio retained") }
@@ -246,17 +259,22 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                     complete.append(part)
                 }
                 val text = complete.toString()
-                store.saveResult(text, text, "Recovered • copy manually"); file.delete()
-                withContext(Dispatchers.Main) { if (session == token && !active && !finishing) { result = text; original = text; update("Recovered to history • no field was edited") } }
+                check(text.isNotBlank()) { "Empty recovery response" }
+                val savedId = store.saveResult(text, text, "Recovered • copy manually")
+                if (savedId != null) file.delete()
+                withContext(Dispatchers.Main) { if (session == token && !active && !finishing) { result = text; original = text; update(if (savedId != null) "Recovered to history • no field was edited" else "Recovered • history off. Copy the result; audio retained until you discard it") } }
             } catch (e: Exception) { withContext(Dispatchers.Main) { if (session == token && !active) update(if (e is SafeApiException) "${e.message} · recording retained" else "Audio recovery failed; saved recording retained") } }
             finally { withContext(NonCancellable + Dispatchers.Main) { recoveryFile = null; recoveryJob = null } }
         }
     }
     fun testKey() {
+        if (keyTestJob?.isActive == true || active || finishing) return
+        val token = session
         update("Checking transcription model access…")
-        io.launch {
-            try { api.clientSecret(store.apiKey() ?: error("Save an API key first"), store.language(), ""); withContext(Dispatchers.Main) { update("Key accepted • gpt-live-transcribe session available") } }
-            catch (e: Exception) { withContext(Dispatchers.Main) { update(if (e is SafeApiException) e.message else "Connection check failed; check key and network") } }
+        keyTestJob = io.launch {
+            try { api.clientSecret(store.apiKey() ?: error("Save an API key first"), store.language(), ""); withContext(Dispatchers.Main) { if (session == token && !active && !finishing) update("Key accepted • gpt-live-transcribe session available") } }
+            catch (e: Exception) { withContext(Dispatchers.Main) { if (session == token && !active && !finishing) update(if (e is SafeApiException) e.message else "Connection check failed; check key and network") } }
+            finally { withContext(NonCancellable + Dispatchers.Main) { keyTestJob = null } }
         }
     }
 }

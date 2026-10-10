@@ -44,13 +44,18 @@ class LocalStore(private val context: Context) {
         val array = JSONArray(historyFile.readFully().toString(Charsets.UTF_8))
         val days = prefs.getInt("retention", 7)
         val cutoff = System.currentTimeMillis() - days * 86400000L
-        return (0 until array.length()).map { array.getJSONObject(it) }.filter { days == 0 || it.getLong("time") > cutoff }
+        val entries = (0 until array.length()).map { array.getJSONObject(it) }
+        val kept = entries.filter { days == 0 || it.getLong("time") > cutoff }
+        if (kept.size != entries.size) writeHistory(kept)
+        return kept
     }
-    @Synchronized fun saveResult(original: String, result: String, status: String) {
-        if (prefs.getInt("retention", 7) == -1 || (original.isBlank() && result.isBlank())) return
+    @Synchronized fun saveResult(original: String, result: String, status: String): String? {
+        if (prefs.getInt("retention", 7) == -1 || (original.isBlank() && result.isBlank())) return null
         val entries = history().toMutableList()
-        entries.add(0, JSONObject().put("id", java.util.UUID.randomUUID().toString()).put("time", System.currentTimeMillis()).put("original", original).put("result", result).put("status", status))
+        val id = java.util.UUID.randomUUID().toString()
+        entries.add(0, JSONObject().put("id", id).put("time", System.currentTimeMillis()).put("original", original).put("result", result).put("status", status))
         writeHistory(entries)
+        return id
     }
     @Synchronized fun deleteHistory(id: String? = null) {
         val entries = history().toMutableList(); if (id == null) entries.clear() else entries.removeAll { it.optString("id") == id }

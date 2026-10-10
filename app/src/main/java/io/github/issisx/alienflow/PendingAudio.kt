@@ -61,6 +61,8 @@ class PendingAudio internal constructor(
         }
     }
 
+    init { writer.prestartCoreThread() }
+
     /**
      * Copies and offers one complete PCM16 buffer without waiting for disk or queue capacity.
      * Metadata is fixed by the first nonempty frame. Overflow or a format/storage failure is

@@ -1,5 +1,7 @@
 # Android build path implementation report
 
+**Current correction:** compile/target SDK 36 on stable channel 0. The initial SDK 37 configuration below is historical; the final section records the observed Actions failure and verified correction.
+
 ## Status
 
 Implemented Android Gradle configuration, verified Gradle wrapper, and the GitHub Actions unsigned release bundle path. No commit, push, workflow dispatch, signing operation, private key, or repository signing secret was created by this agent. Actual dependency resolution, compilation, unit tests, lint, and APK/package verification still require the lead's Actions run; local syntax checks do not establish those outcomes.
@@ -165,3 +167,55 @@ The SDK, javac toolchain, full Gradle distribution, and Android compilation are 
 Hosted Ubuntu image and its SDK command-line manager are runner-provided mutable inputs; Java patch version, SDK requested package versions, action commits, Gradle/AGP, and direct dependency coordinates are pinned, but this is not a reproducibility claim. The SDK apksigner bundle is required to include its actual installed NOTICE file(s); absence fails rather than silently redistributing tooling without notices.
 
 CI proves build/static checks only. Microphone access, provider account/model access, real WebRTC sessions, accessibility editor compatibility, long-session recovery, and signed APK install/update behavior still require device/runtime validation by the lead/user.
+
+## CI correction — stable SDK platform availability (2026-10-10)
+
+This section supersedes the initial compile/target API37 configuration described earlier in this report.
+
+### Observed failure
+
+The lead supplied actual CI evidence for source `659088d25082f70ddd65dca1be2fbb1cd45a6cb4`, run `38057134203`, job `114227802359`: Java `17.0.20+101` downloaded, pinned actions/wrapper checks passed, but the exact SDK installation step failed at 13:48:37 UTC with `Warning: Failed to find package 'platforms;android-37'`. The application compiler, unit tests, release lint, release assembly, and packaging gates did not run. A later cache-cleanup `BUILD SUCCESSFUL` was unrelated to app validation.
+
+The initial AGP release-table verification correctly established maximum supported API37, but incorrectly treated that compatibility maximum as evidence that a stable API37 SDK package was published. That inference is corrected here.
+
+### Primary publication evidence checked for the fix
+
+Fetched and parsed Google's live SDK repository XML:
+
+https://dl.google.com/android/repository/repository2-3.xml
+
+The metadata explicitly lists:
+
+| Package | Revision | Channel | Published archive |
+| --- | --- | --- | --- |
+| `platforms;android-36` | 2 | `channel-0` (stable) | `platform-36_r02.zip` |
+| `build-tools;36.0.0` | 36.0.0 | `channel-0` (stable) | `build-tools_r36_linux.zip` for Linux |
+
+The exact package `platforms;android-37` is absent from that repository metadata. API36.1 is also listed, but the app does not need its minor-API extensions, so API36 is the coherent stable choice.
+
+Metadata archive evidence (recorded as published; no claim of downloading these archives locally):
+
+- API36 revision2: size 65,878,410 bytes, published SHA1 `2c1a80dd4d9f7d0e6dd336ec603d9b5c55a6f576`.
+- Build Tools36 Linux: size 63,737,259 bytes, published SHA1 `b0b6376977657e8ad9b969bacf4093601da2c6fb`.
+
+Official Android16 setup documentation explicitly prescribes `compileSdk = 36` and `targetSdk = 36`:
+
+https://developer.android.com/about/versions/16/setup-sdk
+
+Official SDK Platform release notes list Android16/API36 as stable:
+
+https://developer.android.com/tools/releases/platforms
+
+### Patch applied
+
+- `app/build.gradle.kts`: compileSdk `37 → 36`, targetSdk `37 → 36`; minSdk remains33 and Build Tools remains36.0.0.
+- `.github/workflows/android-release.yml`: `COMPILE_SDK` `37 → 36`; SDK manager now explicitly uses `--channel=0`, requesting only stable `platforms;android-36` and `build-tools;36.0.0`.
+- `scripts/package_release.py`: expected targetSDK `37 → 36` and bundle build-info compileSDK `37 → 36`, preserving coherent APK identity validation and metadata.
+
+The corrected configured tuple is AGP9.4.0 / Gradle9.6.0 / Temurin17.0.20+101 / Build Tools36.0.0 / compile36 / target36 / min33. Package/version, direct dependencies, action commits, release flags, test/lint gates, source provenance, unsigned checks, and native16KiB alignment checks remain as specified.
+
+### Verification and next gate
+
+Python syntax compilation passed. Workflow YAML parsed and its API36 value was asserted. Parsed primary SDK XML assertions verified both chosen packages use stable channel-0 and the API37 package is absent. `git diff --check` passed. The patch contains only the assigned build/workflow/packaging paths plus this report append. No application source, repository state, remote write, CI invocation, signing code, private key, or secret was changed.
+
+The next Actions run must establish actual application compilation and test/lint/APK gates. SDK platform availability is now supported by primary package metadata instead of an AGP compatibility maximum; successful install/build is still not claimed before that run.
