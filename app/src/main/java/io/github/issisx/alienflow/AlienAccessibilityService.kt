@@ -26,22 +26,21 @@ class AlienAccessibilityService : AccessibilityService() {
     private var imeBottom = 0
     private var safeTop = 0
     private var safeBottom = 0
-    var compositionKnown = false; private set
     var composing = false; private set
     private var layoutKey = "folded"
-    fun confirmEmptyComposition() { compositionKnown = true; composing = false }
+    fun confirmEmptyComposition() { composing = false }
     override fun onCreateInputMethod(): android.accessibilityservice.InputMethod = object : android.accessibilityservice.InputMethod(this) {
         override fun onStartInput(info: android.view.inputmethod.EditorInfo, restarting: Boolean) {
-            super.onStartInput(info, restarting); compositionKnown = false; composing = false
+            super.onStartInput(info, restarting); composing = false
             if (::bridge.isInitialized) { bridge.invalidate(); handler.post { app.coordinator.targetEvent() } }
         }
         override fun onFinishInput() {
-            super.onFinishInput(); compositionKnown = false; composing = false
+            super.onFinishInput(); composing = false
             if (::bridge.isInitialized) { bridge.invalidate(); handler.post { app.coordinator.targetEvent() } }
         }
         override fun onUpdateSelection(oldStart: Int, oldEnd: Int, newStart: Int, newEnd: Int, candidatesStart: Int, candidatesEnd: Int) {
             super.onUpdateSelection(oldStart, oldEnd, newStart, newEnd, candidatesStart, candidatesEnd)
-            compositionKnown = true; composing = candidatesStart >= 0 && candidatesEnd >= candidatesStart
+            composing = EditorEvidence.hasComposingRange(candidatesStart, candidatesEnd)
             handler.post { app.coordinator.targetEvent() }
         }
     }
@@ -71,21 +70,19 @@ class AlienAccessibilityService : AccessibilityService() {
         }
         restorePosition()
     }
-    /** Non-touchable feedback is visible in the app the owner is dictating into.
-     * Never contains user speech or editor contents, only coordinator status.
-     */
+    /** Non-touchable feedback is visible in the app the owner is dictating into. */
     fun presentStatus(message: String) {
         if (!::wm.isInitialized || bubble?.isAttachedToWindow != true) return
         handler.removeCallbacks(hideStatusNotice)
         val label = statusNotice ?: TextView(this).apply {
-            setTextColor(Color.WHITE)
+            setTextColor(Color.rgb(230, 235, 241))
             textSize = 14f
             maxLines = 4
             setPadding(dp(12), dp(9), dp(12), dp(9))
             background = GradientDrawable().apply {
-                setColor(Color.rgb(24, 35, 26))
+                setColor(Color.rgb(18, 23, 30))
                 cornerRadius = dp(12).toFloat()
-                setStroke(dp(1), Color.rgb(133, 190, 112))
+                setStroke(dp(1), Color.rgb(126, 139, 154))
             }
         }
         label.text = message
@@ -149,7 +146,7 @@ class AlienAccessibilityService : AccessibilityService() {
     private fun remember() { val p = params ?: return; app.store.prefs.edit().putFloat("x_$layoutKey", p.x.toFloat() / max(1, bounds().width() - p.width)).putFloat("y_$layoutKey", (p.y - safeTop).toFloat() / max(1, usableHeight() - p.height)).apply() }
     private fun openMenu() {
         if (menu != null) return
-        val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.rgb(26, 38, 27)); setPadding(dp(8), dp(8), dp(8), dp(8)) }
+        val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.rgb(22, 27, 34)); setPadding(dp(8), dp(8), dp(8), dp(8)) }
         fun item(label: String, action: () -> Unit) { column.addView(Button(this).apply { text = label; setOnClickListener { closeMenu(); action() } }) }
         if (app.coordinator.active || app.coordinator.finishing) item("Cancel dictation") { app.coordinator.cancel() }
         item("Settings") { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
@@ -171,6 +168,9 @@ class AlienAccessibilityService : AccessibilityService() {
     override fun onDestroy() { clearStatusNotice(); closeMenu(); bubble?.let { wm.removeView(it) }; bubble = null; app.coordinator.serviceLost(); super.onDestroy() }
     private inner class AlienView : View(this@AlienAccessibilityService) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val head = Path()
+        private val leftEye = Path()
+        private val rightEye = Path()
         private var rawX = 0f; private var rawY = 0f; private var x0 = 0; private var y0 = 0
         private var dragged = false; private var longPressed = false; private var holdStarted = false
         private val threshold = ViewConfiguration.get(context).scaledTouchSlop
@@ -184,15 +184,43 @@ class AlienAccessibilityService : AccessibilityService() {
         }
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
-            val diameter = dp(app.store.prefs.getInt("size", 32)).toFloat(); val cx = width / 2f; val cy = height / 2f; val r = diameter / 2
-            paint.color = Color.rgb(166, 242, 123)
-            val shape = Path().apply { moveTo(cx, cy + r * .9f); cubicTo(cx - r * 1.4f, cy - r * .05f, cx - r, cy - r, cx, cy - r); cubicTo(cx + r, cy - r, cx + r * 1.4f, cy - r * .05f, cx, cy + r * .9f); close() }
-            canvas.drawPath(shape, paint)
-            paint.color = Color.rgb(13, 23, 15)
-            canvas.save(); canvas.rotate(25f, cx - r * .4f, cy - r * .13f); canvas.drawOval(cx - r * .75f, cy - r * .4f, cx - r * .12f, cy + r * .06f, paint); canvas.restore()
-            canvas.save(); canvas.rotate(-25f, cx + r * .4f, cy - r * .13f); canvas.drawOval(cx + r * .12f, cy - r * .4f, cx + r * .75f, cy + r * .06f, paint); canvas.restore()
-            canvas.drawCircle(cx, cy + r * .4f, r * .09f, paint)
-            if (app.coordinator.active || app.coordinator.finishing) { paint.color = Color.rgb(255, 117, 95); canvas.drawCircle(cx + r * .75f, cy - r * .8f, dp(4).toFloat(), paint) }
+            val diameter = dp(app.store.prefs.getInt("size", 32)).toFloat()
+            val cx = width / 2f; val cy = height / 2f; val r = diameter / 2f
+            head.reset()
+            head.moveTo(cx, cy + r * .94f)
+            head.cubicTo(cx - r * .50f, cy + r * .58f, cx - r * 1.03f, cy + r * .05f, cx - r * .86f, cy - r * .55f)
+            head.cubicTo(cx - r * .66f, cy - r * 1.08f, cx - r * .24f, cy - r * 1.18f, cx, cy - r * 1.18f)
+            head.cubicTo(cx + r * .24f, cy - r * 1.18f, cx + r * .66f, cy - r * 1.08f, cx + r * .86f, cy - r * .55f)
+            head.cubicTo(cx + r * 1.03f, cy + r * .05f, cx + r * .50f, cy + r * .58f, cx, cy + r * .94f)
+            head.close()
+            paint.style = Paint.Style.FILL
+            paint.shader = LinearGradient(cx - r, cy - r, cx + r, cy + r,
+                Color.rgb(218, 224, 230), Color.rgb(91, 101, 113), Shader.TileMode.CLAMP)
+            canvas.drawPath(head, paint)
+            paint.shader = null
+            paint.style = Paint.Style.STROKE; paint.strokeWidth = max(1f, r * .07f); paint.color = Color.rgb(45, 52, 61)
+            canvas.drawPath(head, paint)
+            paint.style = Paint.Style.FILL
+            leftEye.reset(); leftEye.moveTo(cx - r * .72f, cy - r * .32f)
+            leftEye.cubicTo(cx - r * .47f, cy - r * .48f, cx - r * .18f, cy - r * .33f, cx - r * .14f, cy - r * .04f)
+            leftEye.cubicTo(cx - r * .40f, cy + r * .05f, cx - r * .67f, cy - r * .04f, cx - r * .72f, cy - r * .32f); leftEye.close()
+            rightEye.reset(); rightEye.moveTo(cx + r * .72f, cy - r * .32f)
+            rightEye.cubicTo(cx + r * .47f, cy - r * .48f, cx + r * .18f, cy - r * .33f, cx + r * .14f, cy - r * .04f)
+            rightEye.cubicTo(cx + r * .40f, cy + r * .05f, cx + r * .67f, cy - r * .04f, cx + r * .72f, cy - r * .32f); rightEye.close()
+            paint.color = Color.rgb(4, 7, 11); canvas.drawPath(leftEye, paint); canvas.drawPath(rightEye, paint)
+            paint.color = Color.argb(130, 185, 205, 220)
+            canvas.drawCircle(cx - r * .43f, cy - r * .27f, max(1f, r * .055f), paint)
+            canvas.drawCircle(cx + r * .43f, cy - r * .27f, max(1f, r * .055f), paint)
+            paint.color = Color.rgb(55, 63, 72)
+            canvas.drawOval(cx - r * .13f, cy + r * .25f, cx - r * .035f, cy + r * .32f, paint)
+            canvas.drawOval(cx + r * .035f, cy + r * .25f, cx + r * .13f, cy + r * .32f, paint)
+            paint.style = Paint.Style.STROKE; paint.strokeWidth = max(1f, r * .04f); paint.color = Color.rgb(68, 76, 85)
+            canvas.drawArc(cx - r * .20f, cy + r * .48f, cx + r * .20f, cy + r * .65f, 18f, 144f, false, paint)
+            if (app.coordinator.active || app.coordinator.finishing) {
+                paint.style = Paint.Style.STROKE; paint.strokeWidth = max(2f, r * .10f); paint.color = Color.rgb(91, 214, 230)
+                canvas.drawCircle(cx, cy, r * 1.08f, paint)
+            }
+            paint.style = Paint.Style.FILL; paint.shader = null
         }
         override fun onTouchEvent(event: MotionEvent): Boolean {
             when (event.actionMasked) {

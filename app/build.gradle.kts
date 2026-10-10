@@ -11,15 +11,14 @@ android {
         applicationId = "io.github.issisx.alienflow"
         minSdk = 33
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.1.3"
+        versionCode = 5
+        versionName = "0.1.4"
         ndk { abiFilters += "arm64-v8a" }
     }
     buildTypes {
         release {
             isDebuggable = false
             isMinifyEnabled = false
-            // Deliberately unsigned: the private release key stays outside CI/repository.
             signingConfig = null
         }
     }
@@ -39,7 +38,6 @@ android {
     }
 }
 
-// AGP 9 uses built-in Kotlin; a separate org.jetbrains.kotlin.android plugin is unnecessary.
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)

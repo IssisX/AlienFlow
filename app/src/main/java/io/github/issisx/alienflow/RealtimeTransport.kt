@@ -12,6 +12,12 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.sqrt
 
+object RealtimeCapturePolicy {
+    const val USE_HARDWARE_ACOUSTIC_ECHO_CANCELER = false
+    const val USE_HARDWARE_NOISE_SUPPRESSOR = false
+    const val USE_INDEPENDENT_CLIENT_RECORDING_DEMAND = false
+}
+
 /** All native lifecycle operations run on main. HTTP runs on IO, never on the audio thread. */
 class RealtimeTransport(private val context: Context, private val audio: PendingAudio, private val listener: Listener) {
     interface Listener { fun event(value: JSONObject); fun captured(); fun turnCommitted(); fun interrupted(); fun reconnected(); fun failure(message: String) }
@@ -26,6 +32,7 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
     @Volatile private var closed = false
     @Volatile private var capturing = true
     @Volatile private var localOnly = false
+    @Volatile private var reconnecting = false
     private var firstSample = true
     private var voiced = false
     private var speechMs = 0L
@@ -57,11 +64,16 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
                 if (factory == null) {
                     (context.applicationContext as AlienApp).crashJournal.mark("webrtc.initialize")
                     PeerConnectionFactory.initialize(PeerConnectionFactory.InitializationOptions.builder(context).createInitializationOptions())
-                    device = JavaAudioDeviceModule.builder(context).setUseStereoInput(false).setAudioFormat(android.media.AudioFormat.ENCODING_PCM_16BIT)
-                        .setUseHardwareAcousticEchoCanceler(true).setUseHardwareNoiseSuppressor(true)
+                    device = JavaAudioDeviceModule.builder(context)
+                        .setUseStereoInput(false)
+                        .setAudioFormat(android.media.AudioFormat.ENCODING_PCM_16BIT)
+                        .setUseHardwareAcousticEchoCanceler(RealtimeCapturePolicy.USE_HARDWARE_ACOUSTIC_ECHO_CANCELER)
+                        .setUseHardwareNoiseSuppressor(RealtimeCapturePolicy.USE_HARDWARE_NOISE_SUPPRESSOR)
                         .setAudioRecordStateCallback(object : JavaAudioDeviceModule.AudioRecordStateCallback {
                             override fun onWebRtcAudioRecordStart() { }
-                            override fun onWebRtcAudioRecordStop() { main.post { if (!closed && capturing) listener.failure("Microphone capture stopped unexpectedly; recording preserved") } }
+                            override fun onWebRtcAudioRecordStop() {
+                                main.post { if (!closed && capturing && !reconnecting) listener.failure("Microphone capture stopped unexpectedly; recording preserved") }
+                            }
                         })
                         .setAudioRecordErrorCallback(object : JavaAudioDeviceModule.AudioRecordErrorCallback {
                             override fun onWebRtcAudioRecordInitError(message: String) { microphoneError("Microphone initialization failed") }
@@ -101,8 +113,6 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
                     override fun onRenegotiationNeeded() {}
                     override fun onAddTrack(receiver: RtpReceiver, streams: Array<out MediaStream>) {}
                 }) ?: error("WebRTC connection creation failed")
-                // Do not begin microphone capture before the realtime path is ready.
-                // During reconnect, the ADM's independent client demand keeps capture alive.
                 connection!!.setAudioRecording(false)
                 connection!!.addTrack(track, listOf("alienflow"))
                 (context.applicationContext as AlienApp).crashJournal.mark("webrtc.data-channel")
@@ -110,11 +120,22 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
                     override fun onBufferedAmountChange(previousAmount: Long) {}
                     override fun onStateChange() { main.post {
                         if (!closed && capturing && generation == connectionGeneration && ch.state() == DataChannel.State.OPEN) {
-                            (context.applicationContext as AlienApp).crashJournal.mark("microphone.request")
-                            connection?.setAudioRecording(true); device?.requestStartRecording(); localOnly = false
-                            if (reconnect) listener.reconnected()
-                        }
-                        else if (!closed && capturing && generation == connectionGeneration && ch.state() == DataChannel.State.CLOSED) listener.interrupted()
+                            try {
+                                (context.applicationContext as AlienApp).crashJournal.mark("microphone.request")
+                                // Peer ownership alone starts capture. The old code also called
+                                // JavaAudioDeviceModule.requestStartRecording(), creating a second
+                                // recording demand at the same boundary where the phone crashed.
+                                connection?.setAudioRecording(true)
+                                localOnly = false; reconnecting = false
+                                if (reconnect) listener.reconnected()
+                            } catch (_: AssertionError) {
+                                listener.failure("WebRTC microphone start assertion; audio preserved")
+                            } catch (_: LinkageError) {
+                                listener.failure("WebRTC native microphone startup failed; audio preserved")
+                            } catch (_: RuntimeException) {
+                                listener.failure("WebRTC microphone startup failed; audio preserved")
+                            }
+                        } else if (!closed && capturing && generation == connectionGeneration && ch.state() == DataChannel.State.CLOSED) listener.interrupted()
                     } }
                     override fun onMessage(buffer: DataChannel.Buffer) {
                         if (buffer.binary) return
@@ -140,6 +161,8 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
                 val answer = withContext(Dispatchers.IO) { api!!.answer(secret, offer.description) }
                 if (!closed && capturing && generation == connectionGeneration) setDescription(SessionDescription(SessionDescription.Type.ANSWER, answer), false)
             } catch (_: CancellationException) { }
+            catch (_: AssertionError) { if (!closed && capturing) listener.failure("WebRTC audio assertion; recording preserved") }
+            catch (_: LinkageError) { if (!closed && capturing) listener.failure("WebRTC native initialization failed; recording preserved") }
             catch (e: Exception) {
                 if (!closed && capturing) { if (reconnect && !(e is SafeApiException && e.httpCode in setOf(401, 403, 429))) scheduleReconnect() else listener.failure(safeNetworkError(e)) }
             }
@@ -159,6 +182,7 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
         }
     }
     @Synchronized private fun inspect(data: ByteArray, rate: Int, channels: Int) {
+        if (rate <= 0 || channels <= 0) { main.post { if (!closed && capturing) listener.failure("Microphone returned invalid audio metadata") }; return }
         var sum = 0.0; var count = 0
         for (i in 0 until data.size - 1 step 2) { val value = ((data[i].toInt() and 255) or (data[i + 1].toInt() shl 8)).toShort().toDouble(); sum += value * value; count++ }
         val ms = data.size * 1000L / (rate * channels * 2)
@@ -174,13 +198,10 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
         if (ok) { coverage.sent(id); listener.turnCommitted() } else coverage.markUncertain()
         return ok
     }
-    fun rejectEmptyCommit(clientEventId: String): Boolean {
-        // Empty server buffer does not prove an empty local recording or media coverage.
-        return coverage.rejectEmpty(clientEventId)
-    }
+    fun rejectEmptyCommit(clientEventId: String): Boolean = coverage.rejectEmpty(clientEventId)
     fun finishCapture(): Boolean {
-        capturing = false; reconnectJob?.cancel(); connectJob?.cancel()
-        connection?.setAudioRecording(false); device?.requestStopRecording()
+        capturing = false; reconnectJob?.cancel(); connectJob?.cancel(); reconnecting = false
+        connection?.setAudioRecording(false)
         if (channel?.state() != DataChannel.State.OPEN || localOnly) coverage.markUncertain()
         main.postDelayed({ if (!closed && !localOnly) commit() }, 350)
         return !hasPendingCoverage
@@ -188,18 +209,19 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
     fun continueLocally() {
         if (closed || !capturing) return
         coverage.markUncertain(); localOnly = true
-        device?.requestStartRecording()
-        detachPeer(); scheduleReconnect()
+        // Keep the existing peer-owned microphone alive during the reconnect grace
+        // period. Do not create a second JavaAudioDeviceModule recording demand.
+        scheduleReconnect()
     }
     private fun scheduleReconnect() {
         if (closed || !capturing) return
-        reconnectJob?.cancel()
+        reconnectJob?.cancel(); reconnecting = true
         reconnectJob = scope.launch { delay(3000); if (!closed && capturing) { detachPeer(); openPeer(true) } }
     }
     private fun detachPeer() { connectionGeneration++; channel?.dispose(); channel = null; connection?.close(); connection?.dispose(); connection = null }
     fun close() {
-        if (closed) return; closed = true; capturing = false; scope.cancel()
-        try { connection?.setAudioRecording(false); device?.requestStopRecording() }
+        if (closed) return; closed = true; capturing = false; reconnecting = false; scope.cancel()
+        try { connection?.setAudioRecording(false) }
         finally {
             detachPeer(); track?.dispose(); track = null; source?.dispose(); source = null; factory?.dispose(); factory = null; device?.release(); device = null; key = ""
         }

@@ -11,10 +11,12 @@ object EditorEvidence {
     data class KeyboardText(val text: String, val start: Int, val end: Int, val offset: Int)
     data class Read(val snapshot: EditorSnapshot? = null, val error: String? = null)
 
+    /** Candidate ranges are half-open. A zero-length 0..0 range is not composition. */
+    fun hasComposingRange(start: Int, end: Int): Boolean = start >= 0 && end > start
+
     fun fromNode(
         generation: Long,
         node: NodeText,
-        compositionKnown: Boolean,
         composing: Boolean,
     ): Read {
         // A hint is an invitation to enter text, not existing user content.
@@ -25,8 +27,10 @@ object EditorEvidence {
         if (start < 0 || end > text.length) {
             return Read(error = "[AF-E07] The text box has not provided a usable cursor. Tap inside it again")
         }
+        // Unknown composition is not proof of active composition. Consequential writes
+        // are still corroborated against the keyboard connection before mutation.
         return Read(EditorSnapshot(generation, text, start, end,
-            composing = !emptyCursor && (composing || !compositionKnown)))
+            composing = !emptyCursor && composing))
     }
 
     /** Require complete, matching contents and selection before every edit and confirmation. */
