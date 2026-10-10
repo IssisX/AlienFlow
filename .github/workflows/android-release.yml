@@ -1,0 +1,68 @@
+name: Android release candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [build/first-apk]
+    paths:
+      - 'app/**'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - '*.gradle.kts'
+      - 'gradle.properties'
+      - 'scripts/**'
+      - '.github/workflows/android-release.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: alienflow-first-apk
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Test, lint, and package unsigned release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      BUILD_TOOLS_VERSION: '36.0.0'
+      COMPILE_SDK: '37'
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Java 17
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
+        with:
+          distribution: temurin
+          java-version: '17.0.20+101'
+      - name: Check wrapper JAR against upstream checksum
+        run: echo '497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7  gradle/wrapper/gradle-wrapper.jar' | sha256sum --check --strict
+      - name: Set up Gradle cache and wrapper validation
+        uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
+        with:
+          cache-read-only: false
+      - name: Install exact Android SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" "platforms;android-${COMPILE_SDK}" "build-tools;${BUILD_TOOLS_VERSION}"
+      - name: Unit tests, release lint, and unsigned release
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/ci
+          bash gradlew --no-daemon --no-configuration-cache --console=plain --stacktrace \
+            :app:testDebugUnitTest :app:lintRelease :app:assembleRelease 2>&1 | tee build/ci/gradle.log
+      - name: Verify release and prepare delivery bundle
+        run: python3 scripts/package_release.py
+      - name: Upload single delivery ZIP
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: build/delivery/AlienFlow-0.1.0-unsigned-release-bundle.zip
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
