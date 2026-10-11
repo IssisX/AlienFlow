@@ -5,27 +5,37 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
-// The approved image is text-encoded for connector transport; decoding is verified
-// before any Android resource processing. No runtime download or fallback artwork.
-val approvedAlienRes = layout.buildDirectory.dir("generated/approved-alien/res")
-val artworkParts = rootProject.fileTree("artwork/approved-gray") { include("*.b64") }
-val prepareApprovedAlien = tasks.register("prepareApprovedAlien") {
-    inputs.files(artworkParts)
-    outputs.dir(approvedAlienRes)
-    doLast {
-        val parts = artworkParts.files.sortedBy { it.name }
-        check(parts.map { it.name } == (0..7).map { "%02d.b64".format(it) })
-        val bytes = Base64.getDecoder().decode(parts.joinToString("") { it.readText().trim() })
+// Declared generated resources use the AGP variant API, which also carries
+// the generator task dependency to resource processing (no compatibility override).
+abstract class PrepareApprovedAlien : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val parts: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction
+    fun generate() {
+        val ordered = parts.files.sortedBy { it.name }
+        check(ordered.map { it.name } == (0..7).map { "%02d.b64".format(it) })
+        val bytes = Base64.getDecoder().decode(ordered.joinToString("") { it.readText().trim() })
         val sha = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
         check(sha == "8850ac9bbd07c876ba00e5b4339d1b126a14d631194b07379dde0ac676888940") {
             "Approved artwork checksum mismatch"
         }
-        val target = approvedAlienRes.get().file("drawable/alien_approved.webp").asFile
+        val target = outputDirectory.file("drawable/alien_approved.webp").get().asFile
         target.parentFile.mkdirs()
         target.writeBytes(bytes)
     }
 }
-tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(prepareApprovedAlien) }
+
+androidComponents.onVariants { variant ->
+    val generator = tasks.register<PrepareApprovedAlien>("prepare${variant.name.replaceFirstChar { it.uppercaseChar() }}ApprovedAlien") {
+        parts.from(rootProject.fileTree("artwork/approved-gray") { include("*.b64") })
+    }
+    variant.sources.res?.addGeneratedSourceDirectory(generator, PrepareApprovedAlien::outputDirectory)
+}
 
 android {
     namespace = "io.github.issisx.alienflow"
@@ -42,7 +52,6 @@ android {
         ndk { abiFilters += "arm64-v8a" }
     }
     buildFeatures { buildConfig = true }
-    sourceSets.getByName("main").res.srcDir(approvedAlienRes)
     buildTypes {
         release {
             isDebuggable = false
