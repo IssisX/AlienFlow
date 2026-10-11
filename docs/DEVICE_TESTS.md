@@ -14,7 +14,7 @@ If Android blocks the accessibility toggle as a restricted setting after APK ins
 
 ## Bubble and settings
 
-- [ ] Idle bubble is approximately a Gboard mic button in visible size and 25% opaque by default; active state is clearly distinguishable.
+- [ ] Idle bubble is approximately a Gboard mic button in visible size and 75% opaque by default; active state is clearly distinguishable.
 - [ ] Dragging does not accidentally start/stop dictation. Position survives restart, fold/unfold and rotation, remaining reachable.
 - [ ] Main behavior settings change actual behavior, persist, and apply consistently across apps. Test faithful, very light and stronger correction modes.
 - [ ] Ordinary battery settings work. Cold microphone start must pass with the activity closed and without having recently opened or prewarmed recording.
@@ -49,7 +49,7 @@ A custom editor failure remains a product compatibility failure to investigate. 
 
 Record observed results in `IMPLEMENTATION.md` or a dated verification report. Do not include API keys, private dictation or recordings in the public repository.
 
-## 0.1.1 tap-to-start feedback check · pending phone observation
+## Historical 0.1.1 tap-to-start checklist
 
 - [ ] Install the signed `AlienFlow-0.1.1.apk` directly over 0.1.0; do not uninstall. Verify settings and saved key persist.
 - [ ] Focus a new empty note with Gboard selected; tap the alien once. Confirm a non-touchable status notice appears next to it. Record the exact notice (no API key or private dictated text).
@@ -60,7 +60,7 @@ Record observed results in `IMPLEMENTATION.md` or a dated verification report. D
 
 Source/CI/signature proof is in `RELEASE_VERIFICATION_0.1.1.json`; do not mark these phone observations as passed until actually reproduced.
 
-## 0.1.3 crash capture · pending phone test
+## Historical 0.1.3 crash checklist (navigation superseded by 0.1.5)
 
 - [ ] Install the signed 0.1.3 APK **over** 0.1.2, without uninstalling or clearing data. Confirm the key and settings remain.
 - [ ] Focus an empty note and tap the alien once. If Android reports an app crash, reopen AlienFlow.
@@ -68,3 +68,13 @@ Source/CI/signature proof is in `RELEASE_VERIFICATION_0.1.1.json`; do not mark t
 - [ ] Use the evidence to identify the owner of the failure; fix that owner and rerun the actual device path before claiming crash resolution.
 
 No Java handler can promise to catch a native crash or an OS-level process kill. No ADB/Termux debugging setup is required for the initial attempt to collect an app-owned report.
+
+## 0.1.5 focus repair and diagnostic delivery — physical checks pending
+
+- [ ] Install the signed 0.1.5 APK over the existing app without uninstalling or clearing data. Verify version 0.1.5 (6), retained settings/key/history and the approved Gray face.
+- [ ] Confirm the **Diagnostics / share report** button immediately below the landing-screen version, and the same entry in the long-press alien menu.
+- [ ] Focus an empty note, tap the alien, and observe actual Listening, words in the same field, and microphone release after Stop. Separately check manual edits and focus changes preserve existing text.
+- [ ] If dictation stops/exits, return to Diagnostics and copy/share/save the actual report. Distinguish process exits from app-controlled stops by timestamps and session events. Do not clear diagnostic data first.
+- [ ] The optional 3-second no-upload microphone probe reports sample counts and releases capture when complete or when leaving the screen. A passed probe does not establish WebRTC/provider correctness.
+
+The framework UI tests and visually reviewed Robolectric renders passed in CI; these checkboxes remain phone-only acceptance, not implied passes.

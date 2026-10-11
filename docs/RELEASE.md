@@ -74,3 +74,11 @@ Require successful APK verification and the certificate fingerprint above. Recor
 - [GitHub Actions run 38066975001](https://github.com/IssisX/AlienFlow/actions/runs/38066975001): 56 unit tests passed, release lint zero errors and 21 warnings/issues, APK assembly and identity/16-KiB alignment checks passed.
 - Signed `AlienFlow-0.1.3.apk` (versionCode 4), 17,045,689 bytes. SHA-256 `e29174db72a5e195b8d36a008bab874e1a3e9fb17ce6d2d9372b8aadc1b0e7d9`. Same original certificate SHA-256 `d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f`. No new keystore; private key was not put in the repo or Actions.
 - This diagnostic build preserves the installed package and data. It does NOT prove or fix the phone crash; see `IMPLEMENTATION.md` and `RELEASE_VERIFICATION_0.1.3.json` for the acceptance boundary.
+
+## Signed 0.1.5 update — 2026-10-11
+
+Compiled source `c289cb98f5d1dabffcc8eadf6fad98dbc586efc5`, [run 38139391856](https://github.com/IssisX/AlienFlow/actions/runs/38139391856): 69 tests passed, release lint zero errors/29 warnings, assembly and packaging passed. VersionCode 6, same application ID and permanent signing certificate. See RELEASE_VERIFICATION_0.1.5.json for actual artifact/member hashes, final signature and device limits.
+
+Installer: `AlienFlow-0.1.5.apk`, 17,086,706 bytes, SHA-256 `923055310de532dfd2194fa403140fe264cc963c426db52f1b927911ff20341a`. APK v3 signature passed with certificate `d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f`. Original unsigned payload entries are unchanged after signing. Only signature metadata was added.
+
+Install the signed APK delivered in the conversation, not the unsigned Actions intermediate. Physical update/data preservation and the original mic-start failure still require phone acceptance.

@@ -1,42 +1,39 @@
-# AlienFlow 👽
+# AlienFlow
 
-Personal native Android dictation with a movable alien bubble, live text in the focused field, conservative corrections, and a user-supplied OpenAI API key.
+Personal Android dictation with a movable alien bubble, live text in the focused field, very light corrections, and your own OpenAI API key.
 
-## Current signed test build: 0.1.4
+## Current signed update: 0.1.5 (6)
 
-AlienFlow 0.1.4 targets two phone-observed failures from 0.1.3:
+This update fixes the editor lookup so it follows keyboard input focus across windows instead of the currently touched window, which may be AlienFlow's bubble. It also detaches the accessibility service before terminal UI updates during teardown. The original phone shutdown is not declared resolved: actual device acceptance remains open.
 
-- Android showed the microphone privacy indicator and the process died about one second later. The previous realtime path gave microphone ownership to the WebRTC peer and also requested a second independent `JavaAudioDeviceModule` recording demand at that same boundary. 0.1.4 removes the duplicate demand, uses one peer-owned microphone lifecycle, and disables hardware AEC/noise suppression that this transcription-only app does not need.
-- A blank ChatGPT field incorrectly produced `[AF-E08] Finish the keyboard's composing word`. The accessibility callback treated a zero-length candidate range such as `0..0` as active composition and treated unknown composition as proof. 0.1.4 requires explicit positive-length composition evidence while retaining full text/cursor corroboration before any edit.
+**Diagnostics / share report** is now directly below the version on the landing screen and in the alien's long-press menu. The dedicated screen offers Share, Copy, Save and Refresh. Its report includes the installed version/source, permission and service state, recent session-stage events, handled/uncaught Java failure locations and Android's recorded process exit reasons. When Android retains a native crash trace, only signal and code-location frames are extracted. It does not share API keys, dictated text, audio, raw memory or arbitrary exception messages. Nothing is uploaded automatically.
 
-The bubble and launcher now use a restrained graphite/silver “Gray” alien with dark almond eyes and a cyan active ring instead of the bright green cartoon head.
+The optional three-second microphone probe reads Android audio and reports sample counts without saving or uploading audio. It does not prove WebRTC or provider operation.
 
-[GitHub Actions run 38069975789](https://github.com/IssisX/AlienFlow/actions/runs/38069975789) passed 58 tests, release lint with zero errors, release assembly, package identity checks, and 16 KiB native/ZIP alignment for compiled source `b39de2b1b73e89c29bb918dd5710a207084240e6`. The signed installer uses the original package and certificate. See [0.1.4 verification](docs/RELEASE_VERIFICATION_0.1.4.json).
+Both the bubble and launcher use the exact approved Gray alien image, scaled and encoded for the app rather than redesigned. The 75% idle opacity and existing sliders remain.
 
-This build still requires the Fold6 runtime check. CI cannot prove that the native microphone crash is gone or that live text works in every editor.
+## Install and report
 
-## Install and test
+Install **AlienFlow-0.1.5.apk** over the existing installation. Do not uninstall or clear data. The application ID and permanent signing certificate are unchanged, with versionCode 6.
 
-Install the signed `AlienFlow-0.1.4.apk` over the existing version. Do not uninstall or clear app data; the package ID and signing identity are unchanged.
+Open AlienFlow and confirm **Version 0.1.5 (6)**. Try one dictation. If it stops or exits, return to AlienFlow and tap **Diagnostics / share report**, then **Copy diagnostic report**, and paste the result into the development conversation. The same entry is in the long-press bubble menu. A report may also include prior Android exit records; absence of a trace is not proof of no crash.
 
-1. Focus a blank text field with Gboard selected.
-2. Tap the alien once. Confirm the process stays alive and reaches **Listening**.
-3. Speak one short phrase and confirm words appear.
-4. Tap again and confirm the microphone privacy indicator disappears.
-5. Test an empty ChatGPT field; a zero-length keyboard candidate range must no longer trigger AF-E08.
+The GitHub Actions bundle contains an unsigned intermediate APK. Install the separately delivered signed APK, not that intermediate file.
 
-If the app still dies, preserve the exact timing and last visible state. Do not attribute the remaining failure without runtime evidence.
+## Verified scope
 
-## Product defaults
+[Actions run 38139391856](https://github.com/IssisX/AlienFlow/actions/runs/38139391856), compiled source `c289cb98f5d1dabffcc8eadf6fad98dbc586efc5`, passed **69 tests**, release lint with **zero errors and 29 warnings**, assembly, identity/native alignment checks and artifact upload. The actual main/diagnostic activities were rendered under Robolectric; the top entry and real Copy, Share and Save-intent handlers were exercised. The focus tests simulate Android's focus broker and do not replace a Samsung device test.
 
-- Movable Gray alien bubble, approximately Gboard microphone size.
-- 75% opaque idle default, with size and opacity sliders.
-- Existing keyboard remains selected.
-- Live text in the focused field.
-- Very light correction by default; wording, numbers, negation, slang, and profanity are preserved.
-- Seven days of local text history by default.
-- No AlienFlow word quota; provider, connectivity, storage, and device limits still apply.
+Downloaded bundle hashes, all 39 listed member digests, the packaged approved artwork, compiled source identifier, and the final APK signature were checked. All 26 original APK payload entries remained identical after signing; only signature metadata was added. [Release verification](docs/RELEASE_VERIFICATION_0.1.5.json) and [signature output](docs/APK_SIGNATURE_0.1.5.txt) identify the exact installer.
+
+Physical installation/update, microphone capture, native transport and live typing on the Fold6 remain unverified. Passing automated checks is not full product acceptance.
+
+## Product defaults and continuity
+
+Movable Gray alien; 75% idle opacity; adjustable main behavior settings; existing keyboard retained; live in-field text and very light correction; wording, negation, numbers, slang and profanity preserved; seven days of text history by default; no AlienFlow word allowance. Provider, connection, file-format and device limits still apply. Existing history and key-storage formats were not migrated or reset in this update.
 
 ## Engineering handoff
 
-Read `AGENTS.md`, `docs/PRODUCT_SPEC.md`, and `docs/IMPLEMENTATION.md` before editing. The implementation branch is `build/first-apk`; pull request #1 remains the integration record. GitHub Actions builds an unsigned bundle. The permanent signing key stays outside GitHub and CI.
+Start with `AGENTS.md`, [product requirements](docs/PRODUCT_SPEC.md), [current checkpoint](docs/IMPLEMENTATION.md), and [current primary-source research](docs/RESEARCH_2026-10-11.md). The branch is `build/first-apk`; PR #1 remains the draft integration record pending device acceptance. The signing key stays outside the repository and CI. Prior release records and the verbatim [0.1.4 checkpoint](docs/history/IMPLEMENTATION_0.1.4.md) remain available.
+
+The previous duplicate-microphone-demand explanation was not proven. The WebRTC fork explicitly coordinates independent/native recording demands; see the corrected research. Do not repeat that explanation as the established phone crash cause.
