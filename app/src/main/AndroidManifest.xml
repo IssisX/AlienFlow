@@ -8,6 +8,7 @@
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity>
+        <activity android:name=".DiagnosticsActivity" android:exported="false" android:label="AlienFlow diagnostics" />
         <service android:name=".CaptureService" android:exported="false" android:foregroundServiceType="microphone" />
         <service android:name=".AlienAccessibilityService" android:exported="true" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:label="AlienFlow dictation">
             <intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter>

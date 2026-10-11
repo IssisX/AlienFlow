@@ -27,8 +27,8 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         }
         return node.isPassword || password(node.inputType) || password(service.inputMethod?.currentInputEditorInfo?.inputType ?: 0)
     }
-    fun focused(): AccessibilityNodeInfo? = service.rootInActiveWindow
-        ?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable && !isProtected(it) }
+    fun focused(): AccessibilityNodeInfo? = service.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        ?.takeIf { it.isEditable && !isProtected(it) }
 
     fun begin(): Boolean {
         generation++; writeSequence++; ownership = null; first = true; lastError = ""
@@ -156,5 +156,9 @@ class EditorBridge(private val service: AlienAccessibilityService) {
     fun detachedTargetUnchanged() = detachedSnapshot?.let { it == snapshotNode() } == true
     fun invalidate() { generation++; writeSequence++; ownership?.invalidate() }
     private fun rejected(reason: String): EditorSnapshot? { fail(reason); return null }
-    private fun fail(reason: String): Boolean { lastError = reason; return false }
+    private fun fail(reason: String): Boolean {
+        lastError = reason
+        app.crashJournal.editorFailure(reason)
+        return false
+    }
 }

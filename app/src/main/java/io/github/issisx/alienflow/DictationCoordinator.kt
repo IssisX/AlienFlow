@@ -55,6 +55,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     private fun update(value: String? = null) {
         val changed = value != null && value != status
         if (value != null) status = value
+        if (changed) app.crashJournal.statusChanged(status)
         listener?.invoke()
         service?.refreshBubble()
         if (changed) service?.presentStatus(status)
@@ -79,7 +80,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         active = true; finishing = false; update("Starting microphone and realtime connection…")
         app.crashJournal.mark("service.start-requested")
         try { app.startForegroundService(Intent(app, CaptureService::class.java).setAction(CaptureService.START)); app.crashJournal.mark("service.start-returned") }
-        catch (_: Exception) { active = false; editor = null; update("Android denied background microphone start. Open AlienFlow and start a test; bubble start is not available in this permission state") }
+        catch (e: Exception) { app.crashJournal.recordFailure("service.failure", e); active = false; editor = null; update("Android denied background microphone start. Open AlienFlow and start a test; bubble start is not available in this permission state") }
     }
     fun microphoneServiceReady() {
         if (!active || transport != null) return
@@ -274,7 +275,11 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         if (!writing && bridge != null) bridge.cancel { ok -> if (session == canceledToken && !active && !finishing) update(if (ok) "Canceled • owned text restored" else "Canceled • ownership uncertain, field left unchanged") }
         else update("Canceled • in-flight edit cannot be undone safely")
     }
-    fun serviceLost() { if (active || finishing) failure("Accessibility disconnected; recording stopped and audio preserved"); service = null }
+    fun serviceLost() {
+        app.crashJournal.mark("accessibility.disconnected")
+        service = null
+        if (active || finishing) failure("Accessibility disconnected; recording stopped and audio preserved")
+    }
     fun screenUnavailable() { if (active || finishing) failure("Screen locked or turned off; microphone stopped and unfinished work preserved") }
     fun captureServiceLost() { if (active) failure("Microphone service stopped unexpectedly; audio retained") }
     fun ownsAudio(file: File) = audio?.file == file || recoveryFile == file

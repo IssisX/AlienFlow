@@ -28,7 +28,14 @@ class MainActivity : Activity() {
         window.statusBarColor = Color.rgb(16, 22, 16)
         val screen = column(); screen.setBackgroundColor(Color.rgb(16, 22, 16)); screen.setPadding(dp(22), dp(24), dp(22), dp(40))
         val scroll = ScrollView(this); scroll.addView(screen); setContentView(scroll)
+        scroll.setOnApplyWindowInsetsListener { _, insets ->
+            val bars = insets.getInsets(android.view.WindowInsets.Type.systemBars())
+            screen.setPadding(dp(22) + bars.left, dp(16) + bars.top, dp(22) + bars.right, dp(24) + bars.bottom)
+            insets
+        }
         title(screen, "ALIENFLOW", 30)
+        text(screen, "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", 14)
+        button(screen, "Diagnostics / share report") { startActivity(Intent(this, DiagnosticsActivity::class.java)) }
         text(screen, "Your words. Your keyboard.", 18, green)
         text(screen, "Live dictation uses your personal OpenAI account. The alien keeps your existing keyboard selected.")
         status = text(screen, app.coordinator.status, 17, green)
@@ -53,12 +60,6 @@ class MainActivity : Activity() {
         result = text(screen, "No dictation yet", 17)
         button(screen, "Copy current result") { copy(app.coordinator.result) }
         button(screen, "Settings") { settings() }
-        title(screen, "Crash diagnostic (private)")
-        text(screen, "If dictation crashes, reopen AlienFlow and copy the diagnostic below. It excludes your speech, API key, and exception messages. Native crashes may only leave a startup checkpoint.")
-        val diagnostic = text(screen, app.crashJournal.diagnostic(), 13)
-        button(screen, "Refresh diagnostic") { diagnostic.text = app.crashJournal.diagnostic() }
-        button(screen, "Copy crash diagnostic") { copy(app.crashJournal.diagnostic()) }
-        button(screen, "Clear diagnostic") { app.crashJournal.clear(); diagnostic.text = app.crashJournal.diagnostic() }
         title(screen, "Recent text & pending recovery")
         text(screen, "Completed recordings are deleted. Text is kept for 7 days by default. Interrupted audio stays private for 24 hours; recovery never turns on the mic or edits a new field.")
         button(screen, "Refresh history") { refreshHistory() }

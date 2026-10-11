@@ -17,7 +17,7 @@ class CaptureService : Service() {
             startForeground(1, notification("Starting dictation…"), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
             (application as AlienApp).crashJournal.mark("service.promoted")
             coordinator.microphoneServiceReady()
-        } catch (_: Exception) { coordinator.failure("Android denied microphone foreground service; check microphone permission and start restrictions"); stopSelf() }
+        } catch (e: Exception) { (application as AlienApp).crashJournal.recordFailure("service.failure", e); coordinator.failure("Android denied microphone foreground service; check microphone permission and start restrictions"); stopSelf() }
         return START_NOT_STICKY
     }
     private fun notification(text: String): Notification {

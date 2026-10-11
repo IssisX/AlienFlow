@@ -70,7 +70,7 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
                         .setUseHardwareAcousticEchoCanceler(RealtimeCapturePolicy.USE_HARDWARE_ACOUSTIC_ECHO_CANCELER)
                         .setUseHardwareNoiseSuppressor(RealtimeCapturePolicy.USE_HARDWARE_NOISE_SUPPRESSOR)
                         .setAudioRecordStateCallback(object : JavaAudioDeviceModule.AudioRecordStateCallback {
-                            override fun onWebRtcAudioRecordStart() { }
+                            override fun onWebRtcAudioRecordStart() { main.post { if (!closed) (context.applicationContext as AlienApp).crashJournal.mark("microphone.native-started") } }
                             override fun onWebRtcAudioRecordStop() {
                                 main.post { if (!closed && capturing && !reconnecting) listener.failure("Microphone capture stopped unexpectedly; recording preserved") }
                             }
@@ -122,17 +122,19 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
                         if (!closed && capturing && generation == connectionGeneration && ch.state() == DataChannel.State.OPEN) {
                             try {
                                 (context.applicationContext as AlienApp).crashJournal.mark("microphone.request")
-                                // Peer ownership alone starts capture. The old code also called
-                                // JavaAudioDeviceModule.requestStartRecording(), creating a second
-                                // recording demand at the same boundary where the phone crashed.
+                                // Preserve 0.1.4 peer-owned capture. The fork supports independent
+                                // client demand too; its presence alone did not prove the crash cause.
                                 connection?.setAudioRecording(true)
                                 localOnly = false; reconnecting = false
                                 if (reconnect) listener.reconnected()
-                            } catch (_: AssertionError) {
+                            } catch (e: AssertionError) {
+                                (context.applicationContext as AlienApp).crashJournal.recordFailure("microphone.failure", e)
                                 listener.failure("WebRTC microphone start assertion; audio preserved")
-                            } catch (_: LinkageError) {
+                            } catch (e: LinkageError) {
+                                (context.applicationContext as AlienApp).crashJournal.recordFailure("microphone.failure", e)
                                 listener.failure("WebRTC native microphone startup failed; audio preserved")
-                            } catch (_: RuntimeException) {
+                            } catch (e: RuntimeException) {
+                                (context.applicationContext as AlienApp).crashJournal.recordFailure("microphone.failure", e)
                                 listener.failure("WebRTC microphone startup failed; audio preserved")
                             }
                         } else if (!closed && capturing && generation == connectionGeneration && ch.state() == DataChannel.State.CLOSED) listener.interrupted()
@@ -161,14 +163,26 @@ class RealtimeTransport(private val context: Context, private val audio: Pending
                 val answer = withContext(Dispatchers.IO) { api!!.answer(secret, offer.description) }
                 if (!closed && capturing && generation == connectionGeneration) setDescription(SessionDescription(SessionDescription.Type.ANSWER, answer), false)
             } catch (_: CancellationException) { }
-            catch (_: AssertionError) { if (!closed && capturing) listener.failure("WebRTC audio assertion; recording preserved") }
-            catch (_: LinkageError) { if (!closed && capturing) listener.failure("WebRTC native initialization failed; recording preserved") }
+            catch (e: AssertionError) {
+                if (!closed) (context.applicationContext as AlienApp).crashJournal.recordFailure("transport.failure", e)
+                if (!closed && capturing) listener.failure("WebRTC audio assertion; recording preserved")
+            }
+            catch (e: LinkageError) {
+                if (!closed) (context.applicationContext as AlienApp).crashJournal.recordFailure("transport.failure", e)
+                if (!closed && capturing) listener.failure("WebRTC native initialization failed; recording preserved")
+            }
             catch (e: Exception) {
+                if (!closed) (context.applicationContext as AlienApp).crashJournal.recordFailure("transport.failure", e)
                 if (!closed && capturing) { if (reconnect && !(e is SafeApiException && e.httpCode in setOf(401, 403, 429))) scheduleReconnect() else listener.failure(safeNetworkError(e)) }
             }
         }
     }
-    private fun microphoneError(message: String) { main.post { if (!closed && capturing) listener.failure(message) } }
+    private fun microphoneError(message: String) { main.post {
+        if (!closed && capturing) {
+            (context.applicationContext as AlienApp).crashJournal.mark("microphone.native-error")
+            listener.failure(message)
+        }
+    } }
     private fun safeNetworkError(e: Exception) = if (e is SafeApiException) e.message!! else "Realtime connection failed; check network, key and model access"
     private suspend fun setDescription(description: SessionDescription, local: Boolean) {
         suspendCancellableCoroutine<Unit> { cont ->
