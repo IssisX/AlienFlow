@@ -3,7 +3,12 @@ package io.github.issisx.alienflow
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
 class RealtimeCapturePolicyTest {
     @Test fun sessionUsesDocumentedLiveTranscriptionContract() {
         val update = JSONObject(RealtimeProtocol.sessionUpdate("en", "ScraperX AC-42"))
