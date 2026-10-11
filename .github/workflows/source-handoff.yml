@@ -1,5 +1,6 @@
 name: Source handoff for diagnostic repair
 on:
+  workflow_dispatch:
   push:
     branches: [build/first-apk]
     paths: ['.github/workflows/source-handoff.yml']
