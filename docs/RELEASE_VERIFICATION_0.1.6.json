@@ -1,0 +1,82 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version_name": "0.1.6",
+  "version_code": 7,
+  "compiled_source_sha": "a60c0278f554b9805e93240f9d324bcbbc902502",
+  "compiled_tree_sha": "870d7577fd7607b16709e8b41ee32e915988b99c",
+  "branch": "build/first-apk",
+  "workflow_run_url": "https://github.com/IssisX/AlienFlow/actions/runs/38159376803",
+  "artifact_id": 11709204998,
+  "unsigned_bundle": {
+    "filename": "AlienFlow-0.1.6-unsigned-release-bundle.zip",
+    "size_bytes": 3200109,
+    "sha256": "95a838b85bf61be6ce5d055297cb31352287451e3878e44967c6e95da8ac95b1",
+    "manifest_member_hashes_verified": 39
+  },
+  "unsigned_apk": {
+    "filename": "AlienFlow-0.1.6-unsigned.apk",
+    "size_bytes": 4311961,
+    "sha256": "f24a6c3a10986be44ba10d474aef3f89f5f89c966a9b463ec2a6f1c79fc142b5"
+  },
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.6.apk",
+    "size_bytes": 4323480,
+    "sha256": "17db5338ac297d1820a4acbc17bfd08f3e8acecf158b1bdb4cb7ab88d90dccd5",
+    "signing_scheme": "APK v3",
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "unsigned_payload_entries": 25,
+    "unchanged_payload_entries": 25,
+    "added_signature_entries": [
+      "META-INF/ALIENFLO.RSA",
+      "META-INF/ALIENFLO.SF",
+      "META-INF/MANIFEST.MF"
+    ]
+  },
+  "transport": {
+    "name": "android-audiorecord+openai-realtime-websocket",
+    "sample_rate_hz": 24000,
+    "channels": 1,
+    "encoding": "PCM16 little-endian",
+    "model": "gpt-live-transcribe",
+    "native_libraries": [],
+    "libjingle_peerconnection_packaged": false
+  },
+  "approved_artwork": {
+    "apk_entry": "res/0p.webp",
+    "sha256": "8850ac9bbd07c876ba00e5b4339d1b126a14d631194b07379dde0ac676888940"
+  },
+  "tests": {
+    "executed": 73,
+    "total": 73,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": {
+      "CrashJournalTest": 2,
+      "DiagnosticsUiTest": 2,
+      "DictationLogicTest": 15,
+      "EditorEvidenceTest": 12,
+      "EditorWidgetTest": 6,
+      "FocusRoutingTest": 6,
+      "NativeCrashSummaryTest": 3,
+      "PendingAudioTest": 22,
+      "RealtimeCapturePolicyTest": 5
+    }
+  },
+  "lint": {
+    "issues": 28,
+    "errors": 0
+  },
+  "framework_ui_renders": [
+    "reports/ui-proof/main-0.1.6.png",
+    "reports/ui-proof/diagnostics-0.1.6.png"
+  ],
+  "runtime_evidence_motivating_change": {
+    "device": "samsung SM-F956U",
+    "android_api": 36,
+    "direct_microphone_probe_samples": 70560,
+    "historical_failure": "REASON_CRASH_NATIVE; signal 6; crashing frames in libjingle_peerconnection_so.so"
+  },
+  "phone_acceptance": "Not yet run for 0.1.6. The physical Fold6 live dictation path remains the release acceptance gate.",
+  "paid_provider_test": "Not run in CI; no user API key was placed in source, logs, or artifacts."
+}
