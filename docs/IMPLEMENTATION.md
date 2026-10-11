@@ -1,44 +1,95 @@
-# AlienFlow current checkpoint — 0.1.5
+# AlienFlow implementation checkpoint — 0.1.6
 
-Repository: IssisX/AlienFlow. Branch: build/first-apk. Baseline: d148e9da7191eff78d49a674a92118a79775a071. Date: 2026-10-11.
+Repository: `IssisX/AlienFlow`  
+Branch: `build/first-apk`  
+Compiled source: `a60c0278f554b9805e93240f9d324bcbbc902502`  
+Date: 2026-10-11
 
-## Scope and observations
+The full prior 0.1.5 checkpoint is preserved at [history/IMPLEMENTATION_0.1.5.md](history/IMPLEMENTATION_0.1.5.md). This file is the current authority.
 
-The owner reports continued mic-start exits on 0.1.4, now described as graceful, and needs an accessible way to send evidence. The exact generated Gray alien was approved. No Android exit record, Java stack, or native trace from the phone has yet been supplied. The green indicator alone does not establish receipt of microphone frames by AlienFlow, or upload to OpenAI. “Thinking failed” did not undo the published source: the baseline includes the source handoff workflow from that interrupted turn.
+## Observed failure and supported cause
 
-The prior checkpoint is preserved verbatim in history/IMPLEMENTATION_0.1.4.md. All earlier source/history, release metadata, signing identity, user preferences, key storage, transcript history and recovery files are preserved. The signed 0.1.4 payload was compared to its original unsigned bundle and all entries match. The 0.1.3/0.1.4 DEX files do contain the previous diagnostic label/class; this does not establish that the owner could reach that UI, and the new UI does not depend on those instructions.
+The owner's Galaxy Z Fold6 diagnostic report supplied the missing discriminator:
 
-## Implemented repair and evidence collection
+- Android 16/API 36, ARM64, microphone and notification permissions granted, accessibility bound.
+- The isolated Android microphone probe captured 70,560 PCM samples successfully.
+- No Java/Kotlin uncaught exception was captured.
+- Android recorded multiple native crashes. The retained tombstone shows signal 6 / abort and every application-owned crashing-thread frame inside `base.apk!libjingle_peerconnection_so.so`, build ID `8939406b3b9fa259`.
 
-- EditorBridge now uses AccessibilityService.findFocus(FOCUS_INPUT) across windows. The old rootInActiveWindow search follows the currently touched window, which can be the bubble, rather than keyboard focus. Missing/currently changed input is still rejected; no stale-target fallback or blind mutation was added. A broker-fixture regression exercises the production resolver with an active overlay and a distinct keyboard-focused editor; physical Samsung broker behavior is a separate gate.
-- Accessibility teardown detaches the service from the coordinator before publishing a terminal status or removing its views. No status update is intentionally routed through a destroyed overlay.
-- The landing screen identifies the installed version and puts **Diagnostics / share report** immediately below the title/version. The same entry is in the long-press bubble menu. A dedicated DiagnosticsActivity contains the real preview, Share, Copy, Save and Refresh actions. The old duplicate diagnostic subsection was removed. Share uses Android's chooser and requires an explicit user action; nothing is sent automatically.
-- The report includes current build/source/certificate, device/API/ABI, microphone and notification grant state, accessibility/capture binding, an 80-event metadata trace, latest editor AF-E code, and caught/uncaught Java failure locations. Android ApplicationExitInfo supplies up to five historical exits, separating process death from app-controlled recording stops. System exit descriptions and arbitrary exception messages are excluded.
-- When Android retains a native tombstone, a bounded parser extracts signal numbers and up to 24 code-location frames from the crashing thread. Raw memory, abort messages, logs, file descriptors and command-line strings are neither shared nor saved by the parser. No trace is reported as no available trace, not proof of no crash.
-- An explicit three-second Android microphone probe reads PCM and counts samples, with no WebRTC, API request, recording file or text insertion. Leaving its activity cancels it and releases AudioRecord. Its result does not establish realtime transcription success.
-- The approved artwork is scaled/encoded as a packaged WebP, not redrawn. Both overlay and launcher load that asset. Default 75% idle opacity and the existing sliders remain unchanged.
+This establishes that basic Android microphone capture works under the granted permission and that the delivered native WebRTC library owned the observed process death. It does not identify the exact internal WebRTC assertion because Android did not retain symbols or the abort message, but it is sufficient to stop patching around that library.
 
-## Research correction
+## Repair
 
-The earlier “two microphone demands caused the crash” claim was not established. The fork explicitly coordinates client and native demand using separate flags; the original PROTOCOL.md already described that mechanism. The 0.1.4 experiment failed on the phone. This change does not introduce another speculative microphone backend/dependency/effect change. Current primary references and the narrower conclusions are in RESEARCH_2026-10-11.md.
+AlienFlow no longer depends on or packages WebRTC.
 
-## Verified 0.1.5 delivery
+`RealtimeTransport` now owns one direct path:
 
-Compiled source: `c289cb98f5d1dabffcc8eadf6fad98dbc586efc5`, tree `600cf1386cdd024d451607c8c8deec84c7c5c822`. Later documentation-only commits record these outcomes without changing the compiled code.
+1. Open an authenticated OpenAI Realtime WebSocket.
+2. Send a transcription `session.update` for `gpt-live-transcribe` with 24 kHz PCM input and `turn_detection: null`.
+3. After the server acknowledges the session, create one Android `AudioRecord` using `VOICE_RECOGNITION`, mono PCM16 at 24 kHz.
+4. Persist each PCM chunk to the existing `PendingAudio` WAV owner.
+5. Base64-encode the same raw PCM bytes and send `input_audio_buffer.append`.
+6. Use the existing conservative client-side speech/silence detector to send `input_audio_buffer.commit`.
+7. Feed returned transcript delta/completion events into the existing transcript ledger and guarded editor bridge.
 
-- The initial run at `43b6bdbf29e426347715441ad2b67ea25cc5016a` failed during Gradle configuration because AGP rejects a Provider supplied to the legacy Android SourceSet API. No application test/build pass was claimed for that run. The generated artwork was registered through the documented variant generated-source API, carrying its task dependency; no compatibility override or disabled check was added.
-- [Actions run 38139391856](https://github.com/IssisX/AlienFlow/actions/runs/38139391856) passed all 69 tests, with zero failures/errors/skips. This includes six production-focus-resolver executions with a simulated OS broker, three native-metadata parser tests, and two actual activity/click-handler tests, alongside the existing suites.
-- MainActivity and DiagnosticsActivity were rendered under Robolectric API 35 at 822×1782. Both images were visually inspected. The diagnostics entry is visible below the title/version; Copy places the actual report on the clipboard; Share uses the same text in Android's chooser; Save launches the system document picker. These are framework-level tests, not physical phone screenshots or a completed file-save/device/microphone integration test.
-- Release lint: zero errors, 29 warnings, all inspected. They concern deliberate synchronous diagnostic persistence, pinned-version/SDK recommendations, ARM64-only coverage, localization, absolute overlay coordinates and launcher-theme resource polish. No error baseline or new suppression was used.
-- APK assembly, application/version identity, native 16 KiB alignment, and artifact upload passed. GitHub artifact `11702214281` SHA-256 `7edbffea6c2d98b21190db3ea18fd5c02f970f2d68eb86be5266b5bb23e4fa02` matched the downloaded bundle. All 39 manifest-listed member hashes matched.
-- The approved WebP survived packaging byte-for-byte with SHA-256 `8850ac9bbd07c876ba00e5b4339d1b126a14d631194b07379dde0ac676888940`. AAPT shortened its packaged path to `res/0p.webp`; the source drawable identifier remains in the resource table. The DEX contains the exact compiled source identifier, version and diagnostic UI labels.
-- The final signed APK is 17,086,706 bytes with SHA-256 `923055310de532dfd2194fa403140fe264cc963c426db52f1b927911ff20341a`. APK v3 verification passed using original certificate `d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f`. All 26 original payload entries match the unsigned candidate; the signer added only its three META-INF signature metadata entries.
-- Local source whitespace checks passed excluding the intentionally verbatim historical Markdown copy (its original hard-break whitespace was retained). XML/Python syntax and the bounded native-parser smoke test passed. No local Android SDK build, emulator, paid provider call or physical phone test was run.
+The transport keeps bounded WebSocket queue ownership, exact connection generations, explicit local-only/reconnect state, and audio-coverage uncertainty. Connection loss preserves local capture/recovery rather than pretending remote coverage succeeded.
 
-The exact machine-readable record is RELEASE_VERIFICATION_0.1.5.json and actual signer output is APK_SIGNATURE_0.1.5.txt.
+## Preserved contracts
 
-## Remaining acceptance
+The following were not reset or migrated:
 
-The original shutdown on the Fold6 remains unresolved until the same phone path succeeds or its diagnostic report identifies the failure. Install the signed update in place, verify Version 0.1.5 (6), and try one dictation. If it stops/exits, open the top-level **Diagnostics / share report** and copy or save the report. Android exit timestamps plus session events distinguish graceful stop, Java/native crash, permission/update termination or missing system evidence. The three-second probe is optional and proves only basic AudioRecord reads.
+- Application ID and permanent signing certificate.
+- Encrypted API-key storage.
+- Preferences, bubble positions, 75% default opacity, and approved Gray artwork.
+- History and pending WAV formats.
+- Accessibility overlay and guarded editor ownership.
+- Transcript ordering, correction modes, profanity/text preservation, cancellation, and recovery semantics.
 
-Do not equate a passing build, simulated broker test or framework screenshot with real microphone/provider/editor success. Preserve the product requirements, existing signing identity, saved settings and user work. A report with no native trace is incomplete evidence, not a no-crash finding.
+The foreground microphone service still owns Android's microphone lifecycle. The service rechecks `RECORD_AUDIO` immediately before `AudioRecord` creation. There is no `SYSTEM_ALERT_WINDOW` substitution and no hidden activity workaround.
+
+## Current API contract
+
+Official OpenAI documentation checked on 2026-10-11 specifies `gpt-live-transcribe` transcription sessions, 24 kHz `audio/pcm`, Base64 `input_audio_buffer.append`, explicit `input_audio_buffer.commit`, and client-side VAD when turn detection is null. AlienFlow implements that contract over WebSocket. The personal BYOK design keeps the account key encrypted on the phone; this remains a personal-app tradeoff, not a recommended public multi-user secret architecture.
+
+## Verification tied to the compiled revision
+
+[GitHub Actions run 38159376803](https://github.com/IssisX/AlienFlow/actions/runs/38159376803) passed for source `a60c0278f554b9805e93240f9d324bcbbc902502`:
+
+- 73 tests executed; zero failures, errors, or skips.
+- Test suites: crash journal 2, diagnostics UI 2, dictation logic 15, editor evidence 12, editor widgets 6, focus routing 6, native trace parser 3, pending audio 22, realtime protocol/capture policy 5.
+- Release lint: zero errors, 28 warnings. No baseline or weakened gate was added.
+- Release assembly and package/version identity passed.
+- Packaging failed closed unless the APK had no native libraries, no `native-code:` declaration, and no `libjingle_peerconnection_so.so`.
+- The exact approved artwork SHA-256 was found once in the APK.
+- Framework UI renders for version 0.1.6 and the diagnostics controls were produced.
+
+Artifact `11709204998`, `AlienFlow-0.1.6-unsigned-release-bundle.zip`:
+
+- Size: 3,200,109 bytes.
+- SHA-256: `95a838b85bf61be6ce5d055297cb31352287451e3878e44967c6e95da8ac95b1`.
+- All 39 member hashes in `build-info.json` were verified after download.
+
+Final signed APK:
+
+- File: `AlienFlow-0.1.6.apk`.
+- Size: 4,323,480 bytes.
+- SHA-256: `17db5338ac297d1820a4acbc17bfd08f3e8acecf158b1bdb4cb7ab88d90dccd5`.
+- APK Signature Scheme v3 verified.
+- Certificate SHA-256: `d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f`.
+- All 25 unsigned payload entries remained byte-identical; only `META-INF/ALIENFLO.RSA`, `META-INF/ALIENFLO.SF`, and `META-INF/MANIFEST.MF` were added by signing.
+
+Machine-readable evidence is in [RELEASE_VERIFICATION_0.1.6.json](RELEASE_VERIFICATION_0.1.6.json). Actual signer output is in [APK_SIGNATURE_0.1.6.txt](APK_SIGNATURE_0.1.6.txt).
+
+## Remaining acceptance gate
+
+The Fold6 must still exercise the changed path. A passing build does not prove the phone, editor, network, or provider integration.
+
+Required first run:
+
+1. Install over 0.1.5 without clearing data and confirm version 0.1.6 (7).
+2. Focus an empty ordinary field with Gboard.
+3. Tap the alien; confirm the process remains alive and reaches `Listening`.
+4. Speak, pause, observe transcript text, then stop.
+5. Confirm the microphone indicator clears and history/recovery state is truthful.
+
+If it fails, collect the new diagnostics. Old `libjingle` crash records can remain in Android's historical list; the relevant evidence is the newest timestamp and the 0.1.6 session events. Do not call the native crash fixed until the same phone path survives.
