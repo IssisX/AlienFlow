@@ -46,10 +46,9 @@ android {
         applicationId = "io.github.issisx.alienflow"
         minSdk = 33
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.1.5"
+        versionCode = 7
+        versionName = "0.1.6"
         buildConfigField("String", "SOURCE_REVISION", "\"${System.getenv("GITHUB_SHA") ?: "local-unversioned"}\"")
-        ndk { abiFilters += "arm64-v8a" }
     }
     buildFeatures { buildConfig = true }
     buildTypes {
@@ -84,7 +83,6 @@ kotlin {
 dependencies {
     implementation(libs.coroutines.android)
     implementation(libs.okhttp)
-    implementation(libs.webrtc)
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.robolectric)

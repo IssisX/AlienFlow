@@ -76,7 +76,7 @@ class DiagnosticsActivity : Activity() {
         button("Refresh report", false) { refreshReport() }
         label("No API key, dictated words, recordings, memory dumps, or automatic uploads. Android exit records distinguish crashes from normal session stops.", 14f)
         button("Test microphone for 3 seconds (no upload)", false) { microphoneProbe() }
-        label("This separate check tests Android audio capture only, not WebRTC or OpenAI. It saves sample counts, not audio.", 14f)
+        label("This separate check tests Android audio capture only, not the realtime WebSocket or OpenAI. It saves sample counts, not audio.", 14f)
         output = label("", 13f).apply { setTextIsSelectable(true) }
         refreshReport()
     }

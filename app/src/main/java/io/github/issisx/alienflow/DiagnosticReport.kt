@@ -20,6 +20,8 @@ object DiagnosticReport {
         appendLine("Package: ${app.packageName}; pid=${Process.myPid()}")
         appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}; Android ${Build.VERSION.RELEASE}; API ${Build.VERSION.SDK_INT}")
         appendLine("ABI: ${Build.SUPPORTED_ABIS.joinToString()}")
+        appendLine("Transport: ${RealtimeProtocol.TRANSPORT_NAME}")
+        appendLine("Native WebRTC packaged: false")
         try {
             val info = app.packageManager.getPackageInfo(app.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
             val cert = info.signingInfo?.apkContentsSigners?.firstOrNull()?.toByteArray()

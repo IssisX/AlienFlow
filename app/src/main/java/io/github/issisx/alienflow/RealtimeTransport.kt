@@ -1,243 +1,416 @@
 package io.github.issisx.alienflow
 
 import android.content.Context
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.os.Handler
 import android.os.Looper
 import kotlinx.coroutines.*
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
 import org.json.JSONObject
-import org.webrtc.*
-import org.webrtc.audio.JavaAudioDeviceModule
-import java.nio.ByteBuffer
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
-import kotlin.math.sqrt
+import java.io.IOException
 
-object RealtimeCapturePolicy {
-    const val USE_HARDWARE_ACOUSTIC_ECHO_CANCELER = false
-    const val USE_HARDWARE_NOISE_SUPPRESSOR = false
-    const val USE_INDEPENDENT_CLIENT_RECORDING_DEMAND = false
-}
+/**
+ * Direct 24 kHz PCM capture plus the OpenAI Realtime WebSocket protocol.
+ *
+ * The previous native WebRTC library is deliberately not part of this owner path:
+ * the Fold6 supplied an Android tombstone proving SIGABRT inside that exact ELF,
+ * while the app's direct AudioRecord probe captured 70,560 samples successfully.
+ */
+class RealtimeTransport(
+    private val context: Context,
+    private val audio: PendingAudio,
+    private val listener: Listener,
+) {
+    interface Listener {
+        fun event(value: JSONObject)
+        fun captured()
+        fun turnCommitted()
+        fun interrupted()
+        fun reconnected()
+        fun failure(message: String)
+    }
 
-/** All native lifecycle operations run on main. HTTP runs on IO, never on the audio thread. */
-class RealtimeTransport(private val context: Context, private val audio: PendingAudio, private val listener: Listener) {
-    interface Listener { fun event(value: JSONObject); fun captured(); fun turnCommitted(); fun interrupted(); fun reconnected(); fun failure(message: String) }
+    private val app = context.applicationContext as AlienApp
     private val main = Handler(Looper.getMainLooper())
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private var factory: PeerConnectionFactory? = null
-    private var device: JavaAudioDeviceModule? = null
-    private var connection: PeerConnection? = null
-    private var channel: DataChannel? = null
-    private var source: AudioSource? = null
-    private var track: AudioTrack? = null
+    private val state = Any()
+    private val controlScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val captureScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val vad = ClientSideVad()
+    private val coverage = AudioCoverage()
+
     @Volatile private var closed = false
     @Volatile private var capturing = true
     @Volatile private var localOnly = false
-    @Volatile private var reconnecting = false
-    private var firstSample = true
-    private var voiced = false
-    private var speechMs = 0L
-    private var silenceMs = 0L
-    private var lastVoice = System.currentTimeMillis()
-    private var connectionGeneration = 0
-    private var commitSequence = 0L
-    private val coverage = AudioCoverage()
-    private var reconnectJob: Job? = null
-    private var connectJob: Job? = null
+    @Volatile private var recorder: AudioRecord? = null
+
     private var api: OpenAiClient? = null
     private var key = ""
     private var language = ""
     private var vocabulary = ""
-    val hasPendingCoverage get() = coverage.uncertain
+    private var socket: WebSocket? = null
+    private var socketGeneration = 0
+    private var sessionReady = false
+    private var reconnecting = false
+    private var interruptionReported = false
+    private var remoteBufferedBytes = 0L
+    private var commitSequence = 0L
+    private var reconnectJob: Job? = null
+    private var captureJob: Job? = null
+    private var firstSample = true
+
+    val hasPendingCoverage: Boolean get() = synchronized(state) { coverage.uncertain }
     var silenceStopSeconds = 0
     var onSilenceStop: (() -> Unit)? = null
+
     fun connect(api: OpenAiClient, key: String, language: String, vocabulary: String) {
-        this.api = api; this.key = key; this.language = language; this.vocabulary = vocabulary
-        openPeer(false)
+        this.api = api
+        this.key = key
+        this.language = language
+        this.vocabulary = vocabulary
+        openSocket(reconnect = false)
     }
-    private fun openPeer(reconnect: Boolean) {
-        connectJob = scope.launch {
-            val generation = ++connectionGeneration
-            try {
-                val secret = withContext(Dispatchers.IO) { api!!.clientSecret(key, language, vocabulary) }
-                if (closed || !capturing || generation != connectionGeneration) return@launch
-                (context.applicationContext as AlienApp).crashJournal.mark("session.secret")
-                if (factory == null) {
-                    (context.applicationContext as AlienApp).crashJournal.mark("webrtc.initialize")
-                    PeerConnectionFactory.initialize(PeerConnectionFactory.InitializationOptions.builder(context).createInitializationOptions())
-                    device = JavaAudioDeviceModule.builder(context)
-                        .setUseStereoInput(false)
-                        .setAudioFormat(android.media.AudioFormat.ENCODING_PCM_16BIT)
-                        .setUseHardwareAcousticEchoCanceler(RealtimeCapturePolicy.USE_HARDWARE_ACOUSTIC_ECHO_CANCELER)
-                        .setUseHardwareNoiseSuppressor(RealtimeCapturePolicy.USE_HARDWARE_NOISE_SUPPRESSOR)
-                        .setAudioRecordStateCallback(object : JavaAudioDeviceModule.AudioRecordStateCallback {
-                            override fun onWebRtcAudioRecordStart() { main.post { if (!closed) (context.applicationContext as AlienApp).crashJournal.mark("microphone.native-started") } }
-                            override fun onWebRtcAudioRecordStop() {
-                                main.post { if (!closed && capturing && !reconnecting) listener.failure("Microphone capture stopped unexpectedly; recording preserved") }
-                            }
-                        })
-                        .setAudioRecordErrorCallback(object : JavaAudioDeviceModule.AudioRecordErrorCallback {
-                            override fun onWebRtcAudioRecordInitError(message: String) { microphoneError("Microphone initialization failed") }
-                            override fun onWebRtcAudioRecordStartError(code: JavaAudioDeviceModule.AudioRecordStartErrorCode, message: String) { microphoneError("Microphone start failed") }
-                            override fun onWebRtcAudioRecordError(message: String) { microphoneError("Microphone capture failed") }
-                        })
-                        .setSamplesReadyCallback { samples ->
-                            if (!capturing || closed) return@setSamplesReadyCallback
-                            try {
-                                check(samples.audioFormat == android.media.AudioFormat.ENCODING_PCM_16BIT) { "Unsupported microphone PCM format" }
-                                audio.append(samples.data, samples.sampleRate, samples.channelCount)
-                                if (firstSample) { firstSample = false; lastVoice = System.currentTimeMillis(); main.post { if (!closed && capturing) listener.captured() } }
-                                inspect(samples.data, samples.sampleRate, samples.channelCount)
-                            } catch (_: Exception) { main.post { if (!closed && capturing) listener.failure("Local audio storage failed; capture stopped") } }
-                        }.createAudioDeviceModule()
-                    (context.applicationContext as AlienApp).crashJournal.mark("webrtc.factory")
-                    factory = PeerConnectionFactory.builder().setAudioDeviceModule(device).createPeerConnectionFactory()
-                    source = factory!!.createAudioSource(MediaConstraints())
-                    track = factory!!.createAudioTrack("alienflow-microphone", source)
+
+    private fun openSocket(reconnect: Boolean) {
+        if (closed || !capturing) return
+        val generation = synchronized(state) {
+            socketGeneration += 1
+            sessionReady = false
+            reconnecting = reconnect
+            socketGeneration
+        }
+        app.crashJournal.mark("websocket.connecting")
+        try {
+            api!!.realtimeWebSocket(key, object : WebSocketListener() {
+                override fun onOpen(webSocket: WebSocket, response: Response) {
+                    val accepted = synchronized(state) {
+                        if (closed || !capturing || generation != socketGeneration) false
+                        else {
+                            socket = webSocket
+                            true
+                        }
+                    }
+                    if (!accepted) {
+                        webSocket.cancel()
+                        return
+                    }
+                    app.crashJournal.mark("websocket.open")
+                    if (!webSocket.send(RealtimeProtocol.sessionUpdate(language, vocabulary))) {
+                        transportLost(generation, webSocket, null, "Realtime session setup could not be sent")
+                        return
+                    }
+                    app.crashJournal.mark("websocket.session-update")
+                    main.postDelayed({
+                        val waiting = synchronized(state) {
+                            !closed && capturing && generation == socketGeneration && !sessionReady
+                        }
+                        if (waiting) transportLost(
+                            generation,
+                            webSocket,
+                            null,
+                            "Realtime session setup timed out",
+                        )
+                    }, 15_000L)
                 }
-                (context.applicationContext as AlienApp).crashJournal.mark("webrtc.peer")
-                val config = PeerConnection.RTCConfiguration(emptyList()).apply { sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN }
-                connection = factory!!.createPeerConnection(config, object : PeerConnection.Observer {
-                    override fun onSignalingChange(s: PeerConnection.SignalingState) {}
-                    override fun onIceConnectionChange(s: PeerConnection.IceConnectionState) {
-                        if (s == PeerConnection.IceConnectionState.FAILED || s == PeerConnection.IceConnectionState.DISCONNECTED) main.postDelayed({
-                            if (!closed && capturing && generation == connectionGeneration && connection?.iceConnectionState() in setOf(PeerConnection.IceConnectionState.FAILED, PeerConnection.IceConnectionState.DISCONNECTED)) listener.interrupted()
-                        }, 1500)
+
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    val value = try { JSONObject(text) } catch (_: Exception) {
+                        postFailure("Invalid realtime event received")
+                        return
                     }
-                    override fun onIceConnectionReceivingChange(receiving: Boolean) {}
-                    override fun onIceGatheringChange(s: PeerConnection.IceGatheringState) {}
-                    override fun onIceCandidate(candidate: IceCandidate) {}
-                    override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>) {}
-                    override fun onAddStream(stream: MediaStream) {}
-                    override fun onRemoveStream(stream: MediaStream) {}
-                    override fun onDataChannel(dataChannel: DataChannel) {}
-                    override fun onRenegotiationNeeded() {}
-                    override fun onAddTrack(receiver: RtpReceiver, streams: Array<out MediaStream>) {}
-                }) ?: error("WebRTC connection creation failed")
-                connection!!.setAudioRecording(false)
-                connection!!.addTrack(track, listOf("alienflow"))
-                (context.applicationContext as AlienApp).crashJournal.mark("webrtc.data-channel")
-                channel = connection!!.createDataChannel("oai-events", DataChannel.Init()).also { ch -> ch.registerObserver(object : DataChannel.Observer {
-                    override fun onBufferedAmountChange(previousAmount: Long) {}
-                    override fun onStateChange() { main.post {
-                        if (!closed && capturing && generation == connectionGeneration && ch.state() == DataChannel.State.OPEN) {
-                            try {
-                                (context.applicationContext as AlienApp).crashJournal.mark("microphone.request")
-                                // Preserve 0.1.4 peer-owned capture. The fork supports independent
-                                // client demand too; its presence alone did not prove the crash cause.
-                                connection?.setAudioRecording(true)
-                                localOnly = false; reconnecting = false
-                                if (reconnect) listener.reconnected()
-                            } catch (e: AssertionError) {
-                                (context.applicationContext as AlienApp).crashJournal.recordFailure("microphone.failure", e)
-                                listener.failure("WebRTC microphone start assertion; audio preserved")
-                            } catch (e: LinkageError) {
-                                (context.applicationContext as AlienApp).crashJournal.recordFailure("microphone.failure", e)
-                                listener.failure("WebRTC native microphone startup failed; audio preserved")
-                            } catch (e: RuntimeException) {
-                                (context.applicationContext as AlienApp).crashJournal.recordFailure("microphone.failure", e)
-                                listener.failure("WebRTC microphone startup failed; audio preserved")
-                            }
-                        } else if (!closed && capturing && generation == connectionGeneration && ch.state() == DataChannel.State.CLOSED) listener.interrupted()
-                    } }
-                    override fun onMessage(buffer: DataChannel.Buffer) {
-                        if (buffer.binary) return
-                        val bytes = ByteArray(buffer.data.remaining()); buffer.data.get(bytes)
-                        try { val value = JSONObject(String(bytes, Charsets.UTF_8)).put("_connection_generation", generation); main.post {
-                            if (!closed && generation == connectionGeneration) {
-                                if (value.optString("type") == "input_audio_buffer.committed") coverage.acknowledge(value.optString("item_id"))
-                                listener.event(value)
-                            }
-                        } }
-                        catch (_: Exception) { main.post { if (!closed && generation == connectionGeneration) listener.failure("Invalid realtime event received") } }
+                    val type = value.optString("type")
+                    if (RealtimeProtocol.isSessionReadyEvent(type)) {
+                        sessionBecameReady(generation, webSocket, reconnect)
+                        return
                     }
-                }) }
-                (context.applicationContext as AlienApp).crashJournal.mark("webrtc.offer")
-                val offer = suspendCancellableCoroutine<SessionDescription> { cont -> connection!!.createOffer(object : SdpObserver {
-                    override fun onCreateSuccess(s: SessionDescription) { if (cont.isActive) cont.resume(s) }
-                    override fun onSetSuccess() {}
-                    override fun onCreateFailure(message: String) { if (cont.isActive) cont.resumeWithException(IllegalStateException("WebRTC offer creation failed")) }
-                    override fun onSetFailure(message: String) {}
-                }, MediaConstraints()) }
-                setDescription(offer, true)
-                (context.applicationContext as AlienApp).crashJournal.mark("webrtc.answer")
-                val answer = withContext(Dispatchers.IO) { api!!.answer(secret, offer.description) }
-                if (!closed && capturing && generation == connectionGeneration) setDescription(SessionDescription(SessionDescription.Type.ANSWER, answer), false)
-            } catch (_: CancellationException) { }
-            catch (e: AssertionError) {
-                if (!closed) (context.applicationContext as AlienApp).crashJournal.recordFailure("transport.failure", e)
-                if (!closed && capturing) listener.failure("WebRTC audio assertion; recording preserved")
-            }
-            catch (e: LinkageError) {
-                if (!closed) (context.applicationContext as AlienApp).crashJournal.recordFailure("transport.failure", e)
-                if (!closed && capturing) listener.failure("WebRTC native initialization failed; recording preserved")
-            }
-            catch (e: Exception) {
-                if (!closed) (context.applicationContext as AlienApp).crashJournal.recordFailure("transport.failure", e)
-                if (!closed && capturing) { if (reconnect && !(e is SafeApiException && e.httpCode in setOf(401, 403, 429))) scheduleReconnect() else listener.failure(safeNetworkError(e)) }
-            }
+                    main.post {
+                        if (!closed && generation == synchronized(state) { socketGeneration }) {
+                            if (type == "input_audio_buffer.committed") {
+                                synchronized(state) { coverage.acknowledge(value.optString("item_id")) }
+                            }
+                            listener.event(value.put("_connection_generation", generation))
+                        }
+                    }
+                }
+
+                override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                    webSocket.close(code, null)
+                }
+
+                override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                    transportLost(generation, webSocket, null, "Realtime connection closed")
+                }
+
+                override fun onFailure(webSocket: WebSocket, problem: Throwable, response: Response?) {
+                    app.crashJournal.recordFailure("websocket.failure", problem)
+                    transportLost(generation, webSocket, response, safeSocketFailure(response))
+                }
+            })
+        } catch (problem: Exception) {
+            app.crashJournal.recordFailure("websocket.failure", problem)
+            postFailure("Realtime connection could not start")
         }
     }
-    private fun microphoneError(message: String) { main.post {
-        if (!closed && capturing) {
-            (context.applicationContext as AlienApp).crashJournal.mark("microphone.native-error")
-            listener.failure(message)
+
+    private fun sessionBecameReady(generation: Int, webSocket: WebSocket, reconnect: Boolean) {
+        var startCapture = false
+        var reportReconnect = false
+        synchronized(state) {
+            if (closed || !capturing || generation != socketGeneration || socket !== webSocket) return
+            sessionReady = true
+            localOnly = false
+            interruptionReported = false
+            reconnecting = false
+            startCapture = captureJob == null
+            reportReconnect = reconnect && !startCapture
         }
-    } }
-    private fun safeNetworkError(e: Exception) = if (e is SafeApiException) e.message!! else "Realtime connection failed; check network, key and model access"
-    private suspend fun setDescription(description: SessionDescription, local: Boolean) {
-        suspendCancellableCoroutine<Unit> { cont ->
-            val observer = object : SdpObserver {
-                override fun onCreateSuccess(s: SessionDescription) {}
-                override fun onSetSuccess() { if (cont.isActive) cont.resume(Unit) }
-                override fun onCreateFailure(message: String) {}
-                override fun onSetFailure(message: String) { if (cont.isActive) cont.resumeWithException(IllegalStateException("WebRTC SDP setup failed")) }
+        app.crashJournal.mark("websocket.session-ready")
+        if (startCapture) startCapture()
+        if (reportReconnect) main.post { if (!closed && capturing) listener.reconnected() }
+    }
+
+    private fun startCapture() {
+        synchronized(state) {
+            if (closed || !capturing || captureJob != null) return
+            captureJob = captureScope.launch { captureLoop() }
+        }
+    }
+
+    private suspend fun captureLoop() {
+        var owned: AudioRecord? = null
+        try {
+            app.crashJournal.mark("audiorecord.creating")
+            val minimum = AudioRecord.getMinBufferSize(
+                RealtimeProtocol.SAMPLE_RATE,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+            )
+            check(minimum > 0) { "Unsupported microphone format" }
+            val current = AudioRecord.Builder()
+                .setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(RealtimeProtocol.SAMPLE_RATE)
+                        .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
+                        .build(),
+                )
+                .setBufferSizeInBytes(maxOf(minimum * 2, RealtimeProtocol.CHUNK_BYTES * 4))
+                .build()
+            owned = current
+            check(current.state == AudioRecord.STATE_INITIALIZED) { "Microphone did not initialize" }
+            recorder = current
+            current.startRecording()
+            check(current.recordingState == AudioRecord.RECORDSTATE_RECORDING) { "Microphone did not start" }
+            app.crashJournal.mark("audiorecord.started")
+
+            val samples = ShortArray(RealtimeProtocol.CHUNK_SAMPLES)
+            while (capturing && currentCoroutineContext().isActive) {
+                val count = current.read(samples, 0, samples.size, AudioRecord.READ_BLOCKING)
+                if (count > 0) {
+                    val pcm = RealtimeProtocol.pcm16LittleEndian(samples, count)
+                    audio.append(pcm, RealtimeProtocol.SAMPLE_RATE, RealtimeProtocol.CHANNELS)
+                    if (firstSample) {
+                        firstSample = false
+                        main.post { if (!closed && capturing) listener.captured() }
+                    }
+                    sendAudio(pcm)
+                    val decision = vad.inspect(pcm, System.currentTimeMillis(), silenceStopSeconds)
+                    if (decision.commit) sendCommit()
+                    if (decision.silenceStop) main.post { if (!closed && capturing) onSilenceStop?.invoke() }
+                } else if (count < 0) {
+                    if (!capturing || closed) break
+                    throw IOException("AudioRecord read failed ($count)")
+                } else {
+                    delay(5)
+                }
             }
-            if (local) connection!!.setLocalDescription(observer, description) else connection!!.setRemoteDescription(observer, description)
+        } catch (_: CancellationException) {
+            // Explicit stop/close owns cancellation.
+        } catch (problem: Throwable) {
+            if (!closed && capturing) {
+                app.crashJournal.recordFailure("audiorecord.failure", problem)
+                postFailure("Android microphone capture failed; recording preserved")
+            }
+        } finally {
+            synchronized(state) { if (recorder === owned) recorder = null }
+            try {
+                if (owned?.recordingState == AudioRecord.RECORDSTATE_RECORDING) owned.stop()
+            } catch (_: Exception) { }
+            try { owned?.release() } catch (_: Exception) { }
+            app.crashJournal.mark("audiorecord.released")
         }
     }
-    @Synchronized private fun inspect(data: ByteArray, rate: Int, channels: Int) {
-        if (rate <= 0 || channels <= 0) { main.post { if (!closed && capturing) listener.failure("Microphone returned invalid audio metadata") }; return }
-        var sum = 0.0; var count = 0
-        for (i in 0 until data.size - 1 step 2) { val value = ((data[i].toInt() and 255) or (data[i + 1].toInt() shl 8)).toShort().toDouble(); sum += value * value; count++ }
-        val ms = data.size * 1000L / (rate * channels * 2)
-        if (count > 0 && sqrt(sum / count) > 450) { voiced = true; speechMs += ms; silenceMs = 0; lastVoice = System.currentTimeMillis() } else silenceMs += ms
-        if (voiced && speechMs >= 120 && silenceMs >= 850) { voiced = false; speechMs = 0; silenceMs = 0; main.post { if (capturing && !closed) commit() } }
-        if (silenceStopSeconds > 0 && System.currentTimeMillis() - lastVoice > silenceStopSeconds * 1000L) { lastVoice = System.currentTimeMillis(); main.post { if (capturing && !closed) onSilenceStop?.invoke() } }
+
+    private fun sendAudio(pcm: ByteArray) {
+        var failedSocket: WebSocket? = null
+        var notify = false
+        synchronized(state) {
+            val current = socket
+            if (closed || localOnly || !sessionReady || current == null) return
+            if (current.queueSize() + pcm.size > RealtimeProtocol.MAX_WEBSOCKET_QUEUE_BYTES ||
+                !current.send(RealtimeProtocol.appendEvent(pcm))) {
+                coverage.markUncertain()
+                localOnly = true
+                sessionReady = false
+                socket = null
+                failedSocket = current
+                if (!interruptionReported) {
+                    interruptionReported = true
+                    notify = true
+                }
+            } else {
+                remoteBufferedBytes += pcm.size
+            }
+        }
+        failedSocket?.cancel()
+        if (notify) main.post { if (!closed && capturing) listener.interrupted() }
     }
-    fun commit(): Boolean {
-        if (closed || localOnly || channel?.state() != DataChannel.State.OPEN) { coverage.markUncertain(); return false }
-        val id = "commit-$connectionGeneration-${++commitSequence}"
-        val event = JSONObject().put("type", "input_audio_buffer.commit").put("event_id", id)
-        val ok = channel!!.send(DataChannel.Buffer(ByteBuffer.wrap(event.toString().toByteArray()), false))
-        if (ok) { coverage.sent(id); listener.turnCommitted() } else coverage.markUncertain()
-        return ok
+
+    fun commit(): Boolean = sendCommit()
+
+    private fun sendCommit(): Boolean {
+        var failedSocket: WebSocket? = null
+        var notify = false
+        var committed = false
+        synchronized(state) {
+            if (remoteBufferedBytes <= 0L) return false
+            val current = socket
+            if (closed || localOnly || !sessionReady || current == null) {
+                coverage.markUncertain()
+                return false
+            }
+            val id = "commit-$socketGeneration-${++commitSequence}"
+            if (current.send(RealtimeProtocol.commitEvent(id))) {
+                coverage.sent(id)
+                remoteBufferedBytes = 0L
+                committed = true
+            } else {
+                coverage.markUncertain()
+                localOnly = true
+                sessionReady = false
+                socket = null
+                failedSocket = current
+                if (!interruptionReported) {
+                    interruptionReported = true
+                    notify = true
+                }
+            }
+        }
+        failedSocket?.cancel()
+        if (committed) main.post { if (!closed) listener.turnCommitted() }
+        if (notify) main.post { if (!closed && capturing) listener.interrupted() }
+        return committed
     }
-    fun rejectEmptyCommit(clientEventId: String): Boolean = coverage.rejectEmpty(clientEventId)
+
+    fun rejectEmptyCommit(clientEventId: String): Boolean =
+        synchronized(state) { coverage.rejectEmpty(clientEventId) }
+
     fun finishCapture(): Boolean {
-        capturing = false; reconnectJob?.cancel(); connectJob?.cancel(); reconnecting = false
-        connection?.setAudioRecording(false)
-        if (channel?.state() != DataChannel.State.OPEN || localOnly) coverage.markUncertain()
-        main.postDelayed({ if (!closed && !localOnly) commit() }, 350)
-        return !hasPendingCoverage
+        capturing = false
+        reconnectJob?.cancel()
+        reconnecting = false
+        stopRecorder()
+        synchronized(state) {
+            if (localOnly || !sessionReady) coverage.markUncertain()
+        }
+        // A read already returned when Stop was tapped may still be serialized to disk and
+        // the socket. Commit after that bounded in-flight callback, preserving message order.
+        main.postDelayed({ if (!closed) sendCommit() }, 250L)
+        return synchronized(state) { !coverage.uncertain }
     }
+
+    private fun stopRecorder() {
+        val current = recorder ?: return
+        try {
+            if (current.recordingState == AudioRecord.RECORDSTATE_RECORDING) current.stop()
+        } catch (problem: Exception) {
+            app.crashJournal.recordFailure("audiorecord.failure", problem)
+        }
+    }
+
     fun continueLocally() {
         if (closed || !capturing) return
-        coverage.markUncertain(); localOnly = true
-        // Keep the existing peer-owned microphone alive during the reconnect grace
-        // period. Do not create a second JavaAudioDeviceModule recording demand.
+        synchronized(state) {
+            coverage.markUncertain()
+            localOnly = true
+            sessionReady = false
+        }
         scheduleReconnect()
     }
+
     private fun scheduleReconnect() {
         if (closed || !capturing) return
-        reconnectJob?.cancel(); reconnecting = true
-        reconnectJob = scope.launch { delay(3000); if (!closed && capturing) { detachPeer(); openPeer(true) } }
-    }
-    private fun detachPeer() { connectionGeneration++; channel?.dispose(); channel = null; connection?.close(); connection?.dispose(); connection = null }
-    fun close() {
-        if (closed) return; closed = true; capturing = false; reconnecting = false; scope.cancel()
-        try { connection?.setAudioRecording(false) }
-        finally {
-            detachPeer(); track?.dispose(); track = null; source?.dispose(); source = null; factory?.dispose(); factory = null; device?.release(); device = null; key = ""
+        reconnectJob?.cancel()
+        reconnectJob = controlScope.launch {
+            delay(3_000)
+            if (!closed && capturing) openSocket(reconnect = true)
         }
+    }
+
+    private fun transportLost(
+        generation: Int,
+        webSocket: WebSocket,
+        response: Response?,
+        message: String,
+    ) {
+        var terminal = false
+        var notifyInterrupted = false
+        synchronized(state) {
+            if (closed || generation != socketGeneration || socket !== webSocket) return
+            socket = null
+            sessionReady = false
+            if (response?.code in setOf(401, 403, 429)) {
+                terminal = true
+            } else if (capturing && captureJob != null) {
+                localOnly = true
+                coverage.markUncertain()
+                if (!interruptionReported) {
+                    interruptionReported = true
+                    notifyInterrupted = true
+                }
+            } else if (capturing) {
+                terminal = true
+            } else if (remoteBufferedBytes > 0L) {
+                coverage.markUncertain()
+                terminal = true
+            }
+        }
+        if (terminal) postFailure(message)
+        else if (notifyInterrupted) main.post { if (!closed && capturing) listener.interrupted() }
+    }
+
+    private fun safeSocketFailure(response: Response?): String = when (response?.code) {
+        401 -> "API key rejected by realtime transcription"
+        403 -> "Account or realtime transcription access denied"
+        429 -> "Account allowance or realtime request limit reached"
+        else -> "Realtime WebSocket connection failed; recording preserved"
+    }
+
+    private fun postFailure(message: String) {
+        main.post { if (!closed) listener.failure(message) }
+    }
+
+    fun close() {
+        if (closed) return
+        closed = true
+        capturing = false
+        reconnecting = false
+        reconnectJob?.cancel()
+        stopRecorder()
+        captureJob?.cancel()
+        controlScope.cancel()
+        captureScope.cancel()
+        val current = synchronized(state) {
+            socketGeneration += 1
+            sessionReady = false
+            localOnly = true
+            socket.also { socket = null }
+        }
+        current?.cancel()
+        key = ""
     }
 }

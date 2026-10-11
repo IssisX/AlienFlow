@@ -41,8 +41,8 @@ class DiagnosticsUiTest {
         Robolectric.buildActivity(MainActivity::class.java).setup().use { controller ->
             val activity = controller.get(); val root = activity.window.decorView
             shadowOf(Looper.getMainLooper()).idle()
-            screenshot(root, "main-0.1.5.png")
-            assertTrue(descendants(root).filterIsInstance<TextView>().any { it.text.toString() == "Version 0.1.5 (6)" })
+            screenshot(root, "main-0.1.6.png")
+            assertTrue(descendants(root).filterIsInstance<TextView>().any { it.text.toString() == "Version 0.1.6 (7)" })
             val entry = button(root, "Diagnostics / share report")
             val at = IntArray(2); entry.getLocationOnScreen(at)
             assertTrue(entry.isShown); assertTrue(at[1] + entry.height < 1782)
@@ -58,11 +58,14 @@ class DiagnosticsUiTest {
             while (!copy.isEnabled && System.currentTimeMillis() < deadline) { shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(10) }
             shadowOf(Looper.getMainLooper()).idle()
             assertTrue("Report did not finish loading", copy.isEnabled)
-            screenshot(root, "diagnostics-0.1.5.png")
+            screenshot(root, "diagnostics-0.1.6.png")
             assertTrue(copy.performClick())
             val copied = activity.getSystemService(ClipboardManager::class.java).primaryClip!!.getItemAt(0).text.toString()
             assertTrue(copied.contains("ALIENFLOW DIAGNOSTIC REPORT"))
-            assertTrue(copied.contains("Version: 0.1.5 (6)")); assertTrue(copied.contains("ANDROID RECORDED PROCESS EXITS"))
+            assertTrue(copied.contains("Version: 0.1.6 (7)"))
+            assertTrue(copied.contains("Transport: Android AudioRecord + OpenAI Realtime WebSocket"))
+            assertTrue(copied.contains("Native WebRTC packaged: false"))
+            assertTrue(copied.contains("ANDROID RECORDED PROCESS EXITS"))
             assertTrue(button(root, "Share diagnostics").performClick())
             val chooser = shadowOf(activity).nextStartedActivity
             assertEquals(Intent.ACTION_CHOOSER, chooser.action)

@@ -46,7 +46,11 @@ class CrashJournal(private val application: Application) {
         "accessibility.disconnected", "microphone.native-started", "microphone.native-error",
         "transport.failure", "microphone.failure", "service.failure", "probe.start", "probe.end", "probe.cancelled", "probe.failure",
         "stop.editor-change", "stop.screen", "stop.service", "status.failure", "status.other",
-        "status.listening", "status.finishing", "editor.rejected"
+        "status.listening", "status.finishing", "editor.rejected",
+        "websocket.connecting", "websocket.open", "websocket.session-update",
+        "websocket.session-ready", "websocket.failure",
+        "audiorecord.creating", "audiorecord.started", "audiorecord.released",
+        "audiorecord.failure"
     )
     private var persistFailed = false
     @Synchronized fun mark(stage: String) {

@@ -8,9 +8,9 @@ class CrashJournalTest {
         val e = IllegalStateException("secret-key-from-device and private dictated sentence")
         e.stackTrace = arrayOf(StackTraceElement(
             "io.github.issisx.alienflow.RealtimeTransport",
-            "openPeer", "RealtimeTransport.kt", 78))
-        val report = CrashReportFormatter.render("webrtc.factory", e)
-        assertTrue(report.contains("webrtc.factory"))
+            "openSocket", "RealtimeTransport.kt", 78))
+        val report = CrashReportFormatter.render("websocket.failure", e)
+        assertTrue(report.contains("websocket.failure"))
         assertTrue(report.contains("RealtimeTransport.kt:78"))
         assertTrue(report.contains("java.lang.IllegalStateException"))
         assertFalse(report.contains("secret-key"))
