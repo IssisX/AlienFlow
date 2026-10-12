@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit
 
 class SafeApiException(val httpCode: Int, message: String) : IllegalStateException(message)
 
-class OpenAiClient {
+class OpenAiClient internal constructor(private val socketFactory: WebSocket.Factory? = null) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(45, TimeUnit.SECONDS)
@@ -60,24 +60,8 @@ class OpenAiClient {
         }
     }
 
-    /** Used by the explicit key/model check; live audio itself uses the WebSocket below. */
-    fun clientSecret(key: String, language: String, vocabulary: String): String {
-        val session = RealtimeProtocol.sessionConfig(language, vocabulary)
-        val response = execute(
-            "realtime/client_secrets",
-            key,
-            JSONObject().put("session", session).toString()
-                .toRequestBody("application/json".toMediaType()),
-        )
-        return JSONObject(response).getString("value")
-    }
-
     fun realtimeWebSocket(key: String, listener: WebSocketListener): WebSocket {
-        val request = Request.Builder()
-            .url("wss://api.openai.com/v1/realtime?model=${RealtimeProtocol.MODEL}")
-            .header("Authorization", "Bearer $key")
-            .build()
-        return realtimeClient.newWebSocket(request, listener)
+        return (socketFactory ?: realtimeClient).newWebSocket(RealtimeHandshake.request(key), listener)
     }
 
     fun cleanup(key: String, source: String, mode: String, fillers: Boolean): String {

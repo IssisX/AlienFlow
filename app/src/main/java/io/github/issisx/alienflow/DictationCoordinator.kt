@@ -66,6 +66,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     fun toggle() { if (active || finishing) stop() else start() }
     fun start() {
         if (active || finishing) return
+        if (keyTestJob?.isActive == true) { update("Wait for the live connection check to finish"); return }
         app.crashJournal.mark("tap.received")
         if (!app.screenReady()) { update("Unlock the screen before starting dictation"); return }
         if (recoveryJob?.isActive == true) { update("Wait for audio recovery to finish before starting a new dictation"); return }
@@ -164,7 +165,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                     update("Provider could not confirm the final audio buffer; local audio retained")
                     tryFinish()
                 }
-                else failure("Realtime service error${if (code.matches(Regex("[a-zA-Z0-9_]{1,80}"))) ": $code" else ""}; audio preserved")
+                else failure(LiveConnectionProblem.event(value).message())
             }
         }
     }
@@ -351,10 +352,23 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     fun testKey() {
         if (keyTestJob?.isActive == true || active || finishing) return
         val token = session
-        update("Checking transcription model access…")
+        app.crashJournal.beginConnectionCheck()
+        update("Checking the live connection and transcription session…")
         keyTestJob = io.launch {
-            try { api.clientSecret(store.apiKey() ?: error("Save an API key first"), store.language(), ""); withContext(Dispatchers.Main) { if (session == token && !active && !finishing) update("Key accepted • gpt-live-transcribe session available") } }
-            catch (e: Exception) { withContext(Dispatchers.Main) { if (session == token && !active && !finishing) update(if (e is SafeApiException) e.message else "Connection check failed; check key and network") } }
+            try {
+                RealtimeHandshake.check(api, store.apiKey() ?: error("Save an API key first"),
+                    store.language(), store.prefs.getString("vocabulary", "").orEmpty())
+                withContext(Dispatchers.Main) {
+                    if (session == token && !active && !finishing)
+                        update("Live connection accepted • gpt-live-transcribe • microphone not tested")
+                }
+            } catch (e: LiveConnectionException) {
+                app.crashJournal.liveConnectionFailure(e.problem)
+                withContext(Dispatchers.Main) { if (session == token && !active && !finishing) update(e.problem.message()) }
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) {
+                withContext(Dispatchers.Main) { if (session == token && !active && !finishing) update("Live connection check failed; check key and network") }
+            }
             finally { withContext(NonCancellable + Dispatchers.Main) { keyTestJob = null } }
         }
     }

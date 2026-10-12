@@ -81,12 +81,13 @@ class RealtimeTransport(
         val generation = synchronized(state) {
             socketGeneration += 1
             sessionReady = false
+            remoteBufferedBytes = 0L
             reconnecting = reconnect
             socketGeneration
         }
         app.crashJournal.mark("websocket.connecting")
         try {
-            api!!.realtimeWebSocket(key, object : WebSocketListener() {
+            val pendingSocket = api!!.realtimeWebSocket(key, object : WebSocketListener() {
                 override fun onOpen(webSocket: WebSocket, response: Response) {
                     val accepted = synchronized(state) {
                         if (closed || !capturing || generation != socketGeneration) false
@@ -119,13 +120,18 @@ class RealtimeTransport(
                 }
 
                 override fun onMessage(webSocket: WebSocket, text: String) {
+                    if (synchronized(state) { closed || generation != socketGeneration || socket !== webSocket }) return
                     val value = try { JSONObject(text) } catch (_: Exception) {
                         postFailure("Invalid realtime event received")
                         return
                     }
                     val type = value.optString("type")
                     if (RealtimeProtocol.isSessionReadyEvent(type)) {
-                        sessionBecameReady(generation, webSocket, reconnect)
+                        val problem = RealtimeHandshake.acknowledgementProblem(value)
+                        if (problem != null) {
+                            app.crashJournal.liveConnectionFailure(problem)
+                            postFailure(problem.message())
+                        } else sessionBecameReady(generation, webSocket, reconnect)
                         return
                     }
                     main.post {
@@ -133,6 +139,7 @@ class RealtimeTransport(
                             if (type == "input_audio_buffer.committed") {
                                 synchronized(state) { coverage.acknowledge(value.optString("item_id")) }
                             }
+                            if (type == "error") app.crashJournal.liveConnectionFailure(LiveConnectionProblem.event(value))
                             listener.event(value.put("_connection_generation", generation))
                         }
                     }
@@ -147,10 +154,15 @@ class RealtimeTransport(
                 }
 
                 override fun onFailure(webSocket: WebSocket, problem: Throwable, response: Response?) {
-                    app.crashJournal.recordFailure("websocket.failure", problem)
-                    transportLost(generation, webSocket, response, safeSocketFailure(response))
+                    val failure = LiveConnectionProblem.http(response)
+                    transportLost(generation, webSocket, response, failure.message(), failure)
                 }
             })
+            val retain = synchronized(state) {
+                if (closed || !capturing || generation != socketGeneration) false
+                else { socket = pendingSocket; true }
+            }
+            if (!retain) pendingSocket.cancel()
         } catch (problem: Exception) {
             app.crashJournal.recordFailure("websocket.failure", problem)
             postFailure("Realtime connection could not start")
@@ -238,7 +250,7 @@ class RealtimeTransport(
         } catch (problem: Throwable) {
             if (!closed && capturing) {
                 app.crashJournal.recordFailure("audiorecord.failure", problem)
-                postFailure("Android microphone capture failed; recording preserved")
+                postFailure("Android microphone capture failed")
             }
         } finally {
             synchronized(state) { if (recorder === owned) recorder = null }
@@ -361,11 +373,15 @@ class RealtimeTransport(
         webSocket: WebSocket,
         response: Response?,
         message: String,
+        detail: LiveConnectionProblem? = null,
     ) {
         var terminal = false
         var notifyInterrupted = false
         synchronized(state) {
-            if (closed || generation != socketGeneration || socket !== webSocket) return
+            if (closed || generation != socketGeneration || (socket != null && socket !== webSocket)) return
+            // A failed HTTP upgrade may arrive before onOpen or even before newWebSocket returns.
+            // Invalidate that attempt so the returned handle cannot revive it.
+            socketGeneration += 1
             socket = null
             sessionReady = false
             if (response?.code in setOf(401, 403, 429)) {
@@ -384,15 +400,10 @@ class RealtimeTransport(
                 terminal = true
             }
         }
+        detail?.let { app.crashJournal.liveConnectionFailure(it) }
+        webSocket.cancel()
         if (terminal) postFailure(message)
         else if (notifyInterrupted) main.post { if (!closed && capturing) listener.interrupted() }
-    }
-
-    private fun safeSocketFailure(response: Response?): String = when (response?.code) {
-        401 -> "API key rejected by realtime transcription"
-        403 -> "Account or realtime transcription access denied"
-        429 -> "Account allowance or realtime request limit reached"
-        else -> "Realtime WebSocket connection failed; recording preserved"
     }
 
     private fun postFailure(message: String) {

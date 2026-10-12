@@ -58,6 +58,7 @@ class CrashJournal(private val application: Application) {
         if (stage != "tap.received" && stage == lastStage()) return
         val session = if (stage == "tap.received") System.currentTimeMillis() else prefs.getLong("session", 0)
         try {
+            if (stage == "tap.received") prefs.edit().remove("live_problem").commit()
             val entry = "${Instant.now()} $stage"
             val lines = (prefs.getString("trace", "").orEmpty().lines().filter { it.isNotBlank() } + entry).takeLast(80)
             if (!prefs.edit().putString("stage", stage).putLong("session", session)
@@ -73,6 +74,15 @@ class CrashJournal(private val application: Application) {
         if (prefs.getString("editor_code", "") == code) return
         try { prefs.edit().putString("editor_code", code).commit() } catch (_: Exception) { persistFailed = true }
         mark("editor.rejected")
+    }
+    @Synchronized fun liveConnectionFailure(problem: LiveConnectionProblem) {
+        try {
+            if (!prefs.edit().putString("live_problem", "${Instant.now()} ${problem.diagnostic()}").commit()) persistFailed = true
+        } catch (_: Exception) { persistFailed = true }
+        mark("websocket.failure")
+    }
+    @Synchronized fun beginConnectionCheck() {
+        try { prefs.edit().remove("live_problem").commit() } catch (_: Exception) { persistFailed = true }
     }
     fun statusChanged(message: String) {
         if (message.startsWith("[AF-E")) { editorFailure(message); return }
@@ -100,6 +110,8 @@ class CrashJournal(private val application: Application) {
         appendLine("Latest editor rejection code: " + prefs.getString("editor_code", "none"))
         appendLine("Diagnostic persistence failure observed: $persistFailed")
         appendLine("Android-only microphone test samples: " + if (prefs.contains("probe_samples")) prefs.getInt("probe_samples", 0) else "not run")
+        appendLine("LATEST LIVE CONNECTION FAILURE (metadata only)")
+        appendLine(prefs.getString("live_problem", "No live connection error recorded."))
         appendLine("JAVA/KOTLIN FAILURE RECORD")
         appendLine(report() ?: "No Java/Kotlin failure captured; native crashes and normal stops may not create one.")
     }

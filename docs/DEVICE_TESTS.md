@@ -86,3 +86,11 @@ The framework UI tests and visually reviewed Robolectric renders passed in CI; t
 - [ ] During a session, intentionally switch input fields. Dictation must continue recording; it must NOT edit the newly focused field. After stop, the transcript/history remains copyable.
 - [ ] Reproduce previous immediate termination if possible. If it remains, confirm displayed status includes the initiating failure (provider/network/service) and distinguish actual saved audio from an empty capture.
 - [ ] Send diagnostic with session events from the current run; do not treat older native crash history as new.
+
+## 0.1.8 live transcription route (physical testing pending)
+
+- [ ] Update over 0.1.7; confirm stored key, settings, history and approved Gray image survive.
+- [ ] Check key & transcription model: require “Live connection accepted” only after WebSocket session acknowledgment; microphone must remain off.
+- [ ] Focus an empty input, tap alien, speak a phrase, wait for live words and a completed transcription turn, speak again, stop and confirm microphone release.
+- [ ] Position alien near top/keyboard; full failure notice must remain visible, and Diagnostics must show newest AF-N01 metadata.
+- [ ] Share fresh diagnostic with timestamp if still failing; exclude API key and dictated text.

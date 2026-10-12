@@ -86,8 +86,14 @@ class AlienAccessibilityService : AccessibilityService() {
             }
         }
         label.text = message
+        val system = wm.currentWindowMetrics.windowInsets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+        val noticeWidth = dp(280).coerceAtMost((bounds().width() - system.left - system.right).coerceAtLeast(1))
+        val noticeBottom = max(safeTop + 1, bounds().height() - imeBottom - safeBottom)
+        label.maxHeight = noticeBottom - safeTop
+        label.measure(View.MeasureSpec.makeMeasureSpec(noticeWidth, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(label.maxHeight, View.MeasureSpec.AT_MOST))
         val p = WindowManager.LayoutParams(
-            dp(280).coerceAtMost(bounds().width()), WindowManager.LayoutParams.WRAP_CONTENT,
+            noticeWidth, label.measuredHeight,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
@@ -96,10 +102,11 @@ class AlienAccessibilityService : AccessibilityService() {
         )
         p.gravity = Gravity.TOP or Gravity.LEFT
         val anchor = params
-        p.x = ((anchor?.x ?: 0) - dp(100)).coerceIn(0, (bounds().width() - p.width).coerceAtLeast(0))
-        p.y = ((anchor?.y ?: safeTop) - dp(88)).coerceIn(
-            safeTop, (safeTop + usableHeight() - dp(88)).coerceAtLeast(safeTop)
-        )
+        val position = StatusNoticePosition.place(system.left, safeTop,
+            bounds().width() - system.right, noticeBottom, p.width, p.height,
+            anchor?.x ?: system.left, anchor?.y ?: safeTop, anchor?.height ?: dp(48), dp(8))
+        p.x = position.x
+        p.y = position.y
         try {
             if (statusNotice == null) {
                 wm.addView(label, p)

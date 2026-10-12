@@ -230,35 +230,11 @@ Use a supported OpenAI live transcription model for the default experience. At t
 
 Keep provider-specific request and event mapping behind one adapter. Model choices exposed to the user should be supported capability choices with a clear price/behavior description. Do not offer a text-chat model in a transcription selector or silently switch from live input to an incompatible model.
 
-### 6.2 Native transport decision
+### 6.2 Native transport and live handshake (revised 12 October 2026)
 
-Use one native WebRTC transport. This follows OpenAI's recommended client connection route and has a documented token-and-SDP handshake. The current GA transcription-specific WebSocket routing was not established by this research, so an old beta WebSocket example is not the implementation baseline. [S10, S11]
+Native WebRTC was removed in 0.1.6 after a documented Fold6 native SIGABRT; the Android AudioRecord plus WebSocket implementation remains. The Realtime transcription connection uses `wss://api.openai.com/v1/realtime?intent=transcription` with an authenticated bearer key, **not** `?model=gpt-live-transcribe`. Use `session.update` to configure `type=transcription`, 24-kHz PCM16 and `audio.input.transcription.model=gpt-live-transcribe`; preserve vocabulary, language settings and client-side audio turn commits. Current primary references in `RESEARCH_2026-10-12_LIVE_HANDSHAKE.md`.
 
-The proposed connection contract is:
-
-1. POST to `https://api.openai.com/v1/realtime/client_secrets`, authenticating with the user's standard key. Request a transcription-scoped session using the configuration below. Read the ephemeral token from the returned `value`. [S24]
-2. Create one native peer connection, its microphone media track, and an `oai-events` data channel. Set the generated SDP offer locally.
-3. POST that raw offer to `https://api.openai.com/v1/realtime/calls` with the ephemeral bearer token and `Content-Type: application/sdp`. Set the returned SDP answer as the remote description. Transcript/control events use the data channel; audio uses the media track. [S11]
-
-```json
-{
-  "session": {
-    "type": "transcription",
-    "audio": {
-      "input": {
-        "transcription": { "model": "gpt-live-transcribe" },
-        "turn_detection": null
-      }
-    }
-  }
-}
-```
-
-This is a proposed assembly of documented interfaces, not a tested Android connection. The phone performs the token-minting operation normally assigned to a backend. Ephemeral credentials do not remove the long-lived personal key from that phone; section 8 records that deployment decision.
-
-Before claiming integration success, prove the complete native sequence: accepted transcription session and model; audible speech capture; a transcript delta before the first explicit turn commit; a final transcript after that commit; and a second successful turn. Record the selected native dependency, negotiated audio parameters, and actual acknowledgement/event shapes. Omit the optional `delay` field initially because the live guide and current client-secret reference differ on its supported model; resolve that mismatch experimentally before exposing or tuning it. [S6, S24]
-
-The chosen native binding must support one capture source feeding the media track and a bounded copy for recovery/local turn detection. Verify that audio hook and its supported sample formats during this same milestone. Do not start a second competing microphone recorder or send the same audio through both the media track and JSON events. Recovery files may use a documented normalized PCM format; that is separate from the negotiated WebRTC wire codec.
+The key/model check MUST use that same WebSocket URL and session update and require an acknowledged transcription session; a client-secret request by itself is not evidence of live connectivity. That check must close without activating the microphone. The normal live pipeline may start Android AudioRecord only after the session is acknowledged. Test real transcript deltas and completion events on the phone. Preserve the personal API key and native Android mic permissions; no model fallback, untrusted endpoint override or recording without user intent.
 
 ### 6.3 Audio, turns, and ordered results
 
