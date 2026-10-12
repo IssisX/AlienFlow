@@ -1,0 +1,41 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version_name": "0.1.5",
+  "version_code": 6,
+  "source_sha": "c289cb98f5d1dabffcc8eadf6fad98dbc586efc5",
+  "branch": "build/first-apk",
+  "workflow_run_url": "https://github.com/IssisX/AlienFlow/actions/runs/38139391856",
+  "artifact_id": 11702214281,
+  "unsigned_bundle_sha256": "7edbffea6c2d98b21190db3ea18fd5c02f970f2d68eb86be5266b5bb23e4fa02",
+  "bundle_member_hashes_verified": 39,
+  "apk_filename": "AlienFlow-0.1.5.apk",
+  "apk_size_bytes": 17086706,
+  "apk_sha256": "923055310de532dfd2194fa403140fe264cc963c426db52f1b927911ff20341a",
+  "signing_certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+  "signing_scheme": "APK v3",
+  "tests": {
+    "executed": 69,
+    "total": 69,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "not run"
+  },
+  "lint": {
+    "issues": 29,
+    "errors": 0
+  },
+  "approved_artwork_sha256": "8850ac9bbd07c876ba00e5b4339d1b126a14d631194b07379dde0ac676888940",
+  "unsigned_payload_entries_unchanged_after_signing": true,
+  "signer_added_metadata": [
+    "META-INF/ALIENFLO.RSA",
+    "META-INF/ALIENFLO.SF",
+    "META-INF/MANIFEST.MF"
+  ],
+  "framework_ui_renders": [
+    "reports/ui-proof/main-0.1.5.png",
+    "reports/ui-proof/diagnostics-0.1.5.png"
+  ],
+  "phone_verification": "Not performed. Focus routing regression and diagnostic sharing are automated-test verified; original device shutdown awaits real phone acceptance/report.",
+  "paid_provider_test": "Not performed; no user key used."
+}

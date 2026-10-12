@@ -1,0 +1,37 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version_name": "0.1.1",
+  "version_code": 2,
+  "apk_filename": "AlienFlow-0.1.1.apk",
+  "apk_size_bytes": 17029305,
+  "apk_sha256": "438c9bb3b1fd6a876ac173a66bf58c376b20c679aab90d7523ff48f5a7dc9a0f",
+  "signing_certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+  "signing_scheme": "APK v3",
+  "source_sha": "a3d0aee38adb73b545b31db20e806d6f493d76e8",
+  "branch": "build/first-apk",
+  "workflow_run_url": "https://github.com/IssisX/AlienFlow/actions/runs/38063401303",
+  "artifact_id": 11673294633,
+  "unsigned_bundle_sha256": "8c6e0e2e592be9ed6d2307cd9e930d563f543aa277223c447c17183ab98306bf",
+  "bundle_member_hashes_verified": 23,
+  "tests": {
+    "executed": 37,
+    "failed": 0,
+    "skipped": 0
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 19
+  },
+  "checks": [
+    "Kotlin build",
+    "unit tests",
+    "release lint",
+    "APK assembly",
+    "package/identity check",
+    "native alignment",
+    "GitHub upload",
+    "bundle SHA and member digests",
+    "signed APK verification"
+  ],
+  "phone_verification": "Not performed: bubble tap status, cold microphone, realtime speech-to-text, and editor operation still pending"
+}

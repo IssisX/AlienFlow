@@ -1,0 +1,17 @@
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): false
+Verified using v3 scheme (APK Signature Scheme v3): true
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+Signer #1 certificate DN: CN=AlienFlow personal builds, O=AlienFlow
+Signer #1 certificate SHA-256 digest: d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f
+Signer #1 certificate SHA-1 digest: 37cc2fb39d1b5502b6e64af4a4a2e10914a13f70
+Signer #1 certificate MD5 digest: 2af62acd908c92716092befaa39d4358
+Signer #1 key algorithm: RSA
+Signer #1 key size (bits): 3072
+Signer #1 public key SHA-256 digest: 841bdb996da01f161124709ca45b6ea0fb0c98084d5c86455945c76314bfc3d6
+Signer #1 public key SHA-1 digest: c8468dc223de896a646a81c1eea7c106f807efb1
+Signer #1 public key MD5 digest: 5f85c2bfc51a631f3b794d041f061043

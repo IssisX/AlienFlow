@@ -1,0 +1,32 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version": "0.1.7",
+  "version_code": 8,
+  "compiled_source_sha": "6db8c29dbf85386b9c6d6a3503a1e5838abe670b",
+  "branch": "build/first-apk",
+  "workflow_run": "https://github.com/IssisX/AlienFlow/actions/runs/38246391603",
+  "artifact_id": 11746196600,
+  "unsigned_bundle_sha256": "c72dfd1a65cec75e32177de30b8b6195fcec14e0bb2eee7d918f38d5b620114e",
+  "member_hashes_verified": 40,
+  "tests": {
+    "executed": 75,
+    "total": 75,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "lint": {
+    "errors": 0,
+    "issues": 28
+  },
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.7.apk",
+    "size_bytes": 4323480,
+    "sha256": "9f6b97ffa414f36a195b705f65af70079d332cf64a76d719df3b5bc179a23ebe",
+    "signature_scheme": "APK v3",
+    "signing_certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "payload_entries_unchanged": 25
+  },
+  "device_verification": "Not performed; 0.1.6 screenshot showed immediate stop rather than system crash. Root stop cause still needs 0.1.7 runtime observation.",
+  "scope": "Continue capture after losing editor; no stale-field write; preserve genuine terminal cause and distinguish whether audio was saved."
+}
