@@ -4,7 +4,7 @@ Repository: IssisX/AlienFlow. Branch: AlienFlow2. Date: 2026-10-12. VersionCode:
 
 ## Objective and cost ownership
 
-Reduce paid request overhead without changing microphone capture, low-latency gpt-live-transcribe, recognition frames, original keyboard/editor ownership, or correction modes. The owner provides standing authorization for routine AlienFlow2 commits, remote updates, existing workflow builds, signing and APK delivery; do not repeat permission requests for those actions. This does not represent a public launch or provision a paid trial account.
+Reduce paid request overhead without changing microphone capture, low-latency gpt-live-transcribe, recognition frames, original keyboard/editor ownership, or correction modes. Standing authorization is recorded in AGENTS.md. This efficiency release does not represent a public launch or provision a paid trial account.
 
 Current official pricing bills gpt-live-transcribe by audio duration ($0.017 per minute on 2026-10-12), rather than transcription-context tokens. Removing vocabulary does not reduce that flat audio-minute charge. Do not gate out quiet audio, stop natural thinking pauses, or switch recognition models on an unmeasured cost claim. No savings percentage for the user's actual bill has been measured. GPT-6 Luna cleanup has token-based input/output pricing; its default medium reasoning was previously left unspecified.
 
@@ -20,7 +20,7 @@ Public-key trial credentials and three-day expiry are not implemented here. The 
 
 ## Verification status
 
-Pending exact-revision GitHub Actions tests, release lint and assembly, package-member hashes, unchanged icon, signed update certificate/payload, save and checkpoint. Added request-policy and loopback HTTP tests cover real serialized cleanup bodies, no-reasoning configuration, UTF-8-aware output limits, vocabulary opt-in/retention, documented keyword shape, duplicate reuse, guard rejection, and bounded eviction. These are not live OpenAI billing, model-quality or Fold6 measurements. Preserve the 0.1.15 capture/editor regressions, including no-space keyboard composition and protected edits.
+Exact-revision GitHub Actions run 38300530664 completed successfully for source ffd9950d340022abfd01f3fe97dcc644f9d2c048 (tree 5139e0553cf6d67d0922434f19b8d76f77edbc13): 174 tests, zero failures/errors/skips and zero lint errors (38 non-error issues). Verified all 120 package-member hashes and approved artwork. The signed APK uses the existing update certificate; all 25 ZIP payload entries are unchanged by signing. Inspected the actual small-phone/large-text vocabulary render. Signed installable AlienFlow-0.1.16.apk was saved successfully with unchanged hash. Full evidence: RELEASE_VERIFICATION_0.1.16.json. Added request-policy and loopback HTTP tests cover real serialized cleanup bodies, no-reasoning configuration, UTF-8-aware output limits, vocabulary opt-in/retention, documented keyword shape, duplicate reuse, guard rejection, and bounded eviction. These are not live OpenAI billing, model-quality or Fold6 measurements. Preserve the 0.1.15 capture/editor regressions, including no-space keyboard composition and protected edits.
 
 ## Primary sources
 

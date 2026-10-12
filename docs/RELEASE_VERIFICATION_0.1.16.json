@@ -1,0 +1,82 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version": "0.1.16",
+  "version_code": 17,
+  "branch": "AlienFlow2",
+  "compiled_source_sha": "ffd9950d340022abfd01f3fe97dcc644f9d2c048",
+  "compiled_tree_sha": "5139e0553cf6d67d0922434f19b8d76f77edbc13",
+  "workflow_run": "https://github.com/IssisX/AlienFlow/actions/runs/38300530664",
+  "workflow_conclusion": "success",
+  "artifact_id": 11769539204,
+  "unsigned_bundle_sha256": "70a93fc0c594f3f3586f712a56ce83b2514bf83159b0aca95c47cfc4d34f7bda",
+  "member_hashes_verified": 120,
+  "tests": {
+    "executed": 174,
+    "total": 174,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "not run"
+  },
+  "lint": {
+    "issues": 38,
+    "errors": 0
+  },
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.16.apk",
+    "size_bytes": 4528081,
+    "sha256": "42c6698b5533dbb0245768fe1b080209e8285b02490d31729dc14b3fe3276cf2",
+    "signature_scheme": "APK v3",
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "payload_entries_unchanged": 25
+  },
+  "efficiency_changes": [
+    "Optional personal vocabulary is off by default; saved terms survive disabling it. Both capture and connection checks use the opt-in policy.",
+    "Enabled vocabulary uses native literal keywords, with duplicate and invalid-entry removal. No history or automatic project word list is added.",
+    "Cleanup remains gpt-6-luna, uses shorter instructions, sets reasoning.effort=none, and retains complete recognized input.",
+    "Conservative UTF-8-based output headroom within the existing 2048-token cap; unused output allowance is not billed.",
+    "Per-recording bounded LRU reuses only validated identical chunk results with matching mode/filler settings. Source repetition is preserved.",
+    "Memo instances are replaced at recording start, finalization and cancel; no disk or cross-recording cache."
+  ],
+  "request_evidence": {
+    "default_B_instruction_characters": {
+      "before": 313,
+      "after": 190
+    },
+    "default_C_instruction_characters": {
+      "before": 224,
+      "after": 170
+    },
+    "identical_accepted_chunk_fixture": {
+      "cleanup_invocations": 2,
+      "paid_request_callbacks": 1,
+      "output_unchanged": true
+    },
+    "scope": "Characters are not measured tokens. Callback-count fixture is not real-world billing savings. Loopback HTTP verifies the production client serialized body without contacting OpenAI."
+  },
+  "preserved_contract": [
+    "gpt-live-transcribe minimal-delay recognition and 20 ms PCM audio frames",
+    "Parallel microphone/WebSocket startup",
+    "Typing continues without dictation pauses or waiting for a space; same-field ownership and protected edits",
+    "Cancellation and field-switch safety",
+    "Approved silver artwork and nonfocusable overlay",
+    "Termux final-only insertion with no Enter/submission"
+  ],
+  "visual_verification": "Inspected actual Robolectric-rendered small-phone/large-text language and vocabulary screen; optional toggle and explanation visible. Approved artwork hash verified in APK.",
+  "device_and_provider_verification": "Not performed. Physical Fold6/Gboard/ChatGPT behavior, paid OpenAI recognition/correction quality, latency, exact tokens and actual invoice savings remain unmeasured.",
+  "cost_basis": {
+    "date": "2026-10-12",
+    "speech_model": "gpt-live-transcribe",
+    "speech_price_usd_per_audio_minute": 0.017,
+    "speech_price_basis": "Audio duration, not vocabulary prompt tokens. The recognition model/audio path is unchanged.",
+    "cleanup_model": "gpt-6-luna",
+    "reasoning_effort": "none",
+    "sources": [
+      "https://developers.openai.com/api/docs/models/gpt-live-transcribe",
+      "https://developers.openai.com/api/docs/models/gpt-6-luna",
+      "https://developers.openai.com/api/docs/guides/realtime-transcription"
+    ]
+  },
+  "trial_status": "Three-day sponsor-paid trial not implemented. APK still uses a user-entered encrypted key, with no sponsor credential included. Sponsor master key, trial expiry and spend enforcement require a server-side owner.",
+  "delivery": "Signed installable update saved successfully; local file identity applied and SHA256 unchanged after save."
+}
