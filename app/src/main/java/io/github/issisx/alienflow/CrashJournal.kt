@@ -118,7 +118,11 @@ class CrashJournal(private val application: Application) {
         val metadata = "phase=${if (phase in setOf("before", "after", "node")) phase else "after"}; " +
             "node_length=${n?.text?.length}; node_cursor=${n?.start}:${n?.end}; " +
             "ime_length=${k?.text?.length}; ime_cursor=${k?.start}:${k?.end}; " +
-            "offset=${k?.offset}; composing=${observation.composing}"
+            "offset=${k?.offset}; composing=${observation.composing}; " +
+            "evidence_code=" + (if (n != null && k != null) {
+                val error = EditorEvidence.corroborate(n, k, observation.requiredRange ?: (n.start until n.end)).error
+                Regex("^\\[AF-E([0-9]{2})\\]").find(error.orEmpty())?.groupValues?.get(1) ?: "none"
+            } else "unavailable")
         try { prefs.edit().putString("editor_observation", metadata).commit() }
         catch (_: Exception) { persistFailed = true }
     }
