@@ -36,7 +36,7 @@ class EditorBridgeNodeRouteTest {
         var field: EditText? = null; var focused: AccessibilityNodeInfo? = null; var mutations = 0
         var nativeKeyboard: InputConnection? = null; var inputMethod: InputMethod? = null
         var connection: InputMethod.AccessibilityInputConnection? = null; var info: EditorInfo? = null
-        var brokenHint = false; val selections = mutableListOf<Pair<Int, Int>>()
+        var brokenHint = false; var hideCompositionSpans = false; val selections = mutableListOf<Pair<Int, Int>>()
         var serviceForCallbacks: AlienAccessibilityService? = null
     }
     @Implements(AccessibilityService::class)
@@ -73,7 +73,8 @@ class EditorBridgeNodeRouteTest {
             if (brokenHint && field!!.text.isEmpty()) {
                 actual.text = source.hintText; actual.isShowingHintText = false; actual.setTextSelection(1, 1)
             } else {
-                actual.text = source.text; actual.isShowingHintText = source.isShowingHintText
+                actual.text = if (hideCompositionSpans) source.text?.toString() else source.text
+                actual.isShowingHintText = source.isShowingHintText
                 actual.setTextSelection(source.textSelectionStart, source.textSelectionEnd)
             }
             // Real remote refresh publishes the widget's current actions as well.
@@ -91,7 +92,7 @@ class EditorBridgeNodeRouteTest {
     }
     @Before fun reset() {
         field = null; focused = null; mutations = 0; nativeKeyboard = null; inputMethod = null
-        connection = null; info = null; brokenHint = false; selections.clear(); serviceForCallbacks = null
+        connection = null; info = null; brokenHint = false; hideCompositionSpans = false; selections.clear(); serviceForCallbacks = null
     }
     private fun withField(text: String = "", hint: String = "", keyboard: Boolean = false, block: (AlienAccessibilityService) -> Unit) {
         Robolectric.buildActivity(Activity::class.java).setup().use { activity ->
@@ -246,6 +247,13 @@ class EditorBridgeNodeRouteTest {
         assertEquals("typ hello", field!!.text.toString())
         assertEquals(EditorWriteResult.APPLIED, write(service, "hello world"))
         assertEquals("typ hello world", field!!.text.toString())
+    }
+
+    @Test fun keyboardCompositionStillWorksWhenTheNodeOmitsComposingMetadata() = withField("typ", keyboard = true) { service ->
+        hideCompositionSpans = true; nativeKeyboard!!.setComposingRegion(0, 3)
+        assertFalse(service.composing); assertTrue(service.bridge.begin()); activate(service)
+        assertEquals(EditorWriteResult.APPLIED, write(service, "hello"))
+        assertEquals("typ hello", field!!.text.toString())
     }
 
     @Test fun switchingFieldsCannotAdoptTheNewTargetDuringDictation() = withField(keyboard = true) { service ->

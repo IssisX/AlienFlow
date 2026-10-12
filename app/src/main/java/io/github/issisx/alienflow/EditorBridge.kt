@@ -202,7 +202,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                     }
                 }
                 val tail = if (restoring) value else continuation.tail(value)
-                val inserted = if (!restoring && userInteracted) owner.separateFromTypedWord(tail) else tail
+                var inserted = if (!restoring && userInteracted) owner.separateFromTypedWord(tail) else tail
                 if (!restoring && first && inserted.isEmpty()) {
                     continuation.dispatched(value); outcome = EditorWriteResult.APPLIED; return@launch
                 }
@@ -247,6 +247,14 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 }
                 val initialReading = withTimeoutOrNull(3_000L) { read() }
                     ?: run { fail("[AF-E10] Keyboard read timed out; words are saved in AlienFlow"); outcome = EditorWriteResult.FAILED; return@launch }
+                // Some nodes omit composing spans while the native keyboard supplies
+                // them. That independently observed typed word is also user-owned.
+                if (!restoring && initialReading.composing && !initialNode.composing &&
+                    initialReading.node?.copy(composing = false) == before) {
+                    continuation.protectDispatched(); userInteracted = true; owner.invalidate()
+                    owner = EditorOwnership(before, replaceSelection = false); ownership = owner; first = true
+                    inserted = owner.separateFromTypedWord(continuation.tail(value))
+                }
                 // Only independent empty keyboard contents plus matching hint metadata
                 // may disambiguate a misreported placeholder. Never strip matching words
                 // merely because they look like a prompt.
