@@ -1,9 +1,9 @@
-name: Android release candidate
+name: AlienFlow2 Android release candidate
 
 on:
   workflow_dispatch:
   push:
-    branches: [build/first-apk, AlienFlow2]
+    branches: [AlienFlow2]
     paths:
       - 'app/**'
       - 'artwork/**'
