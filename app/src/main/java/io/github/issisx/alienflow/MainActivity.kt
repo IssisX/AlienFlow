@@ -52,6 +52,7 @@ class MainActivity : Activity() {
         text(screen, "Accessibility lets the alien edit the focused input. Password fields are excluded. Live insertion stops if focus, selection or text changes unexpectedly.")
         text(screen, "Termux is supported with your existing keyboard. Its corrected text inserts when you stop. Enter stays under your control.")
         title(screen, "3 · Try your first dictation")
+        text(screen, "Green dot: ready to speak. Cyan rim: live connection. Amber: finishing or recording locally.", 14)
         val test = EditText(this).apply { hint = "Tap here, then tap the alien or Start below"; setTextColor(white); setHintTextColor(Color.GRAY); minLines = 3; gravity = android.view.Gravity.TOP; inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES }
         screen.addView(test)
         record = button(screen, "Start dictation") { app.coordinator.toggle() }

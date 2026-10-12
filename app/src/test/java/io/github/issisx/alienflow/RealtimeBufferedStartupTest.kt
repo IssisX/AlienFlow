@@ -100,7 +100,8 @@ class RealtimeBufferedStartupTest {
             val uploaded = b.uploadedAudio()
             assertEquals(RealtimeProtocol.MIN_COMMIT_BYTES, uploaded.size)
             var finished = false; b.transport.finishCapture { finished = true }
-            runCurrent(); b.pumpUi(); assertTrue(finished); b.audio.close()
+            runCurrent(); assertFalse("Finalization must await the capture job", finished)
+            advanceTimeBy(5); runCurrent(); b.pumpUi(); assertTrue(finished); b.audio.close()
             assertArrayEquals(uploaded, b.file.readBytes().drop(44).toByteArray())
             assertEquals(1, b.commits); assertFalse(b.transport.hasPendingCoverage)
         }
@@ -110,7 +111,7 @@ class RealtimeBufferedStartupTest {
             b.input.speech(); runCurrent(); b.pumpUi()
             var finished: Boolean? = null
             b.transport.finishCapture { finished = it }
-            runCurrent(); assertNull(finished); assertTrue(b.input.stopped)
+            runCurrent(); advanceTimeBy(5); runCurrent(); assertNull(finished); assertTrue(b.input.stopped)
             b.open(); b.ready(); runCurrent(); b.pumpUi()
             assertEquals(true, finished); assertEquals(1, b.commits)
             b.ready(); runCurrent(); b.pumpUi(); assertEquals(1, b.commits)
@@ -122,7 +123,9 @@ class RealtimeBufferedStartupTest {
             b.input.speech(); runCurrent(); b.pumpUi()
             var covered: Boolean? = null
             b.transport.finishCapture { covered = it }
-            runCurrent(); advanceTimeBy(15_001); runCurrent(); b.audio.close()
+            runCurrent(); advanceTimeBy(5); runCurrent()
+            assertNull("The drained recording still waits for its server", covered)
+            advanceTimeBy(15_001); runCurrent(); b.audio.close()
             assertEquals(false, covered); assertTrue(b.socket.cancelled)
             assertEquals(4_800L, PendingAudio.repair(b.file).dataBytes)
             b.open(); b.ready(); b.pumpUi()
@@ -139,14 +142,14 @@ class RealtimeBufferedStartupTest {
             assertEquals(listOf("session.update") + List(5) { "input_audio_buffer.append" } +
                 listOf("input_audio_buffer.commit") + List(5) { "input_audio_buffer.append" },
                 b.socket.sent.map { it.getString("type") })
-            b.transport.finishCapture {}; runCurrent(); b.pumpUi(); assertEquals(2, b.commits)
+            b.transport.finishCapture {}; runCurrent(); advanceTimeBy(5); runCurrent(); b.pumpUi(); assertEquals(2, b.commits)
             b.audio.close(); assertArrayEquals(b.file.readBytes().drop(44).toByteArray(), b.uploadedAudio())
         }
     }
     @Test fun shortStopAddsOnlySilenceToNetworkEnvelopeAndKeepsOriginalRecoveryBytes() = runTest {
         Boundary(this).use { b ->
             b.input.speech(1); runCurrent(); b.open(); b.ready(); runCurrent(); b.pumpUi()
-            b.transport.finishCapture {}; runCurrent(); b.pumpUi(); b.audio.close()
+            b.transport.finishCapture {}; runCurrent(); advanceTimeBy(5); runCurrent(); b.pumpUi(); b.audio.close()
             val captured = b.file.readBytes().drop(44).toByteArray(); val uploaded = b.uploadedAudio()
             assertEquals(960, captured.size); assertEquals(4_800, uploaded.size)
             assertArrayEquals(captured, uploaded.take(captured.size).toByteArray())
@@ -159,7 +162,8 @@ class RealtimeBufferedStartupTest {
             b.open(); b.ready(); b.input.speech(1)
             var finished = false
             b.input.duringRead = { b.transport.finishCapture { finished = true } }
-            runCurrent(); b.pumpUi(); assertTrue(finished); b.audio.close()
+            runCurrent(); assertFalse("Finalization must await the capture job", finished)
+            advanceTimeBy(5); runCurrent(); b.pumpUi(); assertTrue(finished); b.audio.close()
             assertEquals(960L, PendingAudio.repair(b.file).dataBytes)
             assertArrayEquals(b.file.readBytes().drop(44).toByteArray(), b.uploadedAudio().take(960).toByteArray())
             assertEquals(1, b.commits); assertEquals(0, b.captured)
@@ -172,7 +176,7 @@ class RealtimeBufferedStartupTest {
             assertTrue(b.transport.hasPendingCoverage); assertTrue(b.socket.cancelled)
             assertEquals(1, b.interrupted); assertEquals(0, b.connected)
             var covered = true; b.transport.finishCapture { covered = it }
-            runCurrent(); b.audio.close(); assertFalse(covered)
+            runCurrent(); advanceTimeBy(5); runCurrent(); b.audio.close(); assertFalse(covered)
             assertEquals(4_800L, PendingAudio.repair(b.file).dataBytes)
         }
     }
