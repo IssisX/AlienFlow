@@ -23,7 +23,7 @@ The 0.1.10 transport starts AudioRecord only after an authenticated WebSocket an
 
 Required regressions use the production transport, startup FIFO, actual PCM/WAV pipeline, state selector and native Android Canvas renderer with explicitly simulated microphone/network boundaries. They cover capture before connection, quick Stop before acknowledgement, turn ordering, one-shot replay, failed replay, short final envelope, in-flight final read, access denial after capture, cancellation and late acknowledgement. Existing editor, terminal, synchronization, focus, storage, crash privacy and handshake gates remain required.
 
-Actual activity and production-indicator renders on both light and dark backgrounds are required in the release bundle. Compilation, lint, test and artifact results will be recorded against the exact source and APK hashes in RELEASE_VERIFICATION_0.1.11.json after those gates run. No real provider account or physical Fold6 was exercised by these JVM/CI checks.
+Actual activity and production-indicator renders on both light and dark backgrounds are required in the release bundle. Source 0ed89b514b0adb0626f16a61381dd799d1552d7b passed all 116 tests with zero skipped, release lint with 32 issues and zero errors, release compilation, package verification and all 62 bundle member hashes. Both production-indicator native renders were visually inspected. The APK was signed with the existing certificate; all 25 payload entries remain unchanged. Exact run/artifact/signature/hash evidence is in RELEASE_VERIFICATION_0.1.11.json. No real provider account or physical Fold6 was exercised by these JVM/CI checks.
 
 ## Phone acceptance still required
 

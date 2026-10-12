@@ -1,0 +1,43 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version": "0.1.11",
+  "version_code": 12,
+  "branch": "AlienFlow2",
+  "compiled_source_sha": "0ed89b514b0adb0626f16a61381dd799d1552d7b",
+  "compiled_tree_sha": "f1ef4ae13b51817e3d429ecd0cc03ed38fec5bb0",
+  "workflow_run": "https://github.com/IssisX/AlienFlow/actions/runs/38268463683",
+  "artifact_id": 11755144584,
+  "unsigned_bundle_sha256": "b1c55749e75592be6e6243917568e9304206a4fb5dbb786067cc80b3ab3bc68c",
+  "member_hashes_verified": 62,
+  "tests": {
+    "executed": 116,
+    "total": 116,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "not run"
+  },
+  "lint": {
+    "issues": 32,
+    "errors": 0
+  },
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.11.apk",
+    "size_bytes": 4425681,
+    "sha256": "b8121143844d87aeb80644a8e285c798098ea3bd865d0938284f3cbe7b9f6492",
+    "signature_scheme": "APK v3",
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "payload_entries_unchanged": 25
+  },
+  "verification_scope": "Production buffered startup/capture-drain and recovery pipeline with explicitly simulated microphone and server; real state selector; native Android Canvas indicator and activity renders; existing regression suite, release build, lint, artifact hashes, same-certificate signing and unchanged APK payload.",
+  "phone_latency_observations": "Not collected in this environment. APK records actual monotonic first-observation startup timings after phone use; no measured speed-up or provider ranking claimed.",
+  "device_verification": "Not performed for 0.1.11. Physical microphone, foreground-service timing, real provider account, recognition quality at minimal delay, Termux and Chrome behavior require phone acceptance.",
+  "ui_evidence": [
+    "reports/ui-proof/indicator-light-0.1.11.png",
+    "reports/ui-proof/indicator-dark-0.1.11.png",
+    "reports/ui-proof/main-0.1.11.png",
+    "reports/ui-proof/diagnostics-0.1.11.png"
+  ],
+  "provider_route": "Existing direct OpenAI Realtime WebSocket retained; no additional provider account, idle microphone or paid prewarm session introduced.",
+  "guarded_editor_behavior": "0.1.10 terminal-mode reset, manual-edit preservation, error-only notices and capture-drain ordering retained."
+}
