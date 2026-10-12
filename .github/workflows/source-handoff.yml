@@ -16,12 +16,18 @@ jobs:
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - name: Export tracked repository only
+        shell: bash
         run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --exit-code
           git bundle create "${RUNNER_TEMP}/AlienFlow-source.bundle" HEAD
           git bundle verify "${RUNNER_TEMP}/AlienFlow-source.bundle"
+          git bundle list-heads "${RUNNER_TEMP}/AlienFlow-source.bundle"
           sha256sum "${RUNNER_TEMP}/AlienFlow-source.bundle"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
