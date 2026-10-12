@@ -181,14 +181,15 @@ class EditorBridge(private val service: AlienAccessibilityService) {
             var observation = EditorSynchronization.Reading(null, null)
             try {
                 if (!current()) return@launch
-                var before = snapshotNode() ?: run {
+                val initialNode = snapshotNode() ?: run {
                     outcome = if (sameTarget()) EditorWriteResult.RETRY else EditorWriteResult.USER_EDIT
                     return@launch
                 }
-                // An IME commit replaces its composing region regardless of selection.
-                // Serialize only that transaction; capture/transcription never stop.
-                if (before.composing) { outcome = EditorWriteResult.RETRY; return@launch }
-                if (!(if (first) owner.canFirstWrite(before) else owner.matches(before))) {
+                var before = initialNode.copy(composing = false)
+                // Accessibility commitText batches finishComposingText before insertion
+                // (AOSP RemoteInputConnectionImpl). Do not wait for the user to type a
+                // space: snapshot the literal typed word and preserve it as an anchor.
+                if (initialNode.composing || !(if (first) owner.canFirstWrite(before) else owner.matches(before))) {
                     if (restoring) return@launch
                     userInteracted = true
                     continuation.protectDispatched()
@@ -261,7 +262,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                     if (initialPending) { initialPending = false; return initialReading }
                     return read()
                 }
-                outcome = EditorSynchronization.await(before, before, ::current, ::initialRead)
+                outcome = EditorSynchronization.await(before, before, ::current, ::initialRead, allowComposition = true)
                 if (outcome != EditorWriteResult.APPLIED) return@launch
                 if (!current() || snapshotNode() != rawObservation) { outcome = EditorWriteResult.USER_EDIT; return@launch }
                 val range = if (first) owner.initialRange() else owner.range()

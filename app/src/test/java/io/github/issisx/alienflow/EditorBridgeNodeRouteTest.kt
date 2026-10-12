@@ -37,6 +37,7 @@ class EditorBridgeNodeRouteTest {
         var nativeKeyboard: InputConnection? = null; var inputMethod: InputMethod? = null
         var connection: InputMethod.AccessibilityInputConnection? = null; var info: EditorInfo? = null
         var brokenHint = false; val selections = mutableListOf<Pair<Int, Int>>()
+        var serviceForCallbacks: AlienAccessibilityService? = null
     }
     @Implements(AccessibilityService::class)
     class Broker : ShadowAccessibilityService() {
@@ -53,7 +54,15 @@ class EditorBridgeNodeRouteTest {
     class KeyboardIpc {
         @Implementation fun getSurroundingText(before: Int, after: Int, flags: Int): SurroundingText? = nativeKeyboard?.getSurroundingText(before, after, flags)
         @Implementation fun setSelection(start: Int, end: Int) { selections.add(start to end); nativeKeyboard!!.setSelection(start, end) }
-        @Implementation fun commitText(text: CharSequence, cursor: Int, attributes: TextAttribute?) { nativeKeyboard!!.commitText(text, cursor) }
+        @Implementation fun commitText(text: CharSequence, cursor: Int, attributes: TextAttribute?) {
+            // AOSP accessibility IPC batches finishComposingText before commitText.
+            // Calling a raw native commit alone would simulate a different API.
+            nativeKeyboard!!.beginBatchEdit()
+            nativeKeyboard!!.finishComposingText()
+            nativeKeyboard!!.commitText(text, cursor)
+            nativeKeyboard!!.endBatchEdit()
+            serviceForCallbacks?.confirmEmptyComposition() // Simulated OS selection callback.
+        }
     }
     @Implements(AccessibilityNodeInfo::class)
     class NodeIpc : ShadowAccessibilityNodeInfo() {
@@ -74,12 +83,15 @@ class EditorBridgeNodeRouteTest {
         }
         @Implementation override fun performAction(action: Int, arguments: Bundle?): Boolean {
             mutations++
-            return field?.performAccessibilityAction(action, arguments) ?: false
+            val result = field?.performAccessibilityAction(action, arguments) ?: false
+            if (result && action == AccessibilityNodeInfo.ACTION_SET_TEXT)
+                serviceForCallbacks?.confirmEmptyComposition() // Native setText clears composing spans.
+            return result
         }
     }
     @Before fun reset() {
         field = null; focused = null; mutations = 0; nativeKeyboard = null; inputMethod = null
-        connection = null; info = null; brokenHint = false; selections.clear()
+        connection = null; info = null; brokenHint = false; selections.clear(); serviceForCallbacks = null
     }
     private fun withField(text: String = "", hint: String = "", keyboard: Boolean = false, block: (AlienAccessibilityService) -> Unit) {
         Robolectric.buildActivity(Activity::class.java).setup().use { activity ->
@@ -88,6 +100,7 @@ class EditorBridgeNodeRouteTest {
             focused = field!!.createAccessibilityNodeInfo()
             val controller = Robolectric.buildService(AlienAccessibilityService::class.java).create()
             val service = controller.get()
+            serviceForCallbacks = service
             if (keyboard) {
                 info = EditorInfo().apply { packageName = focused!!.packageName.toString(); inputType = field!!.inputType; fieldId = 42 }
                 nativeKeyboard = field!!.onCreateInputConnection(EditorInfo())!!
@@ -214,30 +227,25 @@ class EditorBridgeNodeRouteTest {
         assertEquals("left next hello right", field!!.text.toString())
     }
 
-    @Test fun composingKeyboardTransactionKeepsCaptureAndQueuesSpeechAutomatically() = withField(keyboard = true) { service ->
+    @Test fun composingKeyboardWordDoesNotWaitForSpaceBeforeMoreSpeech() = withField(keyboard = true) { service ->
         assertTrue(service.bridge.begin()); activate(service)
         assertEquals(EditorWriteResult.APPLIED, write(service, "hello"))
-        field!!.append(" typ"); field!!.setSelection(field!!.length())
-        val prior = mutations
+        nativeKeyboard!!.setComposingText(" typ", 1)
         service.javaClass.getDeclaredField("composing").apply { isAccessible = true }.setBoolean(service, true)
-        assertEquals(EditorWriteResult.RETRY, write(service, "hello there"))
-        assertEquals("hello typ", field!!.text.toString()); assertEquals(prior, mutations)
-        assertTrue((service.application as AlienApp).coordinator.active); assertTrue(service.bridge.sameTarget())
-        service.confirmEmptyComposition(); field!!.append("ed"); field!!.setSelection(field!!.length())
         assertEquals(EditorWriteResult.APPLIED, write(service, "hello there"))
-        assertEquals("hello typed there", field!!.text.toString())
+        assertEquals("hello typ there", field!!.text.toString())
+        assertTrue((service.application as AlienApp).coordinator.active); assertTrue(service.bridge.sameTarget())
     }
 
     @Test fun microphoneBindingDoesNotRequireTheUserToStopTypingFirst() = withField("typ", keyboard = true) { service ->
+        nativeKeyboard!!.setComposingRegion(0, 3)
         service.javaClass.getDeclaredField("composing").apply { isAccessible = true }.setBoolean(service, true)
         assertTrue(service.bridge.lastError, service.bridge.begin()); activate(service)
-        assertEquals(EditorWriteResult.RETRY, write(service, "hello"))
-        assertTrue((service.application as AlienApp).coordinator.active)
-        field!!.append("ed"); field!!.setSelection(field!!.length()); service.confirmEmptyComposition()
         assertEquals(EditorWriteResult.APPLIED, write(service, "hello"))
-        assertEquals("typed hello", field!!.text.toString())
+        assertTrue((service.application as AlienApp).coordinator.active)
+        assertEquals("typ hello", field!!.text.toString())
         assertEquals(EditorWriteResult.APPLIED, write(service, "hello world"))
-        assertEquals("typed hello world", field!!.text.toString())
+        assertEquals("typ hello world", field!!.text.toString())
     }
 
     @Test fun switchingFieldsCannotAdoptTheNewTargetDuringDictation() = withField(keyboard = true) { service ->

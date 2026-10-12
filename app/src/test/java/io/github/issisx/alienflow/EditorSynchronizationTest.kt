@@ -61,6 +61,14 @@ class EditorSynchronizationTest {
         assertEquals(EditorWriteResult.USER_EDIT,
             EditorSynchronization.await(before, before, { true }, { reading(expected) }))
     }
+    @Test fun accessibilityCommitCanProceedWithACorroboratedComposingWord() = runTest {
+        val composed = before.copy(composing = true)
+        assertEquals(EditorWriteResult.APPLIED, EditorSynchronization.await(before, before, { true },
+            { reading(composed, composing = true) }, allowComposition = true))
+        assertEquals(0L, currentTime)
+        assertEquals(EditorWriteResult.USER_EDIT, EditorSynchronization.await(before, before, { true },
+            { reading(composed.copy(text = "changed"), composing = true) }, allowComposition = true))
+    }
     @Test fun finalAudioCommitAndWaveCloseWaitForTheLastCaptureCallback() = runTest {
         val release = CompletableDeferred<Unit>(); val order = mutableListOf<String>()
         val capture = launch { release.await(); order += "last-frame" }

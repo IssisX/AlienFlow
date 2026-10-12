@@ -15,10 +15,9 @@ internal object NodeEditorWriter {
         if (!emptySession) return EditorWriteResult.FAILED
         if (!(if (first) owner.canFirstWrite(before) else owner.matches(before)) ||
             !owner.preservesAnchors(expected)) return EditorWriteResult.RETRY
-        if (before.composing) return EditorWriteResult.RETRY
         if (expected.end != expected.text.length && setSelection == null) return EditorWriteResult.FAILED
         if (!current()) return EditorWriteResult.USER_EDIT
-        if (read() != before) return EditorWriteResult.RETRY
+        if (read()?.copy(composing = false) != before) return EditorWriteResult.RETRY
         if (!setText(expected.text)) return EditorWriteResult.FAILED
         dispatched()
         if (expected.end != expected.text.length) {
