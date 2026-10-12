@@ -1,13 +1,13 @@
-name: Source handoff for live-transcription repair
+name: AlienFlow2 source handoff
 on:
   workflow_dispatch:
   push:
-    branches: [build/first-apk]
+    branches: [AlienFlow2]
     paths: ['.github/workflows/source-handoff.yml']
 permissions:
   contents: read
 concurrency:
-  group: alienflow-first-apk
+  group: alienflow2-source
   cancel-in-progress: false
 jobs:
   source:
@@ -19,19 +19,18 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 0
-      - name: Export tracked repository only
+      - name: Export tracked source
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git diff --exit-code
-          git bundle create "${RUNNER_TEMP}/AlienFlow-source.bundle" HEAD
-          git bundle verify "${RUNNER_TEMP}/AlienFlow-source.bundle"
-          git bundle list-heads "${RUNNER_TEMP}/AlienFlow-source.bundle"
-          sha256sum "${RUNNER_TEMP}/AlienFlow-source.bundle"
+          git bundle create "${RUNNER_TEMP}/AlienFlow2-source.bundle" HEAD
+          git bundle verify "${RUNNER_TEMP}/AlienFlow2-source.bundle"
+          sha256sum "${RUNNER_TEMP}/AlienFlow2-source.bundle"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          path: ${{ runner.temp }}/AlienFlow-source.bundle
+          path: ${{ runner.temp }}/AlienFlow2-source.bundle
           archive: false
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 2
