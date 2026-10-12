@@ -1,0 +1,49 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version": "0.1.12",
+  "version_code": 13,
+  "branch": "AlienFlow2",
+  "compiled_source_sha": "9b8efd0594bda0b7540dc3d78011202fc6ddfdb0",
+  "compiled_tree_sha": "b47690c9e6627e946cccab68c0270e7c14574fbf",
+  "workflow_run": "https://github.com/IssisX/AlienFlow/actions/runs/38277070077",
+  "artifact_id": 11759920859,
+  "unsigned_bundle_sha256": "299d96c7283a9a1883ca6ac6ba6a36b896bdba1fc4af63d0af5165532218d5cb",
+  "member_hashes_verified": 64,
+  "tests": {
+    "executed": 122,
+    "total": 122,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "not run"
+  },
+  "lint": {
+    "issues": 32,
+    "errors": 0
+  },
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.12.apk",
+    "size_bytes": 4429777,
+    "sha256": "6075919782be1406495a5583cf97eded70cb9f87ec023c3187326bf1df287499",
+    "signature_scheme": "APK v3",
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "payload_entries_unchanged": 25
+  },
+  "handoff_regressions": {
+    "executed": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "environment": "Robolectric SDK 35; production service/attached overlay and framework InputMethod callbacks; remote focus/cache and EditorInfo delivery simulated."
+  },
+  "owner_observation": "0.1.11 improving; bubble stops appearing in other fields after Termux use.",
+  "supported_mechanism": "One-shot focus sampling could strand visibility across independently delivered input/tree updates; selection callbacks did not refresh bubble and service XML omitted content-change events.",
+  "device_verification": "Not performed for 0.1.12. Precise phone event order, installed Termux-to-Chrome/native-field transition and absence of service/OEM focus failure require phone acceptance.",
+  "preserved_behavior": [
+    "Accepted artwork and 0.1.11 readiness/latency settings",
+    "Nonfocusable overlay and selected keyboard",
+    "Explicit Hide and protected-input exclusion",
+    "Guarded editor writes; no new target adoption during capture; never submit",
+    "Existing signing certificate and application identity"
+  ]
+}

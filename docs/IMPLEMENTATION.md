@@ -20,7 +20,7 @@ Primary API contracts inspected: [AccessibilityService focus/cache](https://deve
 
 The new regression suite runs the production service callbacks, attached overlay, actual visibility setter and packaged service XML under Robolectric SDK 35. The remote focus/cache broker and EditorInfo delivery are explicitly simulated. It covers Termux-to-delayed-document focus, selection-only recovery, subscribed content-change recovery, password/no-node exclusion, explicit Hide preservation, nonfocusable flags, one overlay identity, bounded refresh work and teardown. Existing editor, terminal, synchronization, capture, protocol, storage and native-render gates remain required. These checks do not prove installed Termux or physical Fold6 acceptance.
 
-Exact compilation, test, lint, package, artifact and signature outcomes will be recorded in RELEASE_VERIFICATION_0.1.12.json after the release gates run. Prior checkpoint: history/IMPLEMENTATION_0.1.11.md.
+Source 9b8efd0594bda0b7540dc3d78011202fc6ddfdb0 passed all 122 tests with zero skipped, including six new handoff regressions. Release lint has 32 issues and zero errors. The release workflow completed successfully; package identity, all 64 bundle member hashes, APK v3 signature and the existing certificate were verified. Signing changed no payload entry (25 entries compared). Exact evidence is recorded in RELEASE_VERIFICATION_0.1.12.json. Prior checkpoint: history/IMPLEMENTATION_0.1.11.md.
 
 ## Phone acceptance remaining
 
