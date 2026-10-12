@@ -10,7 +10,13 @@ set -x
 SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
 AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
 ADB="$ANDROID_HOME/platform-tools/adb"
-# SDK downloads occasionally arrive truncated; retry setup only, never a failing test.
+# Set one explicit state directory for both Java SDK tools and the native emulator.
+# The previous runner's emulator could not find the AVD created by avdmanager.
+export ANDROID_USER_HOME="${RUNNER_TEMP}/alienflow-chat-android"
+export ANDROID_EMULATOR_HOME="$ANDROID_USER_HOME"
+export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+mkdir -p "$ANDROID_AVD_HOME"
+# Retry setup only for interrupted SDK downloads, never a failing integration test.
 SDK_READY=false
 for attempt in 1 2 3; do
   if timeout 360 "$SDKMANAGER" 'emulator' 'system-images;android-36;google_apis;x86_64'; then
@@ -22,11 +28,13 @@ done
 test "$SDK_READY" = true
 test -e /dev/kvm
 sudo chmod 666 /dev/kvm
-printf 'no\n' | "$AVDMANAGER" create avd -n alienflow-chat-api36 -k 'system-images;android-36;google_apis;x86_64' --force
+"$AVDMANAGER" create avd -n alienflow-chat-api36 -k 'system-images;android-36;google_apis;x86_64' --device pixel_6 --path "$ANDROID_AVD_HOME/alienflow-chat-api36.avd" --force
+"$AVDMANAGER" list avd
+"$ANDROID_HOME/emulator/emulator" -list-avds | tee "$PROOF/available-avds.txt"
+grep -Fx 'alienflow-chat-api36' "$PROOF/available-avds.txt"
 "$ANDROID_HOME/emulator/emulator" -avd alienflow-chat-api36 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > "$PROOF/emulator.log" 2>&1 &
 EMULATOR_PID=$!
 cleanup() {
-  # These are exclusively disposable-emulator fixtures, never user phone logs.
   timeout 5 "$ADB" logcat -d -t 3000 > "$PROOF/logcat.txt" 2>&1 || true
   timeout 5 "$ADB" exec-out screencap -p > "$PROOF/last-screen.png" 2>/dev/null || true
   timeout 5 "$ADB" shell dumpsys accessibility > "$PROOF/accessibility.txt" 2>&1 || true
