@@ -16,6 +16,6 @@ Added tests exercise public coordinator start/event/stop, production bridge, fra
 
 ## Verification
 
-Candidate tests and bounded repair written. Exact-revision CI, signed update certificate/payload, package hashes and delivery pending. Keep the 0.1.17 Chrome window/tail fixes, typing/composition protections, background Ready service, microphone-stop ordering, cancellable cleanup budgets, no Enter, selected keyboard, approved artwork and cost reductions.
+Final source 185665b2451e1ce3b9a78e2cb4ba4697bd70e581 (tree 9fe35381143839860f557e052292f9003d5e737a) passed the single CI run 38310603246: 192 tests, zero failures/errors/skips and zero lint errors (38 non-error issues). Verified all 134 package-member hashes, compiled source in DEX and approved artwork. Signed with the original update certificate, with all 25 APK ZIP payload entries unchanged. Saved AlienFlow-0.1.18.apk successfully and verified SHA256 after saving. Full evidence: RELEASE_VERIFICATION_0.1.18.json. Keep the 0.1.17 Chrome window/tail fixes, typing/composition protections, background Ready service, microphone-stop ordering, cancellable cleanup budgets, no Enter, selected keyboard, approved artwork and cost reductions.
 
 Existing exact evidence: RELEASE_VERIFICATION_0.1.17.json and history/IMPLEMENTATION_0.1.17.md. Standing authorization is in AGENTS.md. Installed Termux/Fold6 acceptance remains unverified until phone observation; no paid API call is made for this repair.
