@@ -118,17 +118,19 @@ class EditorBridge(private val service: AlienAccessibilityService) {
 
     private fun writeOwned(value: String, restoring: Boolean, completion: (EditorWriteResult) -> Unit) {
         val owner = ownership ?: return completion(EditorWriteResult.USER_EDIT)
+        lastError = ""
         val writeGeneration = generation
         val sequence = ++writeSequence
         fun current(): Boolean = generation == writeGeneration && ownership === owner && sequence == writeSequence &&
-            app.coordinator.service === service && (restoring || app.coordinator.active || app.coordinator.finishing)
+            app.coordinator.service === service && (restoring || app.coordinator.active || app.coordinator.finishing) &&
+            node?.refresh() == true && focused() == node
         scope.launch {
             var outcome = EditorWriteResult.USER_EDIT
             var phase = "before"
             var observation = EditorSynchronization.Reading(null, null)
             try {
                 if (!current()) return@launch
-                val before = snapshotNode() ?: return@launch
+                val before = snapshotNode() ?: run { outcome = EditorWriteResult.FAILED; return@launch }
                 if (!(if (first) owner.canFirstWrite(before) else owner.matches(before))) {
                     owner.invalidate()
                     return@launch // User typing/cursor movement is an interaction, not a failure.
@@ -168,7 +170,8 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 if (outcome != EditorWriteResult.APPLIED) owner.invalidate()
                 if (outcome == EditorWriteResult.FAILED && current()) {
                     app.crashJournal.editorObservation(phase, observation)
-                    if (!lastError.startsWith("[AF-E04]") && !lastError.startsWith("[AF-E15]"))
+                    val structuralError = observation.node == null && Regex("^\\[AF-E(?:04|05|07|15)\\]").containsMatchIn(lastError)
+                    if (!structuralError && !lastError.startsWith("[AF-E15]"))
                         fail(if (phase == "before") "[AF-E10] Editor sync timed out; see Diagnostics"
                             else "[AF-E14] Insertion sync timed out; see Diagnostics")
                 }
