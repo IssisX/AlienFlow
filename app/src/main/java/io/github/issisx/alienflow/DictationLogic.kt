@@ -142,6 +142,8 @@ class EditorOwnership(private val initial: EditorSnapshot, private val replaceSe
     fun initialRange() = (if (replaceSelection) initial.start else initial.end) until initial.end
     fun preservesAnchors(snapshot: EditorSnapshot) = snapshot.text.startsWith(prefix) && snapshot.text.endsWith(suffix) &&
         snapshot.start == snapshot.end && snapshot.end == snapshot.text.length - suffix.length
+    fun separateFromTypedWord(value: String): String =
+        if (prefix.lastOrNull()?.isLetterOrDigit() == true && value.firstOrNull()?.isLetterOrDigit() == true) " $value" else value
     fun ownsWholeField() = prefix.isEmpty() && suffix.isEmpty() && initial.text.isEmpty()
     fun confirm(snapshot: EditorSnapshot, proposed: String): Boolean {
         val old = owned; owned = proposed

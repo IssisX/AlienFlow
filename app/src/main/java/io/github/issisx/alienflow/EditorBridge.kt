@@ -200,7 +200,8 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                         outcome = EditorWriteResult.FAILED; return@launch
                     }
                 }
-                val inserted = if (restoring) value else continuation.tail(value)
+                val tail = if (restoring) value else continuation.tail(value)
+                val inserted = if (!restoring && userInteracted) owner.separateFromTypedWord(tail) else tail
                 if (!restoring && first && inserted.isEmpty()) {
                     continuation.dispatched(value); outcome = EditorWriteResult.APPLIED; return@launch
                 }

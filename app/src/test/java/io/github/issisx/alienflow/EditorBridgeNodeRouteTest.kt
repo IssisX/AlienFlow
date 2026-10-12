@@ -67,6 +67,9 @@ class EditorBridgeNodeRouteTest {
                 actual.text = source.text; actual.isShowingHintText = source.isShowingHintText
                 actual.setTextSelection(source.textSelectionStart, source.textSelectionEnd)
             }
+            // Real remote refresh publishes the widget's current actions as well.
+            actual.actionList.toList().forEach { actual.removeAction(it) }
+            source.actionList.forEach { actual.addAction(it) }
             return true
         }
         @Implementation override fun performAction(action: Int, arguments: Bundle?): Boolean {
@@ -183,6 +186,16 @@ class EditorBridgeNodeRouteTest {
         assertEquals("hello typed there friend", field!!.text.toString())
     }
 
+    @Test fun nodeOnlyEditorKeepsAnEditedWordAndRestoresAMiddleCursor() = withField { service ->
+        assertTrue(service.bridge.begin()); activate(service)
+        assertEquals(EditorWriteResult.APPLIED, write(service, "hello there"))
+        field!!.setText("Cory there"); field!!.setSelection(4)
+        assertEquals(EditorWriteResult.APPLIED, write(service, "Hello there friend"))
+        assertEquals("Cory friend there", field!!.text.toString()); assertEquals(11, field!!.selectionStart)
+        assertEquals(EditorWriteResult.APPLIED, write(service, "Hello there friend again"))
+        assertEquals("Cory friend again there", field!!.text.toString()); assertEquals(16, field!!.selectionStart)
+    }
+
     @Test fun editingRecognizedWordsAndLateFinalizationNeverOverwriteKeyboardEdits() = withField("left  right", keyboard = true) { service ->
         field!!.setSelection(5); assertTrue(service.bridge.begin()); activate(service)
         assertEquals(EditorWriteResult.APPLIED, write(service, "hello world"))
@@ -221,8 +234,10 @@ class EditorBridgeNodeRouteTest {
         assertEquals(EditorWriteResult.RETRY, write(service, "hello"))
         assertTrue((service.application as AlienApp).coordinator.active)
         field!!.append("ed"); field!!.setSelection(field!!.length()); service.confirmEmptyComposition()
-        assertEquals(EditorWriteResult.APPLIED, write(service, " hello"))
+        assertEquals(EditorWriteResult.APPLIED, write(service, "hello"))
         assertEquals("typed hello", field!!.text.toString())
+        assertEquals(EditorWriteResult.APPLIED, write(service, "hello world"))
+        assertEquals("typed hello world", field!!.text.toString())
     }
 
     @Test fun switchingFieldsCannotAdoptTheNewTargetDuringDictation() = withField(keyboard = true) { service ->
