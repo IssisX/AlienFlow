@@ -82,3 +82,7 @@ Compiled source `c289cb98f5d1dabffcc8eadf6fad98dbc586efc5`, [run 38139391856](ht
 Installer: `AlienFlow-0.1.5.apk`, 17,086,706 bytes, SHA-256 `923055310de532dfd2194fa403140fe264cc963c426db52f1b927911ff20341a`. APK v3 signature passed with certificate `d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f`. Original unsigned payload entries are unchanged after signing. Only signature metadata was added.
 
 Install the signed APK delivered in the conversation, not the unsigned Actions intermediate. Physical update/data preservation and the original mic-start failure still require phone acceptance.
+
+## Signed 0.1.7 update — 2026-10-12
+
+Source `6db8c29dbf85386b9c6d6a3503a1e5838abe670b` / [CI run 38246391603](https://github.com/IssisX/AlienFlow/actions/runs/38246391603). 75 tests passed; lint 0 errors (28 warnings); package checks green. Artifact 11746196600 checked against 40 member hashes. VersionCode 8 / versionName 0.1.7. Privately signed APK 4,323,480 bytes, SHA-256 `9f6b97ffa414f36a195b705f65af70079d332cf64a76d719df3b5bc179a23ebe`, APK v3 verified with original cert. No unsandboxed signing material enters CI. Native WebRTC remains absent. Install over 0.1.6 without clearing data. Phone acceptance pending.

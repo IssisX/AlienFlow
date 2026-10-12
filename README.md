@@ -2,7 +2,18 @@
 
 Personal Android dictation with a movable Gray alien bubble, live text in the focused field, conservative corrections, and a user-supplied OpenAI API key.
 
-## Current signed update: 0.1.6 (7)
+## Current signed update: 0.1.7 (8)
+
+**New observed evidence:** On the Fold6, tapping the alien in 0.1.6 brought up **“Stopped • audio saved for recovery”** while AlienFlow remained on-screen. This is NOT the previous WebRTC process crash. It does not identify the initiating stop source, and the old generic completion message did not distinguish a nonempty saved WAV from no captured audio.
+
+**0.1.7 repair:** The coordinator now treats an uncertain editor focus as *loss of inline editing rights*, not a command to stop microphone capture. The same session continues, and no new text field is adopted. The actual terminal network/provider/service error now survives asynchronous finalization and is shown in the status; if audio was never recorded it explicitly says so. No API, microphone transport, permission or artwork changes were made.
+
+[Actions run 38246391603](https://github.com/IssisX/AlienFlow/actions/runs/38246391603) passed **75 tests**, release lint with zero errors and 28 warnings, verified packaging and artifact upload for compiled source `6db8c29dbf85386b9c6d6a3503a1e5838abe670b`. The privately signed APK's original certificate and versionCode 8 were verified; [0.1.7 release record](docs/RELEASE_VERIFICATION_0.1.7.json) identifies its exact bytes. Physical Fold6 dictation remains pending.
+
+### Do this on the Fold6
+Install the **signed** 0.1.7 APK directly over 0.1.6. Focus an empty note, tap alien, and speak. If focus shifts, dictation should continue while the editor detaches safely. If the app genuinely stops, the status now shows the initiating cause and whether any audio was actually recorded. Use the top-level **Diagnostics / share report** button if it still fails, and share the new session events (not merely old WebRTC crash entries).
+
+## Earlier signed update: 0.1.6 (7)
 
 The Fold6 diagnostic report finally identified the crash owner instead of leaving us to perform interpretive dance around a green microphone dot:
 
