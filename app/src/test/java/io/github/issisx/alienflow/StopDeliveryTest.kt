@@ -16,6 +16,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.util.ReflectionHelpers
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.io.File
 
 /** Real coordinator + cancellable HTTP on loopback. Transcript events are fixtures. */
 @RunWith(RobolectricTestRunner::class)
@@ -65,5 +66,28 @@ class StopDeliveryTest {
         assertEquals("phrase 0 phrase 1 phrase 2", JSONObject(request.body.readUtf8()).getString("input"))
         awaitComplete(coordinator, 3_500)
         assertTrue(canceled.get()); assertEquals(1, server.requestCount)
+    }
+    @Test fun stopCannotFinishBeforeACommitAcknowledgementWhoseUiCounterIsStillQueued() = exercise(false) { coordinator, server, _ ->
+        val app = org.robolectric.RuntimeEnvironment.getApplication() as AlienApp
+        val audio = PendingAudio(File(app.store.audioDir, "held-commit.wav"))
+        val transport = RealtimeTransport(app, audio, coordinator)
+        val coverage = ReflectionHelpers.getField<AudioCoverage>(transport, "coverage")
+        coverage.sent("last-frame", 960L) // Controlled network/Ui callback ordering, no microphone fixture.
+        ReflectionHelpers.setField(coordinator, "transport", transport)
+        ReflectionHelpers.setField(coordinator, "audio", audio)
+        ReflectionHelpers.setField(coordinator, "correctionMode", "A")
+        coordinator.stop()
+        val until = System.nanoTime() + TimeUnit.SECONDS.toNanos(1)
+        while (ReflectionHelpers.getField<Boolean>(coordinator, "audioClosing") && System.nanoTime() < until) {
+            shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(5)
+        }
+        assertFalse(ReflectionHelpers.getField<Boolean>(coordinator, "audioClosing"))
+        assertTrue(coordinator.finishing)
+        assertFalse(ReflectionHelpers.getField<Boolean>(coordinator, "finalizing"))
+        coverage.acknowledge("item2")
+        coordinator.turnCommitted()
+        coordinator.event(JSONObject().put("type", "input_audio_buffer.committed").put("event_id", "ack").put("item_id", "item2"))
+        awaitComplete(coordinator, 1_000)
+        assertEquals(0, server.requestCount)
     }
 }

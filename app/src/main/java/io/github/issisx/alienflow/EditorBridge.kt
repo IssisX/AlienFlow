@@ -272,7 +272,12 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 }
                 var initialPending = true
                 suspend fun initialRead(): EditorSynchronization.Reading {
-                    if (initialPending) { initialPending = false; return initialReading }
+                    if (initialPending) {
+                        initialPending = false
+                        // Placeholder/composition resolution may have replaced the owner.
+                        // Evidence must cover that owner's current mutation range.
+                        return initialReading.copy(requiredRange = owner.replacement(inserted, first).range)
+                    }
                     return read()
                 }
                 outcome = EditorSynchronization.await(before, before, ::current, ::initialRead, allowComposition = true)
@@ -280,7 +285,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 if (!current() || snapshotNode() != rawObservation) { outcome = EditorWriteResult.USER_EDIT; return@launch }
                 val replacement = owner.replacement(inserted, first)
                 val range = replacement.range
-                if (range.first != before.start || range.last + 1 != before.end)
+                if (first || range.first != before.start || range.last + 1 != before.end)
                     connection.setSelection(range.first, range.last + 1)
                 connection.commitText(replacement.text, 1, null)
                 if (!restoring) continuation.dispatched(value)

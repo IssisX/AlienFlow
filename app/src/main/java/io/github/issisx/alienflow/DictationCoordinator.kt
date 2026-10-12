@@ -284,12 +284,12 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         }
         try { val current = transport; if (current != null) current.finishCapture { closeAudio() } else closeAudio() }
         catch (_: Exception) { failure("Could not finalize capture; pending audio preserved"); return }
-        main.postDelayed({ if (session == token && finishing) { if (commits > completeItems.size || commits > committedItems.size || ledger.pending()) failure("Final transcription timed out; pending audio preserved") else tryFinish() } }, 15000)
+        main.postDelayed({ if (session == token && finishing) { if (transport?.hasUnacknowledgedCommit == true || commits > completeItems.size || commits > committedItems.size || ledger.pending()) failure("Final transcription timed out; pending audio preserved") else tryFinish() } }, 15000)
     }
     private fun tryFinish() {
         if (audioClosing || finalizing) return
         if (interrupted && finishing) { finish(true); return }
-        if (!finishing || active || commits > completeItems.size || commits > committedItems.size || ledger.pending()) return
+        if (!finishing || active || transport?.hasUnacknowledgedCommit == true || commits > completeItems.size || commits > committedItems.size || ledger.pending()) return
         if (!endCleanupDone) {
             endCleanupDone = true
             app.crashJournal.mark("dictation.transcript-ready")

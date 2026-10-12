@@ -12,6 +12,7 @@ class AudioCoverage {
     private val outstanding = linkedMapOf<String, Long>()
     private val acknowledged = mutableSetOf<String>()
     var uncertain = false; private set
+    val hasUnacknowledgedCommit: Boolean get() = outstanding.isNotEmpty()
     fun markUncertain() { uncertain = true }
     fun sent(id: String, bytes: Long = 0) { outstanding[id] = bytes }
     fun acknowledge(item: String) {

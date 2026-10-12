@@ -67,6 +67,7 @@ class RealtimeTransport internal constructor(
     private var firstSample = true
 
     val hasPendingCoverage: Boolean get() = synchronized(state) { coverage.uncertain }
+    val hasUnacknowledgedCommit: Boolean get() = synchronized(state) { coverage.hasUnacknowledgedCommit }
     var silenceStopSeconds = 0
     var onSilenceStop: (() -> Unit)? = null
 
