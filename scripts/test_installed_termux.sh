@@ -5,18 +5,38 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 PROOF="$ROOT/build/installed-termux"
 mkdir -p "$PROOF"
+exec > >(tee "$PROOF/driver.log") 2>&1
+set -x
 SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
 AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
 ADB="$ANDROID_HOME/platform-tools/adb"
-"$SDKMANAGER" 'emulator' 'system-images;android-36;google_apis;x86_64'
+# SDK downloads occasionally arrive truncated; retry setup only, never a failing test.
+SDK_READY=false
+for attempt in 1 2 3; do
+  if timeout 360 "$SDKMANAGER" 'emulator' 'system-images;android-36;google_apis;x86_64'; then
+    SDK_READY=true; break
+  fi
+  echo "SDK installation attempt $attempt failed; the actual integration test has not run."
+  sleep 5
+done
+test "$SDK_READY" = true
 test -e /dev/kvm
 sudo chmod 666 /dev/kvm
 printf 'no\n' | "$AVDMANAGER" create avd -n alienflow-chat-api36 -k 'system-images;android-36;google_apis;x86_64' --force
 "$ANDROID_HOME/emulator/emulator" -avd alienflow-chat-api36 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > "$PROOF/emulator.log" 2>&1 &
 EMULATOR_PID=$!
-trap '"$ADB" logcat -d -t 2000 > "$PROOF/logcat.txt" 2>&1 || true; kill "$EMULATOR_PID" 2>/dev/null || true' EXIT
-"$ADB" wait-for-device
+cleanup() {
+  # These are exclusively disposable-emulator fixtures, never user phone logs.
+  timeout 5 "$ADB" logcat -d -t 3000 > "$PROOF/logcat.txt" 2>&1 || true
+  timeout 5 "$ADB" exec-out screencap -p > "$PROOF/last-screen.png" 2>/dev/null || true
+  timeout 5 "$ADB" shell dumpsys accessibility > "$PROOF/accessibility.txt" 2>&1 || true
+  timeout 5 "$ADB" shell dumpsys input_method > "$PROOF/input-method.txt" 2>&1 || true
+  kill "$EMULATOR_PID" 2>/dev/null || true
+}
+trap cleanup EXIT
+timeout 120 "$ADB" wait-for-device
 for _ in $(seq 1 120); do
+  kill -0 "$EMULATOR_PID" || { cat "$PROOF/emulator.log"; exit 1; }
   if [ "$("$ADB" shell getprop sys.boot_completed | tr -d '\r')" = 1 ]; then break; fi
   sleep 2
 done
@@ -40,7 +60,7 @@ cd "$ROOT"
 "$ADB" shell pm grant io.github.issisx.alienflow android.permission.RECORD_AUDIO
 "$ADB" shell pm grant io.github.issisx.alienflow android.permission.POST_NOTIFICATIONS
 "$ADB" shell appops set io.github.issisx.alienflow ACCESS_RESTRICTED_SETTINGS allow
-"$ADB" shell am instrument -w -r -e disableAnalytics true -e class io.github.issisx.alienflow.InstalledTermuxTest io.github.issisx.alienflow.test/androidx.test.runner.AndroidJUnitRunner | tee "$PROOF/instrumentation.txt"
+timeout 300 "$ADB" shell am instrument -w -r -e disableAnalytics true -e class io.github.issisx.alienflow.InstalledTermuxTest io.github.issisx.alienflow.test/androidx.test.runner.AndroidJUnitRunner | tee "$PROOF/instrumentation.txt"
 grep -F 'OK (1 test)' "$PROOF/instrumentation.txt"
 "$ADB" pull /sdcard/Android/data/io.github.issisx.alienflow/files/termux-proof "$PROOF/"
 python3 - "$PROOF/termux-proof/result.json" <<'PY'

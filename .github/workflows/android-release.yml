@@ -20,7 +20,7 @@ permissions:
 
 concurrency:
   group: alienflow-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   release:
@@ -62,6 +62,7 @@ jobs:
           bash gradlew --no-daemon --no-configuration-cache --console=plain --stacktrace \
             :app:testDebugUnitTest :app:lintRelease :app:assembleRelease :app:assembleDebug :app:assembleDebugAndroidTest 2>&1 | tee build/ci/gradle.log
       - name: Exercise real installed Termux on Android 16 emulator
+        timeout-minutes: 22
         run: bash scripts/test_installed_termux.sh
       - name: Verify release and prepare delivery bundle
         run: python3 scripts/package_release.py
