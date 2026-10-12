@@ -30,6 +30,7 @@ class AlienAccessibilityService : AccessibilityService() {
     var composing = false; private set
     private var layoutKey = "folded"
     private var availabilityPass = 0
+    private var previousReadiness = DictationReadiness.IDLE
     private val availabilityDelays = longArrayOf(50L, 150L, 400L)
     private val availabilityRefresh = object : Runnable {
         override fun run() {
@@ -53,7 +54,7 @@ class AlienAccessibilityService : AccessibilityService() {
         override fun onStartInput(info: android.view.inputmethod.EditorInfo, restarting: Boolean) {
             super.onStartInput(info, restarting); composing = false
             clearStatusNotice()
-            if (::bridge.isInitialized) { bridge.invalidate(); refreshAvailability(clearFocusCache = true) }
+            if (::bridge.isInitialized) { bridge.inputStarted(info, restarting); refreshAvailability(clearFocusCache = true) }
         }
         override fun onFinishInput() {
             super.onFinishInput(); composing = false
@@ -157,6 +158,13 @@ class AlienAccessibilityService : AccessibilityService() {
         val available = bridge.focused() != null
         view.contentDescription = "AlienFlow. ${app.coordinator.status}. Tap to start or stop; drag to move; long press for actions"
         view.alpha = if (active) BubbleOpacity.alpha(app.store.prefs.getInt("active_opacity", 100)) else BubbleOpacity.alpha(app.store.prefs.getInt("opacity", BubbleOpacity.DEFAULT_IDLE_PERCENT))
+        val readiness = app.coordinator.readiness
+        if (readiness != previousReadiness) {
+            if ((previousReadiness == DictationReadiness.STARTING && readiness in setOf(DictationReadiness.BUFFERING, DictationReadiness.LIVE)) ||
+                (readiness == DictationReadiness.FINISHING && previousReadiness != DictationReadiness.IDLE))
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            previousReadiness = readiness
+        }
         view.visibility = if (active || (!hidden && (app.store.prefs.getBoolean("always", false) || available))) View.VISIBLE else View.GONE
         app.crashJournal.bubbleAvailability(available, view.visibility == View.VISIBLE, hidden,
             inputMethod?.currentInputStarted == true, bridge.isTerminal)

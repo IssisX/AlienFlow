@@ -15,12 +15,12 @@ import android.widget.TextView
 
 /** Native controls with one restrained visual language. All dimensions are dp/sp. */
 internal class AppUi(val context: Context) {
-    val background = Color.rgb(13, 18, 20)
-    val surface = Color.rgb(24, 32, 35)
-    val border = Color.rgb(48, 61, 65)
-    val ink = Color.rgb(240, 244, 239)
-    val muted = Color.rgb(169, 184, 182)
-    val accent = Color.rgb(181, 240, 149)
+    val background = Color.rgb(14, 18, 25)
+    val surface = Color.rgb(25, 32, 43)
+    val border = Color.rgb(52, 64, 82)
+    val ink = Color.rgb(239, 244, 250)
+    val muted = Color.rgb(173, 187, 205)
+    val accent = Color.rgb(198, 222, 244)
     val danger = Color.rgb(255, 178, 168)
     fun dp(value: Int) = (value * context.resources.displayMetrics.density + .5f).toInt()
     fun column() = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
@@ -29,7 +29,7 @@ internal class AppUi(val context: Context) {
         if (stroke != null) setStroke(dp(1), stroke)
     }
     fun ripple(color: Int, radius: Int = 18, stroke: Int? = null) = RippleDrawable(
-        ColorStateList.valueOf(Color.argb(45, 181, 240, 149)), shape(color, radius, stroke), shape(Color.WHITE, radius))
+        ColorStateList.valueOf(Color.argb(45, 198, 222, 244)), shape(color, radius, stroke), shape(Color.WHITE, radius))
     fun text(value: String, size: Int = 15, color: Int = ink, bold: Boolean = false) = TextView(context).apply {
         text = value; textSize = size.toFloat(); setTextColor(color)
         typeface = Typeface.create(if (bold) "sans-serif-medium" else "sans-serif", Typeface.NORMAL)

@@ -53,6 +53,11 @@ class SettingsNavigationTest {
             render(activity, "settings-0.1.13.png")
             row(activity, "Floating alien").performClick()
             assertTrue(tagged(activity, "size") is SeekBar)
+            val preview = tagged(activity, "bubble-preview") as BubblePreview
+            assertEquals((32 * activity.resources.displayMetrics.density).toInt(), preview.diameterPixels)
+            app(activity).store.prefs.edit().putInt("size", 64).putInt("opacity", 10).apply()
+            preview.invalidate()
+            assertEquals((64 * activity.resources.displayMetrics.density).toInt(), preview.diameterPixels)
             assertFalse(texts(activity).contains("Writing style"))
             render(activity, "bubble-settings-0.1.13.png")
             tagged(activity, "back").performClick()

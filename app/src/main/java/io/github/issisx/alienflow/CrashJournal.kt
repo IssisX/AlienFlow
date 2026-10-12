@@ -103,7 +103,7 @@ class CrashJournal(private val application: Application) {
     }
     @Synchronized fun editorObservation(phase: String, observation: EditorSynchronization.Reading) {
         val n = observation.node; val k = observation.keyboard
-        val metadata = "phase=${if (phase == "before") "before" else "after"}; " +
+        val metadata = "phase=${if (phase in setOf("before", "after", "node")) phase else "after"}; " +
             "node_length=${n?.text?.length}; node_cursor=${n?.start}:${n?.end}; " +
             "ime_length=${k?.text?.length}; ime_cursor=${k?.start}:${k?.end}; " +
             "offset=${k?.offset}; composing=${observation.composing}"

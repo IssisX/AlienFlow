@@ -144,9 +144,6 @@ class MainActivity : Activity() {
             else -> open(Page.SETTINGS)
         }
     }
-    @Deprecated("Platform back callback is registered on API 33+")
-    override fun onBackPressed() = goBack()
-
     private fun renderPage() {
         host.removeAllViews()
         status = null; resultPreview = null; record = null; cancel = null; test = null
@@ -252,6 +249,10 @@ class MainActivity : Activity() {
     }
     private fun bubble(body: LinearLayout) {
         heading(body, "Floating alien", "A small companion that stays out of your way.")
+        val previewCard = ui.card(body)
+        ui.text(previewCard, "Live preview", 18, bold = true)
+        ui.text(previewCard, "See the actual size and visibility on light and dark backgrounds.", 14, ui.muted)
+        previewCard.addView(BubblePreview(this, app.store.prefs).apply { tag = "bubble-preview" }, LinearLayout.LayoutParams(-1, ui.dp(120)))
         val appearance = ui.card(body)
         ui.text(appearance, "Appearance", 18, bold = true)
         slider(appearance, "Size", "size", 32, 24, 64) { "${it * 100 / 32}%" }
@@ -514,7 +515,7 @@ class MainActivity : Activity() {
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onStartTrackingTouch(bar: SeekBar?) = Unit
                 override fun onStopTrackingTouch(bar: SeekBar?) = Unit
-                override fun onProgressChanged(bar: SeekBar?, progress: Int, fromUser: Boolean) { if (fromUser) { val value = progress + low; prefs.edit().putInt(key, value).apply(); caption.text = "$label · ${format(value)}"; app.coordinator.service?.refreshBubble() } }
+                override fun onProgressChanged(bar: SeekBar?, progress: Int, fromUser: Boolean) { if (fromUser) { val value = progress + low; prefs.edit().putInt(key, value).apply(); caption.text = "$label · ${format(value)}"; app.coordinator.service?.refreshBubble(); host.findViewWithTag<View>("bubble-preview")?.invalidate() } }
             })
         }, LinearLayout.LayoutParams(-1, ui.dp(48)))
     }
