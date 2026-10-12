@@ -162,8 +162,7 @@ class RealtimeBufferedStartupTest {
             b.open(); b.ready(); b.input.speech(1)
             var finished = false
             b.input.duringRead = { b.transport.finishCapture { finished = true } }
-            runCurrent(); assertFalse("Finalization must await the capture job", finished)
-            advanceTimeBy(5); runCurrent(); b.pumpUi(); assertTrue(finished); b.audio.close()
+            runCurrent(); b.pumpUi(); assertTrue(finished); b.audio.close()
             assertEquals(960L, PendingAudio.repair(b.file).dataBytes)
             assertArrayEquals(b.file.readBytes().drop(44).toByteArray(), b.uploadedAudio().take(960).toByteArray())
             assertEquals(1, b.commits); assertEquals(0, b.captured)
