@@ -63,7 +63,7 @@ jobs:
       - name: Upload single delivery ZIP
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          path: build/delivery/AlienFlow-0.1.16-unsigned-release-bundle.zip
+          path: build/delivery/AlienFlow-0.1.17-unsigned-release-bundle.zip
           archive: false
           if-no-files-found: error
           retention-days: 14

@@ -52,7 +52,8 @@ class CrashJournal(private val application: Application) {
         "websocket.connecting", "websocket.open", "websocket.session-update",
         "websocket.session-ready", "websocket.failure",
         "audiorecord.creating", "audiorecord.started", "audiorecord.released",
-        "audiorecord.failure", "editor.detached", "failure.terminal"
+        "audiorecord.failure", "editor.detached", "failure.terminal",
+        "dictation.transcript-ready", "cleanup.after-stop", "dictation.saving"
     )
     @Volatile private var persistFailed = false
     private val checkpointWriter = Executors.newSingleThreadExecutor { task ->

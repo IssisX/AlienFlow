@@ -113,7 +113,7 @@ object CleanupChunks {
 }
 
 /** Cancellation is checked around every blocking provider request. */
-suspend fun cleanChunks(source: String, mode: String, fillers: Boolean, request: (String) -> String): String {
+suspend fun cleanChunks(source: String, mode: String, fillers: Boolean, request: suspend (String) -> String): String {
     val output = StringBuilder()
     for (chunk in CleanupChunks.split(source)) {
         currentCoroutineContext().ensureActive()
@@ -126,6 +126,7 @@ suspend fun cleanChunks(source: String, mode: String, fillers: Boolean, request:
 }
 
 data class EditorSnapshot(val generation: Long, val text: String, val start: Int, val end: Int, val composing: Boolean = false)
+data class EditorReplacement(val range: IntRange, val text: String)
 class EditorOwnership(private val initial: EditorSnapshot, private val replaceSelection: Boolean = true) {
     var owned = ""; private set
     var certain = !initial.composing && initial.start >= 0 && initial.end >= initial.start && initial.end <= initial.text.length; private set
@@ -139,6 +140,14 @@ class EditorOwnership(private val initial: EditorSnapshot, private val replaceSe
         snapshot.text == expected() && snapshot.start == cursor() && snapshot.end == cursor() && !snapshot.composing
     fun canFirstWrite(snapshot: EditorSnapshot) = certain && snapshot == initial
     fun range() = prefix.length until (prefix.length + owned.length)
+    /** Keep the confirmed common prefix; streaming deltas normally insert only a tail. */
+    fun replacement(value: String, first: Boolean): EditorReplacement {
+        if (first) return EditorReplacement(initialRange(), value)
+        var common = 0
+        while (common < minOf(owned.length, value.length) && owned[common] == value[common]) common++
+        if (common > 0 && common < owned.length && owned[common - 1].isHighSurrogate() && owned[common].isLowSurrogate()) common--
+        return EditorReplacement((prefix.length + common) until (prefix.length + owned.length), value.drop(common))
+    }
     fun initialRange() = (if (replaceSelection) initial.start else initial.end) until initial.end
     fun preservesAnchors(snapshot: EditorSnapshot) = snapshot.text.startsWith(prefix) && snapshot.text.endsWith(suffix) &&
         snapshot.start == snapshot.end && snapshot.end == snapshot.text.length - suffix.length

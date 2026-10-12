@@ -102,8 +102,8 @@ class EditorBridge(private val service: AlienAccessibilityService) {
             return fail(if (ambiguousHint) "[AF-E16] This field’s placeholder cannot be separated from its text; no text was changed"
                 else "[AF-E04] Can't safely edit the existing text; select the field again or start in an empty field")
         }
-        // Binding permits microphone startup during typing; every actual write
-        // still requires a fresh noncomposing snapshot in writeOwned.
+        // Binding permits microphone startup during typing; writes use fresh
+        // matching text/cursor evidence and finish composition before insertion.
         ownership = EditorOwnership(snapshot.copy(composing = false))
         bound = ownership?.certain == true
         return bound
@@ -229,7 +229,10 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 val connection = service.inputMethod?.currentInputConnection
                     ?: run { fail("[AF-E04] Android detached the keyboard connection"); outcome = EditorWriteResult.FAILED; return@launch }
                 val initialEvidence = before
-                val requested = maxOf(before.text.length, owner.proposedSnapshot(inserted).text.length) + 1
+                // Read the owned mutation plus context, not an entire growing draft.
+                // An editor may return less; coverage is checked before dispatch.
+                val initialReplacement = owner.replacement(inserted, first)
+                val requested = maxOf(before.end - initialReplacement.range.first, initialReplacement.text.length) + 64
                 var rawObservation: EditorSnapshot? = null
                 suspend fun read(): EditorSynchronization.Reading {
                     val surrounding = withContext(Dispatchers.IO) {
@@ -242,7 +245,9 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                     val composed = service.composing || hasComposition(surrounding?.text)
                     val agreed = if (snapshot != null && keyboard != null)
                         EditorEvidence.corroborateWithHint(snapshot, node?.hintText?.toString(), keyboard).snapshot else null
-                    observation = EditorSynchronization.Reading(agreed ?: snapshot, keyboard, composed)
+                    val range = owner.replacement(inserted, first).range
+                    val required = if (phase == "after") range.first until owner.proposedSnapshot(inserted).end else range
+                    observation = EditorSynchronization.Reading(agreed ?: snapshot, keyboard, composed, required)
                     return observation
                 }
                 val initialReading = withTimeoutOrNull(3_000L) { read() }
@@ -273,13 +278,15 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 outcome = EditorSynchronization.await(before, before, ::current, ::initialRead, allowComposition = true)
                 if (outcome != EditorWriteResult.APPLIED) return@launch
                 if (!current() || snapshotNode() != rawObservation) { outcome = EditorWriteResult.USER_EDIT; return@launch }
-                val range = if (first) owner.initialRange() else owner.range()
-                connection.setSelection(range.first, range.last + 1)
-                connection.commitText(inserted, 1, null)
+                val replacement = owner.replacement(inserted, first)
+                val range = replacement.range
+                if (range.first != before.start || range.last + 1 != before.end)
+                    connection.setSelection(range.first, range.last + 1)
+                connection.commitText(replacement.text, 1, null)
                 if (!restoring) continuation.dispatched(value)
                 phase = "after"
                 // A single 100ms sample can read a new IME buffer and an old browser node.
-                // Only exact proposed text AND cursor in both sources authorize another write.
+                // Exact full node text/cursor plus its anchored keyboard window authorize another write.
                 outcome = EditorSynchronization.await(before, owner.proposedSnapshot(inserted), ::current, ::read)
                 if (outcome == EditorWriteResult.APPLIED) {
                     val confirmed = observation.node

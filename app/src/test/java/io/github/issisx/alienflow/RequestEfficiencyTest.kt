@@ -70,7 +70,7 @@ class RequestEfficiencyTest {
         memo.remember("word ".repeat(100), "word ".repeat(100), "B", false)
         assertNull(memo.find("word ".repeat(100), "B", false))
     }
-    @Test fun actualCleanupHttpBodyIsCompactStatelessAndRetainsTheFullSource() {
+    @Test fun actualCleanupHttpBodyIsCompactStatelessAndRetainsTheFullSource() = runBlocking {
         val server = MockWebServer(); val http = OkHttpClient(); val originals = mutableListOf<Request>()
         server.start()
         val api = OpenAiClient(callFactory = Call.Factory { request ->

@@ -1,6 +1,6 @@
 # AlienFlow — Product Design and Implementation Plan
 
-**Version:** 0.1 · **Date:** 10 October 2026 · **Stage:** Planning complete; implementation and device validation pending.
+**Version:** 0.1.17 contract · **Updated:** 12 October 2026 · **Stage:** Implemented Android client; exact verification and remaining device limits are in IMPLEMENTATION.md.
 
 **Working product name:** AlienFlow. This is a personal Android dictation application inspired by the interaction of Wispr Flow. The name is provisional and has not been checked for publication or trademark use.
 
@@ -56,7 +56,7 @@ The application presents a short setup sequence: enter the user's API key, grant
 
 Key validation should distinguish invalid credentials, a model unavailable to the account, exhausted account allowance, and network failure. A paid sample recording belongs to the later, user-initiated setup test. API keys are entered on the phone, never embedded in source or requested in chat.
 
-The landing screen then shows readiness, a dictation test field, a short latest-result preview, and separate History and Settings destinations. Persistent service and recording notifications contain useful status and a stop action. Permission loss returns the user to the relevant setup action without repeated nagging.
+The landing screen then shows readiness, a dictation test field, a short latest-result preview, and separate History and Settings destinations. A persistent Ready notification keeps the floating dictation control available without keeping the activity open. The same foreground-service lifetime covers capture and delivery; the microphone is active only after a dictation tap. Hide alien stops idle readiness, and Reset position restores it. Notifications provide the relevant Hide, Stop or Cancel action. Permission loss returns the user to the relevant setup action without repeated nagging.
 
 ### 2.2 Normal dictation
 
@@ -126,6 +126,8 @@ Remembering includes recent text, explicit vocabulary entries, preferences, and 
 ### 4.1 Recognition and editing are different operations
 
 Speech recognition itself may revise a provisional word as more audio arrives. All correction modes allow this process; mode A cannot promise a literal transcript of every sound. Additional editing is an independent layer with its own rules, revision identifiers, and saved source text.
+
+Completion contract: recognition and accepted corrections are preserved. Stop cancels unfinished live polish and does not drain a correction queue. The explicit after-stop cleanup preference has one combined 2.5-second budget; late or failed cleanup keeps recognized words. Final audio drain, transcript acknowledgements and editor confirmation remain required.
 
 Efficiency contract: keep low-latency recognition and correction behavior intact; omit optional vocabulary unless explicitly enabled, use distinct literal keyword hints instead of a prose word-list prompt, keep cleanup instructions concise, disable unnecessary cleanup reasoning, and reuse only validated identical cleanup chunks within the current recording. Preserve the entire recognized input and lossless chunking. A sponsor-funded three-day trial requires server-held credentials and authoritative expiry/spend enforcement; it is separate from the current personal-key client.
 
@@ -207,7 +209,7 @@ Start with a single application module and one process. Split by responsibility 
 
 Use one serialized queue for recognition and correction proposals. Each target has an editor generation that changes on focus/session reset, a tracked insertion range, nearby text anchors, a selection snapshot, and a local revision. Android offsets use UTF-16 units; handle surrogate pairs and grapheme boundaries deliberately.
 
-For each replacement, re-check the active editor identity, expected text, anchors, and selection. If they still match, select only the owned range and commit the replacement. Require fresh editor evidence before advancing the confirmed display revision or owned range: accessibility selection and commit operations return no success value, so dispatch alone is not confirmation. If the outcome cannot be confirmed, mark it uncertain, stop subsequent automatic replacements, and preserve the result outside the field. Do not blindly retry or undo an uncertain write. [S2]
+For each replacement, re-check the active editor identity, expected text, anchors, and selection. Replace only the changed tail of owned dictation. An explicit surrounding-text offset may corroborate a bounded keyboard window when its text and absolute selection match the complete accessibility snapshot and the window covers the entire mutation; an unknown offset still requires matching full contents. If they still match, select only the owned range and commit the replacement. Require fresh editor evidence before advancing the confirmed display revision or owned range: accessibility selection and commit operations return no success value, so dispatch alone is not confirmation. If the outcome cannot be confirmed, mark it uncertain, stop subsequent automatic replacements, and preserve the result outside the field. Do not blindly retry or undo an uncertain write. [S2]
 
 These operations are not an atomic compare-and-swap transaction across another app. A manual edit or focus transition can race between the check and write. Explicitly investigate that window, including ordinary keyboard autocorrection, in device tests. If the race cannot be bounded sufficiently to prevent data damage, this is a failed architecture gate, not a problem to hide with a prompt.
 
@@ -236,11 +238,11 @@ Keep provider-specific request and event mapping behind one adapter. Model choic
 
 Native WebRTC was removed in 0.1.6 after a documented Fold6 native SIGABRT; the Android AudioRecord plus WebSocket implementation remains. The Realtime transcription connection uses `wss://api.openai.com/v1/realtime?intent=transcription` with an authenticated bearer key, **not** `?model=gpt-live-transcribe`. Use `session.update` to configure `type=transcription`, 24-kHz PCM16 and `audio.input.transcription.model=gpt-live-transcribe`; preserve vocabulary, language settings and client-side audio turn commits. Current primary references in `RESEARCH_2026-10-12_LIVE_HANDSHAKE.md`.
 
-The key/model check MUST use that same WebSocket URL and session update and require an acknowledged transcription session; a client-secret request by itself is not evidence of live connectivity. That check must close without activating the microphone. The normal live pipeline may start Android AudioRecord only after the session is acknowledged. Test real transcript deltas and completion events on the phone. Preserve the personal API key and native Android mic permissions; no model fallback, untrusted endpoint override or recording without user intent.
+The key/model check MUST use that same WebSocket URL and session update and require an acknowledged transcription session; a client-secret request by itself is not evidence of live connectivity. That check must close without activating the microphone. Microphone capture and session negotiation start in parallel; startup audio is bounded and buffered until acknowledgement, then drained once in order. Test real transcript deltas and completion events on the phone. Preserve the personal API key and native Android mic permissions; no model fallback, untrusted endpoint override or recording without user intent.
 
 ### 6.3 Audio, turns, and ordered results
 
-The live guide uses transcription sessions, provisional deltas, and completed transcript events; results across separate turns may complete out of order. Current live transcription does not support server or semantic VAD. Use local turn detection and explicit `input_audio_buffer.commit` control events, while letting the WebRTC media track carry the audio. Validate the accepted configuration and commit behavior rather than assuming another model's examples apply. [S6]
+The live guide uses transcription sessions, provisional deltas, and completed transcript events; results across separate turns may complete out of order. Current live transcription does not support server or semantic VAD. Use local turn detection and explicit `input_audio_buffer.commit` control events, while sending native AudioRecord PCM frames through the acknowledged WebSocket. Validate the accepted configuration and commit behavior rather than assuming another model's examples apply. [S6]
 
 Separate three concepts: a user dictation session, short transcription turns, and an API connection. The user can keep talking through many turns and connection renewals without a word cap. A pause may finalize a turn without stopping the recording.
 

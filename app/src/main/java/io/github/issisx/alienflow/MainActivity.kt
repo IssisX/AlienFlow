@@ -367,6 +367,7 @@ class MainActivity : Activity() {
         ui.button(permissions, "Allow microphone & notifications") { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS), 1) }
         accessibilityState = ui.text(permissions, if (app.coordinator.service != null) "Accessibility connected" else "Accessibility needs to be enabled", 14, ui.accent)
         ui.text(permissions, "Accessibility lets the alien place text while keeping your keyboard. Typing continues to work during dictation. Password fields are excluded. Switching to another field keeps the recording out of that new field; your result remains in AlienFlow.", 14, ui.muted)
+        ui.text(permissions, "AlienFlow stays ready in the background with a notification while accessibility is connected. You do not need to keep its screen open. The microphone starts only when you tap the alien. Hide alien pauses background readiness; Reset position brings it back.", 14, ui.muted)
         ui.button(permissions, "Open accessibility settings") { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
     }
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {

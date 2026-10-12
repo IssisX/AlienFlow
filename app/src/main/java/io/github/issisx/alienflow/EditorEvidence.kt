@@ -33,21 +33,26 @@ object EditorEvidence {
             composing = !emptyCursor && composing))
     }
 
-    /** Require complete, matching contents and selection before every edit and confirmation. */
-    fun corroborate(node: EditorSnapshot, keyboard: KeyboardText): Read {
-        if (keyboard.offset != 0 && keyboard.offset != -1) {
-            return Read(error = "[AF-E09] The keyboard returned only part of this field; no text was replaced")
-        }
-        if (keyboard.text != node.text) {
-            return Read(error = "[AF-E10] Keyboard and text-box contents disagree; no text was replaced")
-        }
+    /** An explicit Android offset anchors a window, including the entire mutation range.
+     * Unknown offsets still require full text. Never search for matching substrings.
+     */
+    fun corroborate(node: EditorSnapshot, keyboard: KeyboardText,
+                    required: IntRange = node.start until node.end): Read {
         val start = minOf(keyboard.start, keyboard.end)
         val end = maxOf(keyboard.start, keyboard.end)
-        if (start < 0 || end > keyboard.text.length || start != node.start || end != node.end) {
+        val offset = if (keyboard.offset == -1 && keyboard.text == node.text) 0 else keyboard.offset
+        val windowEnd = offset.toLong() + keyboard.text.length
+        if (offset < 0 || windowEnd > node.text.length || (keyboard.text.isEmpty() && node.text.isNotEmpty()) || required.first < offset ||
+            required.last.toLong() + 1 > windowEnd) {
+            return Read(error = "[AF-E09] The keyboard window does not cover this edit; no text was replaced")
+        }
+        if (start < 0 || end > keyboard.text.length || offset.toLong() + start != node.start.toLong() ||
+            offset.toLong() + end != node.end.toLong()) {
             return Read(error = "[AF-E11] Keyboard and text-box cursor positions disagree; tap the field again")
         }
-        // -1 means unknown, not invalid. Exact FULL node contents plus identical
-        // selection independently anchor this window. Never align using a substring.
+        if (!node.text.regionMatches(offset, keyboard.text, 0, keyboard.text.length)) {
+            return Read(error = "[AF-E10] Keyboard and text-box contents disagree; no text was replaced")
+        }
         return Read(node)
     }
 

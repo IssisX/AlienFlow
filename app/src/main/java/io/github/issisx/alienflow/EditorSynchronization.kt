@@ -8,13 +8,14 @@ enum class EditorWriteResult { APPLIED, USER_EDIT, RETRY, FAILED }
 
 /** Wait for independently observed node/IME state; never resend a mutation. */
 object EditorSynchronization {
-    data class Reading(val node: EditorSnapshot?, val keyboard: EditorEvidence.KeyboardText?, val composing: Boolean = false)
+    data class Reading(val node: EditorSnapshot?, val keyboard: EditorEvidence.KeyboardText?,
+                       val composing: Boolean = false, val requiredRange: IntRange? = null)
     fun inspect(before: EditorSnapshot, expected: EditorSnapshot, reading: Reading, allowComposition: Boolean = false): EditorWriteResult? {
         val observed = reading.node ?: return null
         val node = if (allowComposition) observed.copy(composing = false) else observed
         val keyboard = reading.keyboard ?: return null
         if (!allowComposition && (reading.composing || node.composing)) return EditorWriteResult.USER_EDIT
-        if (EditorEvidence.corroborate(node, keyboard).snapshot == null) return null
+        if (EditorEvidence.corroborate(node, keyboard, reading.requiredRange ?: (node.start until node.end)).snapshot == null) return null
         return when {
             node == expected -> EditorWriteResult.APPLIED
             node != before -> EditorWriteResult.USER_EDIT

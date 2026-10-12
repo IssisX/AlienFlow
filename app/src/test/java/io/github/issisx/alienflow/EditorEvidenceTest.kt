@@ -65,6 +65,31 @@ class EditorEvidenceTest {
                 EditorEvidence.KeyboardText("text", 4, 4, offset)).snapshot)
         }
     }
+    @Test fun explicitWindowOffsetCoversAMultilineUtf16MutationWithoutReadingTheFullDraft() {
+        val text = "older draft\n".repeat(100) + "emoji 🛸 owned words suffix"
+        val cursor = text.indexOf(" suffix")
+        val snapshot = node(text, start = cursor).snapshot!!
+        val offset = cursor - 24
+        val window = EditorEvidence.KeyboardText(text.substring(offset, cursor + 7), 24, 24, offset)
+        assertEquals(snapshot, EditorEvidence.corroborate(snapshot, window, (cursor - 11) until cursor).snapshot)
+        assertNull(EditorEvidence.corroborate(snapshot, window.copy(offset = -1)).snapshot)
+        assertNull(EditorEvidence.corroborate(snapshot, window.copy(text = "X" + window.text.drop(1))).snapshot)
+        assertNull(EditorEvidence.corroborate(snapshot, window.copy(start = 23)).snapshot)
+        assertNull(EditorEvidence.corroborate(snapshot, window, (offset - 1) until cursor).snapshot)
+        assertNull(EditorEvidence.corroborate(snapshot, window.copy(offset = Int.MAX_VALUE)).snapshot)
+    }
+    @Test fun anEmptyWindowCannotCorroborateANonemptyDraft() {
+        val snapshot = node("draft", start = 0).snapshot!!
+        assertNull(EditorEvidence.corroborate(snapshot, EditorEvidence.KeyboardText("", 0, 0, 0)).snapshot)
+    }
+    @Test fun aChangedTailPreservesTheConfirmedPrefixAndNeverSplitsASurrogatePair() {
+        val initial = EditorSnapshot(7, "left  right", 5, 5)
+        val owner = EditorOwnership(initial)
+        assertTrue(owner.confirm(owner.proposedSnapshot("hello 🛸"), "hello 🛸"))
+        assertEquals(EditorReplacement(13 until 13, " tail"), owner.replacement("hello 🛸 tail", false))
+        assertEquals(EditorReplacement(11 until 13, "🚀"), owner.replacement("hello 🚀", false))
+        assertEquals(EditorReplacement(5 until 13, "Hello 🛸"), owner.replacement("Hello 🛸", false))
+    }
     @Test fun staleHintCannotAuthorizeReplacingNonemptyInput() {
         val snapshot = node("Type here", true).snapshot!!
         assertNull(EditorEvidence.corroborate(snapshot,

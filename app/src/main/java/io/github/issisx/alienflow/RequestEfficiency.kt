@@ -32,7 +32,7 @@ internal class CleanupMemo(private val maxEntries: Int = 32, private val maxChar
     private data class Key(val source: String, val mode: String, val fillers: Boolean)
     private val entries = LinkedHashMap<Key, String>(16, .75f, true)
     private var characters = 0
-    suspend fun clean(source: String, mode: String, fillers: Boolean, request: (String) -> String): String =
+    suspend fun clean(source: String, mode: String, fillers: Boolean, request: suspend (String) -> String): String =
         cleanChunks(source, mode, fillers) { chunk ->
             find(chunk, mode, fillers) ?: request(chunk).also { remember(chunk, it, mode, fillers) }
         }

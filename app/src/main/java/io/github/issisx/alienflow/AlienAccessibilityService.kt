@@ -24,6 +24,7 @@ class AlienAccessibilityService : AccessibilityService() {
     private var statusNotice: TextView? = null
     private val hideStatusNotice = Runnable { clearStatusNotice() }
     private var hidden = false
+    val backgroundEnabled: Boolean get() = !hidden
     private var imeBottom = 0
     private var safeTop = 0
     private var safeBottom = 0
@@ -70,7 +71,14 @@ class AlienAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected(); bridge = EditorBridge(this); app.coordinator.service = this
         wm = getSystemService(WindowManager::class.java); showBubble(); refreshBubble()
+        keepReady()
     }
+    private fun keepReady() {
+        if (hidden) return
+        try { startForegroundService(Intent(this, CaptureService::class.java).setAction(CaptureService.READY)) }
+        catch (e: Exception) { app.crashJournal.recordFailure("service.failure", e); presentStatus("Background service unavailable; open AlienFlow") }
+    }
+    fun hideAlien() { hidden = true; refreshBubble(); if (!app.coordinator.active && !app.coordinator.finishing) CaptureService.instance?.stopSelf() }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun bounds() = wm.currentWindowMetrics.bounds
     private fun usableHeight() = max(dp(48), bounds().height() - imeBottom - safeBottom - safeTop)
@@ -175,7 +183,7 @@ class AlienAccessibilityService : AccessibilityService() {
         view.invalidate()
         return available
     }
-    fun resetPosition() { app.store.prefs.edit().remove("x_folded").remove("y_folded").remove("x_unfolded").remove("y_unfolded").apply(); hidden = false; restorePosition(); refreshBubble() }
+    fun resetPosition() { app.store.prefs.edit().remove("x_folded").remove("y_folded").remove("x_unfolded").remove("y_unfolded").apply(); hidden = false; restorePosition(); refreshBubble(); keepReady() }
     private fun restorePosition() {
         layoutKey = if (bounds().width() / resources.displayMetrics.density > 600) "unfolded" else "folded"
         val p = params ?: return
@@ -200,7 +208,7 @@ class AlienAccessibilityService : AccessibilityService() {
         item("Diagnostics / share report") {
             startActivity(Intent(this, DiagnosticsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
-        item("Hide alien") { hidden = true; refreshBubble() }
+        item("Hide alien") { hideAlien() }
         item("Close") { }
         val p = WindowManager.LayoutParams(dp(220), WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL, PixelFormat.TRANSLUCENT)

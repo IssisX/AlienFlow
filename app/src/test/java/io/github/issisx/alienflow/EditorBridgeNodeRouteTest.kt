@@ -38,6 +38,8 @@ class EditorBridgeNodeRouteTest {
         var connection: InputMethod.AccessibilityInputConnection? = null; var info: EditorInfo? = null
         var brokenHint = false; var hideCompositionSpans = false; val selections = mutableListOf<Pair<Int, Int>>()
         var serviceForCallbacks: AlienAccessibilityService? = null
+        var keyboardWindow = Int.MAX_VALUE
+        val committedTexts = mutableListOf<String>()
     }
     @Implements(AccessibilityService::class)
     class Broker : ShadowAccessibilityService() {
@@ -52,9 +54,11 @@ class EditorBridgeNodeRouteTest {
     }
     @Implements(InputMethod.AccessibilityInputConnection::class)
     class KeyboardIpc {
-        @Implementation fun getSurroundingText(before: Int, after: Int, flags: Int): SurroundingText? = nativeKeyboard?.getSurroundingText(before, after, flags)
+        @Implementation fun getSurroundingText(before: Int, after: Int, flags: Int): SurroundingText? =
+            nativeKeyboard?.getSurroundingText(minOf(before, keyboardWindow), minOf(after, keyboardWindow), flags)
         @Implementation fun setSelection(start: Int, end: Int) { selections.add(start to end); nativeKeyboard!!.setSelection(start, end) }
         @Implementation fun commitText(text: CharSequence, cursor: Int, attributes: TextAttribute?) {
+            committedTexts.add(text.toString())
             // AOSP accessibility IPC batches finishComposingText before commitText.
             // Calling a raw native commit alone would simulate a different API.
             nativeKeyboard!!.beginBatchEdit()
@@ -93,6 +97,8 @@ class EditorBridgeNodeRouteTest {
     @Before fun reset() {
         field = null; focused = null; mutations = 0; nativeKeyboard = null; inputMethod = null
         connection = null; info = null; brokenHint = false; hideCompositionSpans = false; selections.clear(); serviceForCallbacks = null
+        keyboardWindow = Int.MAX_VALUE
+        committedTexts.clear()
     }
     private fun withField(text: String = "", hint: String = "", keyboard: Boolean = false, block: (AlienAccessibilityService) -> Unit) {
         Robolectric.buildActivity(Activity::class.java).setup().use { activity ->
@@ -129,6 +135,27 @@ class EditorBridgeNodeRouteTest {
         while (result == null && System.currentTimeMillis() < until) { shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(5) }
         assertNotNull("Editor operation did not complete", result)
         return result
+    }
+    @Test fun boundedKeyboardWindowInALongExistingDraftInsertsAndRevisesOnlyTheOwnedRange() =
+        withField("older line 🛸\n".repeat(100) + "left  right", keyboard = true) { service ->
+            keyboardWindow = 24
+            val initial = field!!.text.toString(); val cursor = initial.length - 6
+            field!!.setSelection(cursor)
+            assertTrue(service.bridge.begin()); activate(service)
+            assertEquals(EditorWriteResult.APPLIED, write(service, "hello world"))
+            assertEquals(EditorWriteResult.APPLIED, write(service, "Hello, world."))
+            assertEquals(initial.take(cursor) + "Hello, world." + initial.drop(cursor), field!!.text.toString())
+            assertEquals(cursor + "Hello, world.".length, field!!.selectionStart)
+            assertEquals(0, mutations) // Range edits through the native keyboard, no whole-field SET_TEXT.
+        }
+    @Test fun aLongOwnedDictationCanAppendThroughAShortKeyboardWindow() = withField("prior draft ", keyboard = true) { service ->
+        assertTrue(service.bridge.begin()); activate(service)
+        val spoken = "hello ".repeat(100)
+        assertEquals(EditorWriteResult.APPLIED, write(service, spoken))
+        keyboardWindow = 32
+        assertEquals(EditorWriteResult.APPLIED, write(service, spoken + "new words"))
+        assertEquals("prior draft " + spoken + "new words", field!!.text.toString())
+        assertEquals(listOf(spoken, "new words"), committedTexts)
     }
     @Test fun coldEmptyFieldWorksWithoutAnImeAndPreservesItsOwnedTextAcrossRestart() = withField { service ->
         assertNull(service.inputMethod); assertTrue(service.bridge.lastError, service.bridge.begin()); activate(service)

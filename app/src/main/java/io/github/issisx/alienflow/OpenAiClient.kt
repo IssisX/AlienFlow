@@ -8,9 +8,16 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.Response
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.json.JSONObject
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 class SafeApiException(val httpCode: Int, message: String) : IllegalStateException(message)
 
@@ -65,10 +72,10 @@ class OpenAiClient internal constructor(private val socketFactory: WebSocket.Fac
         return (socketFactory ?: realtimeClient).newWebSocket(RealtimeHandshake.request(key), listener)
     }
 
-    fun cleanup(key: String, source: String, mode: String, fillers: Boolean): String {
+    suspend fun cleanup(key: String, source: String, mode: String, fillers: Boolean): String {
         val body = CleanupRequest.body(source, mode, fillers)
         val response = JSONObject(
-            execute("responses", key, body.toString().toRequestBody("application/json".toMediaType())),
+            executeCleanup(key, body.toString().toRequestBody("application/json".toMediaType())),
         )
         check(response.optString("status") == "completed") { "Cleanup response incomplete" }
         val output = response.getJSONArray("output")
@@ -81,6 +88,28 @@ class OpenAiClient internal constructor(private val socketFactory: WebSocket.Fac
             }
         }
         return text.toString().trim()
+    }
+
+    /** Cancelling polishing must cancel its actual HTTP call, not leave a 45s IO worker. */
+    private suspend fun executeCleanup(key: String, body: okhttp3.RequestBody): String = suspendCancellableCoroutine { continuation ->
+        val request = Request.Builder().url("https://api.openai.com/v1/responses")
+            .header("Authorization", "Bearer $key").post(body).build()
+        val call = (callFactory ?: client).newCall(request)
+        continuation.invokeOnCancellation { call.cancel() }
+        call.enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                continuation.resumeWithException(SafeApiException(0, "Cleanup connection unavailable"))
+            }
+            override fun onResponse(call: Call, response: Response) {
+                try {
+                    val text = response.use {
+                        if (!it.isSuccessful) throw SafeApiException(it.code, "Cleanup unavailable (HTTP ${it.code})")
+                        it.body?.string() ?: error("Empty cleanup response")
+                    }
+                    continuation.resume(text)
+                } catch (e: Exception) { continuation.resumeWithException(e) }
+            }
+        })
     }
 
     fun recover(key: String, audio: File, language: String): String {
