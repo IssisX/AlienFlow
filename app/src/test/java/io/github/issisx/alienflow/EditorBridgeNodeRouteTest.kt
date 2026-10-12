@@ -157,6 +157,29 @@ class EditorBridgeNodeRouteTest {
         assertEquals("prior draft " + spoken + "new words", field!!.text.toString())
         assertEquals(listOf(spoken, "new words"), committedTexts)
     }
+    @Test fun endOnlyDocumentWaitsForStopDespiteAccessibilityEvents() = withField("left  right", keyboard = true) { service ->
+        val app = service.application as AlienApp
+        app.store.prefs.edit().clear().putString("correction", "A").putBoolean("live_display", false).commit()
+        val coordinator = DictationCoordinator(app, app.store, keyProvider = { "fixture-not-a-key" })
+        ReflectionHelpers.setField(app, "coordinator", coordinator); coordinator.service = service
+        shadowOf(app).grantPermissions(android.Manifest.permission.RECORD_AUDIO)
+        field!!.setSelection(5); coordinator.start(); assertTrue(coordinator.status, coordinator.active)
+        coordinator.turnCommitted()
+        coordinator.event(org.json.JSONObject().put("type", "input_audio_buffer.committed").put("event_id", "ack").put("item_id", "one"))
+        coordinator.event(org.json.JSONObject().put("type", "conversation.item.input_audio_transcription.completed")
+            .put("event_id", "final").put("item_id", "one").put("transcript", "hello world"))
+        coordinator.targetEvent()
+        val writeUntil = System.currentTimeMillis() + 2_000
+        while (ReflectionHelpers.getField<Boolean>(coordinator, "writing") && System.currentTimeMillis() < writeUntil) {
+            shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(5)
+        }
+        assertEquals("left  right", field!!.text.toString())
+        coordinator.stop()
+        val until = System.currentTimeMillis() + 2_000
+        while (coordinator.finishing && System.currentTimeMillis() < until) { shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(5) }
+        assertFalse(coordinator.status, coordinator.finishing)
+        assertEquals("left hello world right", field!!.text.toString())
+    }
     @Test fun coldEmptyFieldWorksWithoutAnImeAndPreservesItsOwnedTextAcrossRestart() = withField { service ->
         assertNull(service.inputMethod); assertTrue(service.bridge.lastError, service.bridge.begin()); activate(service)
         assertEquals(EditorWriteResult.APPLIED, write(service, "hello")); assertEquals("hello", field!!.text.toString())

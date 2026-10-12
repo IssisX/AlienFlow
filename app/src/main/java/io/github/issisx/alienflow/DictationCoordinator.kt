@@ -205,7 +205,10 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         if (displayLive) pumpWrite()
         update()
     }
-    private fun pumpWrite() {
+    private fun pumpWrite(finalDelivery: Boolean = false) {
+        // Accessibility/selection events may arrive during recording or final
+        // recognition. End-only targets must wait for tryFinish's ready gate.
+        if ((terminalTarget || !displayLive) && !finalDelivery) return
         if (writing || desired == lastWritten || editor == null) return
         writing = true; val proposed = desired; val token = session
         editor!!.write(proposed) { outcome ->
@@ -305,7 +308,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
             // After Stop, retain any still-unwritten result in History.
             if (System.currentTimeMillis() - stoppingAt >= 15_000) {
                 liveFailed = true; editor = null
-            } else { pumpWrite(); return }
+            } else { pumpWrite(finalDelivery = true); return }
         }
         finish(transport?.hasPendingCoverage == true)
     }

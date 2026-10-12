@@ -1,6 +1,6 @@
 # AlienFlow — Product Design and Implementation Plan
 
-**Version:** 0.1.17 contract · **Updated:** 12 October 2026 · **Stage:** Implemented Android client; exact verification and remaining device limits are in IMPLEMENTATION.md.
+**Version:** 0.1.18 contract · **Updated:** 12 October 2026 · **Stage:** Implemented Android client; exact verification and remaining device limits are in IMPLEMENTATION.md.
 
 **Working product name:** AlienFlow. This is an Android dictation application inspired by the interaction of Wispr Flow, with a personal-key development client and a planned paid Google Play release. The name is provisional and has not been checked for publication or trademark use.
 
@@ -126,6 +126,8 @@ Remembering includes recent text, explicit vocabulary entries, preferences, and 
 ### 4.1 Recognition and editing are different operations
 
 Speech recognition itself may revise a provisional word as more audio arrives. All correction modes allow this process; mode A cannot promise a literal transcript of every sound. Additional editing is an independent layer with its own rules, revision identifiers, and saved source text.
+
+End-only dispatch contract: accessibility and selection events cannot dispatch text into Termux or an end-only document while recording or before final recognition is ready. The coordinator’s completion gate alone authorizes final delivery. Termux receives one finished insertion without Enter or control actions.
 
 Completion contract: recognition and accepted corrections are preserved. Stop cancels unfinished live polish and does not drain a correction queue. The explicit after-stop cleanup preference has one combined 2.5-second budget; late or failed cleanup keeps recognized words. Final audio drain, transcript acknowledgements and editor confirmation remain required.
 
