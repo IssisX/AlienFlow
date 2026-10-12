@@ -93,3 +93,11 @@ Required first run:
 5. Confirm the microphone indicator clears and history/recovery state is truthful.
 
 If it fails, collect the new diagnostics. Old `libjingle` crash records can remain in Android's historical list; the relevant evidence is the newest timestamp and the 0.1.6 session events. Do not call the native crash fixed until the same phone path survives.
+
+## 0.1.7 editor-detachment and honest terminal-reason update (pending CI/device)
+
+Owner's first 0.1.6 screenshot shows the app alive and a transient message: “Stopped • audio saved for recovery” immediately on tapping the bubble. This does not by itself identify the initiating callback, nor establish that any audio frames were captured. Before this update the coordinator could call stop() on any targetEvent/500ms focus-validation failure, including overlay/keyboard/window changes unrelated to an intentional user stop. Separately, asynchronous finalization replaced the original failure reason with the generic recovery banner.
+
+Changed the owner of this behavior, not permissions or the API: field changes now invalidate the editor and preserve the current dictated session/audio, without touching any new field. When a session genuinely ends on provider, audio or service failure, it retains the initiating error through asynchronous finish and reports whether a nonempty WAV file was actually created. CrashJournal records editor.detached and failure.terminal. The bridge still checks exact text/selection before every write; password exclusions, source ownership, capture stop on screen lock, and user tap-stop remain.
+
+No new WebRTC dependencies, permission changes, model/API changes, store migration, or artwork changes. VersionName 0.1.7, versionCode 8, same application identity and signing key. Automated policy tests assert focus-loss DETACH semantics and no repeated detach without ownership. CI/signing and physical Fold6 checks are separate acceptance gates; user should share the newest 0.1.7 diagnostic if audio still stops before Listening.

@@ -52,6 +52,8 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     private var stoppingAt = 0L
     private var saved = false
     private var liveFailed = false
+    /** Captured before finish so a real rejection is never masked by the recovery banner. */
+    private var terminalReason: String? = null
     private fun update(value: String? = null) {
         val changed = value != null && value != status
         if (value != null) status = value
@@ -76,7 +78,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         app.crashJournal.mark("editor.ready")
         displayLive = store.prefs.getBoolean("live_display", true); cleanLive = store.prefs.getBoolean("live_cleanup", true); correctionMode = store.mode(); fillersEnabled = store.prefs.getBoolean("fillers", false); continueLocal = store.prefs.getBoolean("continue_local", true)
         session++; ledger = TranscriptLedger(); original = ""; result = ""; desired = ""; lastWritten = ""
-        saved = false; liveFailed = false; microphoneConfirmed = false; interrupted = false; finalizing = false; audioClosing = false; corrections.clear(); cleaned.clear(); writing = false; commits = 0; completeItems.clear(); committedItems.clear(); seenErrors.clear(); editor = bridge; captureTarget = bridge
+        saved = false; liveFailed = false; terminalReason = null; microphoneConfirmed = false; interrupted = false; finalizing = false; audioClosing = false; corrections.clear(); cleaned.clear(); writing = false; commits = 0; completeItems.clear(); committedItems.clear(); seenErrors.clear(); editor = bridge; captureTarget = bridge
         active = true; finishing = false; update("Starting microphone and realtime connection…")
         app.crashJournal.mark("service.start-requested")
         try { app.startForegroundService(Intent(app, CaptureService::class.java).setAction(CaptureService.START)); app.crashJournal.mark("service.start-returned") }
@@ -99,16 +101,42 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
             monitorTarget(token)
         } catch (e: Exception) { failure(e.message ?: "Microphone setup failed") }
     }
+    /**
+     * A field losing focus is NOT a reason to shut off the microphone.
+     * Revoke only the right to edit that field; keep the ongoing capture and
+     * leave all other field contents untouched. Never adopt a new field mid-turn.
+     */
+    private fun detachInlineEditor() {
+        if (editor == null && captureTarget == null) return
+        editor?.invalidate()
+        editor = null
+        captureTarget = null
+        liveFailed = true
+        app.crashJournal.mark("editor.detached")
+        update("Text field changed; dictation continues. Stop when finished, then copy the result")
+    }
     private fun monitorTarget(token: Long) {
         main.postDelayed({
             if (session != token || (!active && !finishing)) return@postDelayed
             if (!app.screenReady()) { screenUnavailable(); return@postDelayed }
-            if (interrupted) { if (captureTarget?.detachedTargetUnchanged() != true) stop() else monitorTarget(token); return@postDelayed }
-            if (!writing && editor?.valid() != true) { liveFailed = true; editor?.invalidate(); editor = null; update("Target changed; recording stopped and result preserved"); stop() }
-            else monitorTarget(token)
+            if (interrupted) {
+                if (captureTarget != null && captureTarget?.detachedTargetUnchanged() != true) detachInlineEditor()
+            } else if (InlineEditorContinuity.action(editor != null, writing,
+                    editor?.valid() == true) == InlineEditorContinuity.Action.DETACH) {
+                detachInlineEditor()
+            }
+            monitorTarget(token)
         }, 500)
     }
-    fun targetEvent() { if (interrupted && active) { if (captureTarget?.detachedTargetUnchanged() != true) stop(); return }; if (!interrupted && (active || finishing) && !writing && editor?.valid() != true) { liveFailed = true; editor?.invalidate(); editor = null; stop(); update("Focus or manual edit changed; result preserved") } }
+    fun targetEvent() {
+        if (!active && !finishing) return
+        if (interrupted) {
+            if (captureTarget != null && captureTarget?.detachedTargetUnchanged() != true) detachInlineEditor()
+        } else if (InlineEditorContinuity.action(editor != null, writing,
+                editor?.valid() == true) == InlineEditorContinuity.Action.DETACH) {
+            detachInlineEditor()
+        }
+    }
     override fun captured() { app.crashJournal.mark("microphone.frames"); microphoneConfirmed = true; if (active) update("Listening • tap the alien to stop") }
     override fun turnCommitted() { commits++ }
     override fun event(value: JSONObject) {
@@ -209,6 +237,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         transport?.close(); transport = null; CaptureService.instance?.stopSelf()
         val captured = audio; val token = session; val source = original.ifBlank { ledger.text() }; val finalText = result
         val retainAudio = keepAudio || (liveFailed && store.prefs.getInt("retention", 7) == -1)
+        val reason = terminalReason
         val outcome = if (retainAudio) "Incomplete • audio pending" else if (liveFailed) "Preserved • live insertion failed" else "Completed"
         finalizationJob = io.launch {
             var storageOk = false
@@ -231,7 +260,16 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                     accepted = true
                     app.crashJournal.mark("dictation.finished")
                     audio = null; saved = storageOk; finalizing = false; finishing = false
-                    update(if (!storageOk) "Storage failed; audio retained. Copy the visible result" else if (audioDeleteFailed) "Result saved, but audio deletion failed; discard it in pending recovery" else if (retainAudio) "Stopped • audio saved for recovery" else if (liveFailed) "Result saved • live insertion failed" else "Complete • ready for another dictation")
+                    val hasSpeechFile = captured?.file?.let { it.exists() && it.length() > 44 } == true
+                    val recoveryLabel = if (hasSpeechFile) "Audio saved for recovery" else "No microphone audio captured"
+                    update(when {
+                        !storageOk -> "Storage failed; audio retained if available. Copy the visible result"
+                        reason != null -> "$reason • $recoveryLabel"
+                        audioDeleteFailed -> "Result saved, but audio deletion failed; discard it in pending recovery"
+                        retainAudio -> if (hasSpeechFile) "Stopped • audio saved for recovery" else "Stopped • no microphone audio captured"
+                        liveFailed -> "Result saved • inline editing unavailable; copy the transcript"
+                        else -> "Complete • ready for another dictation"
+                    })
                     if (storageOk && keepAudio && interrupted && captured != null && continueLocal) recover(captured.file)
                 }
             } finally {
@@ -255,11 +293,14 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     override fun reconnected() { if (active && interrupted) update("Realtime reconnected • recording continues. Full recording will recover after stop") }
     override fun failure(message: String) {
         if (!active && !finishing) { update(message); return }
-        cleanup?.cancel(); editor?.invalidate(); editor = null; liveFailed = true
+        terminalReason = message
+        app.crashJournal.mark("failure.terminal")
+        cleanup?.cancel(); editor?.invalidate(); editor = null; captureTarget = null; liveFailed = true
         finish(true); update(message)
     }
     fun cancel() {
         if (!active && !finishing) return
+        terminalReason = null
         finalizationJob?.cancel(); cleanup?.cancel(); transport?.close(); transport = null
         val bridge = editor; editor = null; active = false; finishing = false
         CaptureService.instance?.stopSelf(); val discarded = audio; audio = null

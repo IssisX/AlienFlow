@@ -78,3 +78,11 @@ No Java handler can promise to catch a native crash or an OS-level process kill.
 - [ ] The optional 3-second no-upload microphone probe reports sample counts and releases capture when complete or when leaving the screen. A passed probe does not establish WebRTC/provider correctness.
 
 The framework UI tests and visually reviewed Robolectric renders passed in CI; these checkboxes remain phone-only acceptance, not implied passes.
+
+## 0.1.7 field-lost recovery (not yet tested on Fold6)
+
+- [ ] Install 0.1.7 over 0.1.6 with retained key and settings.
+- [ ] Focus an empty text box, tap alien once, and wait for Listening. Speak, pause, observe text, tap stop.
+- [ ] During a session, intentionally switch input fields. Dictation must continue recording; it must NOT edit the newly focused field. After stop, the transcript/history remains copyable.
+- [ ] Reproduce previous immediate termination if possible. If it remains, confirm displayed status includes the initiating failure (provider/network/service) and distinguish actual saved audio from an empty capture.
+- [ ] Send diagnostic with session events from the current run; do not treat older native crash history as new.

@@ -50,7 +50,7 @@ class CrashJournal(private val application: Application) {
         "websocket.connecting", "websocket.open", "websocket.session-update",
         "websocket.session-ready", "websocket.failure",
         "audiorecord.creating", "audiorecord.started", "audiorecord.released",
-        "audiorecord.failure"
+        "audiorecord.failure", "editor.detached", "failure.terminal"
     )
     private var persistFailed = false
     @Synchronized fun mark(stage: String) {
