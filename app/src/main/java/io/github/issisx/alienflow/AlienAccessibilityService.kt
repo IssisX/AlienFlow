@@ -32,11 +32,13 @@ class AlienAccessibilityService : AccessibilityService() {
     override fun onCreateInputMethod(): android.accessibilityservice.InputMethod = object : android.accessibilityservice.InputMethod(this) {
         override fun onStartInput(info: android.view.inputmethod.EditorInfo, restarting: Boolean) {
             super.onStartInput(info, restarting); composing = false
-            if (::bridge.isInitialized) { bridge.invalidate(); handler.post { app.coordinator.targetEvent() } }
+            clearStatusNotice()
+            if (::bridge.isInitialized) { bridge.invalidate(); handler.post { app.coordinator.targetEvent(); refreshBubble() } }
         }
         override fun onFinishInput() {
             super.onFinishInput(); composing = false
-            if (::bridge.isInitialized) { bridge.invalidate(); handler.post { app.coordinator.targetEvent() } }
+            clearStatusNotice()
+            if (::bridge.isInitialized) { bridge.invalidate(); handler.post { app.coordinator.targetEvent(); refreshBubble() } }
         }
         override fun onUpdateSelection(oldStart: Int, oldEnd: Int, newStart: Int, newEnd: Int, candidatesStart: Int, candidatesEnd: Int) {
             super.onUpdateSelection(oldStart, oldEnd, newStart, newEnd, candidatesStart, candidatesEnd)
@@ -73,7 +75,7 @@ class AlienAccessibilityService : AccessibilityService() {
     /** Non-touchable feedback is visible in the app the owner is dictating into. */
     fun presentStatus(message: String) {
         if (!::wm.isInitialized || bubble?.isAttachedToWindow != true) return
-        val feedback = CompletionFeedback.bubble(message)
+        val feedback = CompletionFeedback.bubble(message, app.store.prefs.getBoolean("diagnostic_bubble_errors", true))
         if (feedback == null) { clearStatusNotice(); return }
         handler.removeCallbacks(hideStatusNotice)
         val label = statusNotice ?: TextView(this).apply {

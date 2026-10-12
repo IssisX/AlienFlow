@@ -100,88 +100,79 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         return if (first) owner.canFirstWrite(snapshot) else owner.matches(snapshot)
     }
 
-    fun write(value: String, completion: (Boolean) -> Unit) {
+    fun write(value: String, completion: (EditorWriteResult) -> Unit) {
         if (!isTerminal) { writeOwned(value, false, completion); return }
-        if (!app.coordinator.finishing || app.coordinator.active) { completion(false); return }
+        if (!app.coordinator.finishing || app.coordinator.active) { completion(EditorWriteResult.FAILED); return }
         try {
             val connection = service.inputMethod?.currentInputConnection
             val ok = terminalInsertion?.send(value, connection != null && terminalValid()) {
                 connection!!.commitText(it, 1, null)
             } == true
             if (!ok) fail("[AF-T01] Termux focus changed; text is saved in AlienFlow")
-            completion(ok)
+            completion(if (ok) EditorWriteResult.APPLIED else EditorWriteResult.FAILED)
         } catch (_: Exception) {
             fail("[AF-T02] Termux input could not be confirmed; text is saved in AlienFlow")
-            completion(false)
+            completion(EditorWriteResult.FAILED)
         }
     }
 
-    private fun writeOwned(value: String, restoring: Boolean, completion: (Boolean) -> Unit) {
-        val owner = ownership ?: return completion(false)
+    private fun writeOwned(value: String, restoring: Boolean, completion: (EditorWriteResult) -> Unit) {
+        val owner = ownership ?: return completion(EditorWriteResult.USER_EDIT)
         val writeGeneration = generation
         val sequence = ++writeSequence
         fun current(): Boolean = generation == writeGeneration && ownership === owner && sequence == writeSequence &&
             app.coordinator.service === service && (restoring || app.coordinator.active || app.coordinator.finishing)
         scope.launch {
-            var success = false
+            var outcome = EditorWriteResult.USER_EDIT
+            var phase = "before"
+            var observation = EditorSynchronization.Reading(null, null)
             try {
                 if (!current()) return@launch
-                val before = snapshotNode()
-                if (before == null || !(if (first) owner.canFirstWrite(before) else owner.matches(before))) {
+                val before = snapshotNode() ?: return@launch
+                if (!(if (first) owner.canFirstWrite(before) else owner.matches(before))) {
                     owner.invalidate()
-                    if (before != null) fail("[AF-E13] The text or cursor changed; automatic edits stopped")
-                    return@launch
+                    return@launch // User typing/cursor movement is an interaction, not a failure.
                 }
                 val connection = service.inputMethod?.currentInputConnection
-                    ?: run { fail("[AF-E04] Android detached the keyboard connection"); return@launch }
-                val surrounding = withContext(Dispatchers.IO) {
-                    connection.getSurroundingText(100000, 100000, InputConnection.GET_TEXT_WITH_STYLES)
+                    ?: run { fail("[AF-E04] Android detached the keyboard connection"); outcome = EditorWriteResult.FAILED; return@launch }
+                suspend fun read(): EditorSynchronization.Reading {
+                    val surrounding = withContext(Dispatchers.IO) {
+                        connection.getSurroundingText(100000, 100000, InputConnection.GET_TEXT_WITH_STYLES)
+                    }
+                    val keyboard = surrounding?.let { EditorEvidence.KeyboardText(
+                        it.text.toString(), it.selectionStart, it.selectionEnd, it.offset) }
+                    observation = EditorSynchronization.Reading(snapshotNode(), keyboard,
+                        service.composing || hasComposition(surrounding?.text))
+                    return observation
                 }
-                if (!current()) return@launch
-                if (surrounding == null) {
-                    fail("[AF-E06] The keyboard did not return its text; recognized words remain in AlienFlow")
-                    owner.invalidate(); return@launch
-                }
-                val fresh = snapshotNode()
-                if (fresh != before) {
-                    fail("[AF-E13] The text box changed while checking it; no text was replaced")
-                    owner.invalidate(); return@launch
-                }
-                val evidence = EditorEvidence.corroborate(before, EditorEvidence.KeyboardText(
-                    surrounding.text.toString(), surrounding.selectionStart, surrounding.selectionEnd, surrounding.offset))
-                if (evidence.snapshot == null || hasComposition(surrounding.text) || service.composing) {
-                    fail(evidence.error ?: "[AF-E08] The keyboard is still composing a word")
-                    owner.invalidate(); return@launch
-                }
+                outcome = EditorSynchronization.await(before, before, ::current, ::read)
+                if (outcome != EditorWriteResult.APPLIED) return@launch
                 val range = if (first) before.start until before.end else owner.range()
                 connection.setSelection(range.first, range.last + 1)
                 connection.commitText(value, 1, null)
-                delay(100)
-                if (!current()) return@launch
-                val after = withContext(Dispatchers.IO) {
-                    connection.getSurroundingText(100000, 100000, InputConnection.GET_TEXT_WITH_STYLES)
-                }
-                if (!current()) return@launch
-                val afterNode = snapshotNode()
-                val confirmation = if (after != null && afterNode != null && !hasComposition(after.text) && !service.composing) {
-                    EditorEvidence.corroborate(afterNode, EditorEvidence.KeyboardText(
-                        after.text.toString(), after.selectionStart, after.selectionEnd, after.offset))
-                } else null
-                val confirmed = confirmation?.snapshot
-                success = confirmed != null && owner.confirm(confirmed, value)
-                first = false
-                if (!success) {
-                    owner.invalidate()
-                    fail(confirmation?.error ?: "[AF-E14] Insertion could not be confirmed; further edits stopped")
+                phase = "after"
+                // A single 100ms sample can read a new IME buffer and an old browser node.
+                // Only exact proposed text AND cursor in both sources authorize another write.
+                outcome = EditorSynchronization.await(before, owner.proposedSnapshot(value), ::current, ::read)
+                if (outcome == EditorWriteResult.APPLIED) {
+                    val confirmed = observation.node
+                    if (confirmed == null || !owner.confirm(confirmed, value)) outcome = EditorWriteResult.FAILED
+                    else first = false
                 }
             } catch (_: CancellationException) {
-                if (generation == writeGeneration && ownership === owner) owner.invalidate()
+                outcome = EditorWriteResult.USER_EDIT
             } catch (_: Exception) {
-                if (generation == writeGeneration && ownership === owner) {
-                    owner.invalidate(); fail("[AF-E15] Android rejected the editor operation; recognized words remain in AlienFlow")
-                }
+                fail("[AF-E15] Android rejected the editor operation; words are saved in AlienFlow")
+                outcome = EditorWriteResult.FAILED
             } finally {
-                completion(success)
+                if (outcome != EditorWriteResult.APPLIED) owner.invalidate()
+                if (outcome == EditorWriteResult.FAILED && current()) {
+                    app.crashJournal.editorObservation(phase, observation)
+                    if (!lastError.startsWith("[AF-E04]") && !lastError.startsWith("[AF-E15]"))
+                        fail(if (phase == "before") "[AF-E10] Editor sync timed out; see Diagnostics"
+                            else "[AF-E14] Insertion sync timed out; see Diagnostics")
+                }
+                completion(outcome)
             }
         }
     }
@@ -190,11 +181,11 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         val owner = ownership ?: return completion(false)
         if (first) { completion(true); return }
         if (!valid()) { owner.invalidate(); completion(false); return }
-        writeOwned(owner.originalSelection(), true, completion)
+        writeOwned(owner.originalSelection(), true) { completion(it == EditorWriteResult.APPLIED) }
     }
     fun detachForCapture() { invalidate(); detachedSnapshot = snapshotNode() }
     fun detachedTargetUnchanged() = detachedSnapshot?.let { it == snapshotNode() } == true
-    fun invalidate() { generation++; writeSequence++; ownership?.invalidate(); terminalInsertion = null }
+    fun invalidate() { generation++; writeSequence++; ownership?.invalidate(); terminalInsertion = null; isTerminal = false }
     private fun rejected(reason: String): EditorSnapshot? { fail(reason); return null }
     private fun fail(reason: String): Boolean {
         lastError = reason

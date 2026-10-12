@@ -139,6 +139,7 @@ class MainActivity : Activity() {
         retention.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, listOf("History off", "Text for 1 day", "Text for 7 days", "Text for 30 days", "Text until deleted")); retention.setSelection(days.indexOf(p.getInt("retention", 7)).coerceAtLeast(0)); body.addView(retention)
         retention.onItemSelectedListener = object : AdapterView.OnItemSelectedListener { override fun onNothingSelected(parent: AdapterView<*>?) {}; override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) { p.edit().putInt("retention", days[position]).apply() } }
         flag("Keep recording locally on connection loss (off: stop)", "continue_local", true)
+        flag("Show diagnostic errors beside alien", "diagnostic_bubble_errors", true)
         text(body, "Connection loss: keep audio locally until stop (or stop immediately when disabled). Manual recovery preserves the complete recording. Realtime reconnect retries automatically; gaps are recovered after stop, without typing into a changed field. Pending retention: 24 hours. History off does not disable recovery.")
         text(body, "Recordings stay private on this device until recovery. Recovery never restarts the microphone or types into a newly focused field. There is no app word allowance.")
         val scroll = ScrollView(this).apply { setBackgroundColor(Color.rgb(21, 29, 21)); addView(body) }

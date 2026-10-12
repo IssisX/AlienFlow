@@ -562,3 +562,8 @@ Sources were checked on 10 October 2026. Product requirements and proposed archi
 ## Owner amendment — 2026-10-12 / AlienFlow2 0.1.9
 
 0.1.8 live dictation is owner-confirmed. Termux support is mandatory. The Termux terminal adapter keeps the existing keyboard and inserts finalized corrected text once after Stop, because terminal input cannot safely use a document-span replacement protocol. Terminal control characters become spaces; AlienFlow never submits a command. Ordinary document fields retain live text and correction behavior. Quiet successful completion replaces the technical notice beside the bubble. The brand mark is redesigned with a silver alien and dual light/dark border for visibility on either background. These changes do not certify Google Play release readiness.
+
+
+## Owner amendment — 2026-10-12 / AlienFlow2 0.1.10
+
+The 0.1.9 icon is owner-approved. Routine status and expected manual-edit messages must not appear beside/on the icon. Useful diagnostic errors may appear while debugging; a persisted setting disables all overlay notices. Manual edits preserve the user's field and pause automatic replacement while capture continues; a new dictation starts fresh from the currently focused field. Genuine insertion failures must not be hidden or treated as verified writes. Terminal-to-document switching clears old terminal binding and stale notices. Final capture serialization must complete before final audio commit and WAV closure.

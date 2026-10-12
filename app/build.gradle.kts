@@ -46,8 +46,8 @@ android {
         applicationId = "io.github.issisx.alienflow"
         minSdk = 33
         targetSdk = 36
-        versionCode = 10
-        versionName = "0.1.9"
+        versionCode = 11
+        versionName = "0.1.10"
         buildConfigField("String", "SOURCE_REVISION", "\"${System.getenv("GITHUB_SHA") ?: "local-unversioned"}\"")
     }
     buildFeatures { buildConfig = true }

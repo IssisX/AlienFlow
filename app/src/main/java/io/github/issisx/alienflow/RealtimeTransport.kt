@@ -302,7 +302,7 @@ class RealtimeTransport(
             }
             val id = "commit-$socketGeneration-${++commitSequence}"
             if (current.send(RealtimeProtocol.commitEvent(id))) {
-                coverage.sent(id)
+                coverage.sent(id, remoteBufferedBytes)
                 remoteBufferedBytes = 0L
                 committed = true
             } else {
@@ -324,20 +324,24 @@ class RealtimeTransport(
     }
 
     fun rejectEmptyCommit(clientEventId: String): Boolean =
-        synchronized(state) { coverage.rejectEmpty(clientEventId) }
+        synchronized(state) {
+            app.crashJournal.rejectedAudioCommit(coverage.bytesFor(clientEventId) ?: -1L, capturing, socketGeneration)
+            coverage.rejectEmpty(clientEventId)
+        }
 
-    fun finishCapture(): Boolean {
+    fun finishCapture(complete: (Boolean) -> Unit) {
         capturing = false
         reconnectJob?.cancel()
         reconnecting = false
         stopRecorder()
-        synchronized(state) {
-            if (localOnly || !sessionReady) coverage.markUncertain()
+        controlScope.launch {
+            CaptureDrain.finish(captureJob, {
+                if (!closed) {
+                    synchronized(state) { if (localOnly || !sessionReady) coverage.markUncertain() }
+                    sendCommit()
+                }
+            }, { if (!closed) complete(synchronized(state) { !coverage.uncertain }) })
         }
-        // A read already returned when Stop was tapped may still be serialized to disk and
-        // the socket. Commit after that bounded in-flight callback, preserving message order.
-        main.postDelayed({ if (!closed) sendCommit() }, 250L)
-        return synchronized(state) { !coverage.uncertain }
     }
 
     private fun stopRecorder() {

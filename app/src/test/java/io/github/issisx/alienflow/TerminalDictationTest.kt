@@ -67,7 +67,7 @@ class TerminalDictationTest {
         assertFalse(CompletionFeedback.inlineDelivered("", ""))
         assertNull(CompletionFeedback.bubble("Complete • ready for another dictation"))
         assertNull(CompletionFeedback.bubble("Sent to Termux • press Enter yourself"))
-        assertEquals("Text saved in AlienFlow", CompletionFeedback.bubble("Result saved • inline editing unavailable; copy the transcript"))
+        assertNull(CompletionFeedback.bubble("Result saved • inline editing unavailable; copy the transcript"))
         assertEquals("[AF-N01] Live connection failed", CompletionFeedback.bubble("[AF-N01] Live connection failed"))
     }
 }

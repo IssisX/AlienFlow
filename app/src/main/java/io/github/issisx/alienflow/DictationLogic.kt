@@ -9,19 +9,20 @@ object BubbleOpacity {
 }
 
 class AudioCoverage {
-    private val outstanding = linkedSetOf<String>()
+    private val outstanding = linkedMapOf<String, Long>()
     private val acknowledged = mutableSetOf<String>()
     var uncertain = false; private set
     fun markUncertain() { uncertain = true }
-    fun sent(id: String) { outstanding.add(id) }
+    fun sent(id: String, bytes: Long = 0) { outstanding[id] = bytes }
     fun acknowledge(item: String) {
-        if (item.isNotBlank() && acknowledged.add(item)) outstanding.firstOrNull()?.let { outstanding.remove(it) }
+        if (item.isNotBlank() && acknowledged.add(item)) outstanding.keys.firstOrNull()?.let { outstanding.remove(it) }
     }
     fun rejectEmpty(clientEventId: String): Boolean {
         // A server-side empty buffer cannot establish that local audio was empty.
         uncertain = true
-        return outstanding.remove(clientEventId)
+        return outstanding.remove(clientEventId) != null
     }
+    fun bytesFor(id: String): Long? = outstanding[id]
 }
 
 /** Transcripts are keyed by item identity; completion replaces provisional words. */
@@ -132,6 +133,8 @@ class EditorOwnership(private val initial: EditorSnapshot) {
     private val suffix = initial.text.drop(initial.end.coerceAtLeast(0))
     fun expected() = prefix + owned + suffix
     fun cursor() = prefix.length + owned.length
+    fun proposedSnapshot(value: String) = EditorSnapshot(initial.generation, prefix + value + suffix,
+        prefix.length + value.length, prefix.length + value.length)
     fun matches(snapshot: EditorSnapshot): Boolean = certain && snapshot.generation == initial.generation &&
         snapshot.text == expected() && snapshot.start == cursor() && snapshot.end == cursor() && !snapshot.composing
     fun canFirstWrite(snapshot: EditorSnapshot) = certain && snapshot == initial

@@ -30,9 +30,12 @@ object CompletionFeedback {
     fun inlineDelivered(finalText: String, confirmedText: String): Boolean =
         finalText.isNotBlank() && finalText == confirmedText
 
-    fun bubble(message: String): String? = when {
-        message.startsWith("Complete •") || message.startsWith("Sent to Termux •") -> null
-        message.startsWith("Result saved • inline editing unavailable") -> "Text saved in AlienFlow"
-        else -> message
+    fun bubble(message: String, diagnosticErrors: Boolean = true): String? {
+        if (!diagnosticErrors) return null
+        // Focus changes, composition and manual cursor/text changes are ordinary interaction.
+        if (Regex("^\\[AF-E(?:03|08|11|13)\\]").containsMatchIn(message)) return null
+        return message.takeIf { Regex("^\\[AF-[A-Z][0-9]{2}\\]").containsMatchIn(it) ||
+            it.contains("failed", true) || it.contains("denied", true) ||
+            it.contains("timed out", true) || it.startsWith("Accessibility disconnected") }
     }
 }

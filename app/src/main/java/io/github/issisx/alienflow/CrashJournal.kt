@@ -58,7 +58,8 @@ class CrashJournal(private val application: Application) {
         if (stage != "tap.received" && stage == lastStage()) return
         val session = if (stage == "tap.received") System.currentTimeMillis() else prefs.getLong("session", 0)
         try {
-            if (stage == "tap.received") prefs.edit().remove("live_problem").commit()
+            if (stage == "tap.received") prefs.edit().remove("live_problem").remove("editor_code")
+                .remove("editor_observation").remove("audio_commit").commit()
             val entry = "${Instant.now()} $stage"
             val lines = (prefs.getString("trace", "").orEmpty().lines().filter { it.isNotBlank() } + entry).takeLast(80)
             if (!prefs.edit().putString("stage", stage).putLong("session", session)
@@ -74,6 +75,19 @@ class CrashJournal(private val application: Application) {
         if (prefs.getString("editor_code", "") == code) return
         try { prefs.edit().putString("editor_code", code).commit() } catch (_: Exception) { persistFailed = true }
         mark("editor.rejected")
+    }
+    @Synchronized fun editorObservation(phase: String, observation: EditorSynchronization.Reading) {
+        val n = observation.node; val k = observation.keyboard
+        val metadata = "phase=${if (phase == "before") "before" else "after"}; " +
+            "node_length=${n?.text?.length}; node_cursor=${n?.start}:${n?.end}; " +
+            "ime_length=${k?.text?.length}; ime_cursor=${k?.start}:${k?.end}; " +
+            "offset=${k?.offset}; composing=${observation.composing}"
+        try { prefs.edit().putString("editor_observation", metadata).commit() }
+        catch (_: Exception) { persistFailed = true }
+    }
+    @Synchronized fun rejectedAudioCommit(bytes: Long, capturing: Boolean, generation: Int) {
+        try { prefs.edit().putString("audio_commit", "sent_bytes=$bytes; capturing=$capturing; generation=$generation").commit() }
+        catch (_: Exception) { persistFailed = true }
     }
     @Synchronized fun liveConnectionFailure(problem: LiveConnectionProblem) {
         try {
@@ -108,6 +122,8 @@ class CrashJournal(private val application: Application) {
         appendLine("SESSION EVENTS (metadata only)")
         appendLine(prefs.getString("trace", "No session events recorded yet."))
         appendLine("Latest editor rejection code: " + prefs.getString("editor_code", "none"))
+        appendLine("Latest editor observation: " + prefs.getString("editor_observation", "none"))
+        appendLine("Latest rejected audio commit: " + prefs.getString("audio_commit", "none"))
         appendLine("Diagnostic persistence failure observed: $persistFailed")
         appendLine("Android-only microphone test samples: " + if (prefs.contains("probe_samples")) prefs.getInt("probe_samples", 0) else "not run")
         appendLine("LATEST LIVE CONNECTION FAILURE (metadata only)")
@@ -131,7 +147,7 @@ class CrashJournal(private val application: Application) {
     }
     fun clear() {
         crashFile.delete()
-        prefs.edit().remove("trace").remove("editor_code").remove("session").remove("stage").commit()
+        prefs.edit().remove("trace").remove("editor_code").remove("editor_observation").remove("audio_commit").remove("session").remove("stage").commit()
     }
     fun install() {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
