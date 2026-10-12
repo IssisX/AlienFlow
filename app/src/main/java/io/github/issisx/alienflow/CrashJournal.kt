@@ -87,6 +87,14 @@ class CrashJournal(private val application: Application) {
         // Generated from numeric monotonic observations; never accepts a server response.
         prefs.edit().putString("startup_timing", metadata).apply()
     }
+    fun bubbleAvailability(eligible: Boolean, visible: Boolean, hidden: Boolean,
+                          inputStarted: Boolean, terminal: Boolean) {
+        val metadata = "eligible_input=$eligible; visible=$visible; explicitly_hidden=$hidden; " +
+            "input_started=$inputStarted; bound_terminal=$terminal"
+        if (prefs.getString("bubble_availability", "") != metadata) {
+            prefs.edit().putString("bubble_availability", metadata).apply()
+        }
+    }
     @Synchronized fun editorFailure(message: String) {
         val code = Regex("^\\[AF-E([0-9]{2})\\]").find(message)?.groupValues?.get(1) ?: return
         if (prefs.getString("editor_code", "") == code) return
@@ -143,6 +151,7 @@ class CrashJournal(private val application: Application) {
         appendLine("Latest editor rejection code: " + prefs.getString("editor_code", "none"))
         appendLine("Latest editor observation: " + prefs.getString("editor_observation", "none"))
         appendLine("Latest rejected audio commit: " + prefs.getString("audio_commit", "none"))
+        appendLine("Latest bubble availability (metadata only): " + prefs.getString("bubble_availability", "not observed"))
         appendLine("Diagnostic persistence failure observed: $persistFailed")
         appendLine("Android-only microphone test samples: " + if (prefs.contains("probe_samples")) prefs.getInt("probe_samples", 0) else "not run")
         appendLine("LATEST LIVE CONNECTION FAILURE (metadata only)")

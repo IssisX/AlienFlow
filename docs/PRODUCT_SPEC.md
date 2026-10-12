@@ -572,3 +572,8 @@ The 0.1.9 icon is owner-approved. Routine status and expected manual-edit messag
 ## Owner amendment — 2026-10-12 / AlienFlow2 0.1.11
 
 Tap-to-listening must be as quick as the physical microphone allows. Start microphone capture concurrently with network setup after Android foreground-service permission gates; preserve startup audio and turn order, including a quick Stop before setup completes. Do not keep an idle microphone running. Expose a very small, elegant indicator on the accepted icon: first actual captured frames mean safe to speak, and validated server acknowledgement has a distinct connected treatment. Routine overlay status text remains disabled. Automatic low-latency tuning must preserve guarded editor writes, private recoverable audio, keyboard choice and terminal behavior. Measure real phone startup boundaries in metadata-only Diagnostics before claiming a latency number or choosing a provider from marketing figures.
+
+
+## Owner amendment — 2026-10-12 / AlienFlow2 0.1.12
+
+After Termux dictation, the bubble must return in a newly focused ordinary eligible field without toggling accessibility or restarting AlienFlow. Resolve current input focus after asynchronous editor/window publication; do not retain the previous terminal as the new editor. Preserve explicit Hide, protected-field exclusion, keyboard choice, guarded writes and the 0.1.11 latency/readiness behavior. Availability repair must not adopt a new write target during an ongoing dictation.

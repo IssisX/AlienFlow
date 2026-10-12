@@ -29,22 +29,41 @@ class AlienAccessibilityService : AccessibilityService() {
     private var safeBottom = 0
     var composing = false; private set
     private var layoutKey = "folded"
+    private var availabilityPass = 0
+    private val availabilityDelays = longArrayOf(50L, 150L, 400L)
+    private val availabilityRefresh = object : Runnable {
+        override fun run() {
+            if (!::bridge.isInitialized || bubble == null) return
+            app.coordinator.targetEvent()
+            val available = refreshBubbleAndResolve()
+            // InputMethod and the accessibility tree arrive independently. Re-query; never
+            // keep the preceding field or infer availability from the passage of time.
+            if (!available && availabilityPass < availabilityDelays.size) handler.postDelayed(this, availabilityDelays[availabilityPass++])
+        }
+    }
+    private fun refreshAvailability(clearFocusCache: Boolean = false) {
+        if (!::bridge.isInitialized) return
+        handler.removeCallbacks(availabilityRefresh)
+        availabilityPass = 0
+        if (clearFocusCache) clearCache()
+        handler.post(availabilityRefresh)
+    }
     fun confirmEmptyComposition() { composing = false }
     override fun onCreateInputMethod(): android.accessibilityservice.InputMethod = object : android.accessibilityservice.InputMethod(this) {
         override fun onStartInput(info: android.view.inputmethod.EditorInfo, restarting: Boolean) {
             super.onStartInput(info, restarting); composing = false
             clearStatusNotice()
-            if (::bridge.isInitialized) { bridge.invalidate(); handler.post { app.coordinator.targetEvent(); refreshBubble() } }
+            if (::bridge.isInitialized) { bridge.invalidate(); refreshAvailability(clearFocusCache = true) }
         }
         override fun onFinishInput() {
             super.onFinishInput(); composing = false
             clearStatusNotice()
-            if (::bridge.isInitialized) { bridge.invalidate(); handler.post { app.coordinator.targetEvent(); refreshBubble() } }
+            if (::bridge.isInitialized) { bridge.invalidate(); refreshAvailability(clearFocusCache = true) }
         }
         override fun onUpdateSelection(oldStart: Int, oldEnd: Int, newStart: Int, newEnd: Int, candidatesStart: Int, candidatesEnd: Int) {
             super.onUpdateSelection(oldStart, oldEnd, newStart, newEnd, candidatesStart, candidatesEnd)
             composing = EditorEvidence.hasComposingRange(candidatesStart, candidatesEnd)
-            handler.post { app.coordinator.targetEvent() }
+            refreshAvailability()
         }
     }
     override fun onServiceConnected() {
@@ -126,20 +145,27 @@ class AlienAccessibilityService : AccessibilityService() {
         statusNotice = null
     }
     fun refreshBubble() {
-        val view = bubble ?: return
+        refreshBubbleAndResolve()
+    }
+    private fun refreshBubbleAndResolve(): Boolean {
+        val view = bubble ?: return false
         val insets = view.rootWindowInsets ?: wm.currentWindowMetrics.windowInsets
         imeBottom = insets.getInsets(WindowInsets.Type.ime()).bottom
         val system = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()); safeTop = system.top; safeBottom = system.bottom
         clamp()
         val active = app.coordinator.active || app.coordinator.finishing
+        val available = bridge.focused() != null
         view.contentDescription = "AlienFlow. ${app.coordinator.status}. Tap to start or stop; drag to move; long press for actions"
         view.alpha = if (active) BubbleOpacity.alpha(app.store.prefs.getInt("active_opacity", 100)) else BubbleOpacity.alpha(app.store.prefs.getInt("opacity", BubbleOpacity.DEFAULT_IDLE_PERCENT))
-        view.visibility = if (active || (!hidden && (app.store.prefs.getBoolean("always", false) || bridge.focused() != null))) View.VISIBLE else View.GONE
+        view.visibility = if (active || (!hidden && (app.store.prefs.getBoolean("always", false) || available))) View.VISIBLE else View.GONE
+        app.crashJournal.bubbleAvailability(available, view.visibility == View.VISIBLE, hidden,
+            inputMethod?.currentInputStarted == true, bridge.isTerminal)
         val touch = dp(max(48, app.store.prefs.getInt("size", 32)))
         if (params?.width != touch) { params?.width = touch; params?.height = touch; clamp() }
         val key = if (bounds().width() / resources.displayMetrics.density > 600) "unfolded" else "folded"
         if (key != layoutKey) restorePosition()
         view.invalidate()
+        return available
     }
     fun resetPosition() { app.store.prefs.edit().remove("x_folded").remove("y_folded").remove("x_unfolded").remove("y_unfolded").apply(); hidden = false; restorePosition(); refreshBubble() }
     private fun restorePosition() {
@@ -177,10 +203,13 @@ class AlienAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (!::bridge.isInitialized) return
         if (event?.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED || event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) bubble?.requestApplyInsets()
-        app.coordinator.targetEvent(); refreshBubble()
+        // Revoke old edit ownership promptly; visibility rechecks are coalesced on Main.
+        app.coordinator.targetEvent()
+        refreshAvailability()
     }
     override fun onInterrupt() { if (app.coordinator.active) app.coordinator.failure("Accessibility feedback interrupted; recording stopped and audio preserved") }
     override fun onDestroy() {
+        handler.removeCallbacks(availabilityRefresh)
         app.coordinator.serviceLost()
         clearStatusNotice(); closeMenu(); bubble?.let { wm.removeView(it) }; bubble = null
         super.onDestroy()
