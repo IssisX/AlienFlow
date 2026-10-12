@@ -115,7 +115,9 @@ class BubbleEditorHandoffTest {
     @Test fun declaredContentChangeEventsRecoverLaterBrowserFields() {
         Connected().use { c ->
             c.service.resources.getXml(R.xml.accessibility_service).use { parser ->
-                parser.nextTag()
+                while (parser.eventType != org.xmlpull.v1.XmlPullParser.START_TAG &&
+                    parser.eventType != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) parser.next()
+                assertEquals("accessibility-service", parser.name)
                 val attrs = c.service.resources.obtainAttributes(parser, intArrayOf(android.R.attr.accessibilityEventTypes))
                 try { assertTrue(attrs.getInt(0, 0) and AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED != 0) }
                 finally { attrs.recycle() }
