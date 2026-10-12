@@ -103,9 +103,12 @@ class SettingsNavigationTest {
             assertEquals((tagged(activity, "transcript-text") as TextView).text.toString(), activity.getSystemService(ClipboardManager::class.java).primaryClip!!.getItemAt(0).text.toString())
             button(activity, "Delete transcript").performClick()
             ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+            shadowOf(Looper.getMainLooper()).idle()
             assertEquals(120, store.history().size)
             button(activity, "Delete transcript").performClick()
             ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            // AlertDialog dispatches its button listener through the main Handler.
+            shadowOf(Looper.getMainLooper()).idle()
             assertEquals(119, store.history().size)
             assertEquals(0, (tagged(activity, "transcript-list") as ListView).adapter.count)
         }
