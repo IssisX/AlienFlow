@@ -56,7 +56,7 @@ The application presents a short setup sequence: enter the user's API key, grant
 
 Key validation should distinguish invalid credentials, a model unavailable to the account, exhausted account allowance, and network failure. A paid sample recording belongs to the later, user-initiated setup test. API keys are entered on the phone, never embedded in source or requested in chat.
 
-The landing screen then shows readiness, a dictation test field, recent entries, and Settings. Persistent service and recording notifications contain useful status and a stop action. Permission loss returns the user to the relevant setup action without repeated nagging.
+The landing screen then shows readiness, a dictation test field, a short latest-result preview, and separate History and Settings destinations. Persistent service and recording notifications contain useful status and a stop action. Permission loss returns the user to the relevant setup action without repeated nagging.
 
 ### 2.2 Normal dictation
 
@@ -577,3 +577,7 @@ Tap-to-listening must be as quick as the physical microphone allows. Start micro
 ## Owner amendment — 2026-10-12 / AlienFlow2 0.1.12
 
 After Termux dictation, the bubble must return in a newly focused ordinary eligible field without toggling accessibility or restarting AlienFlow. Resolve current input focus after asynchronous editor/window publication; do not retain the previous terminal as the new editor. Preserve explicit Hide, protected-field exclusion, keyboard choice, guarded writes and the 0.1.11 latency/readiness behavior. Availability repair must not adopt a new write target during an ongoing dictation.
+
+## Owner refinement — public-product polish, 2026-10-12
+
+Treat AlienFlow as a product intended for paying public users. Settings must use familiar language and short, hierarchical pages; explain what each choice changes. Separate account/setup, ordinary preferences, history/recovery and technical troubleshooting. Do not expand full transcripts or an ever-growing history below Settings or setup. Use a compact, searchable history list and individual transcript pages. Preserve the accepted icon and existing dictation/keyboard/Termux behavior. This refinement does not itself assert Play Store readiness, phone validation or implementation of future storage/retention options.

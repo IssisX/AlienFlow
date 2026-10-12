@@ -187,7 +187,8 @@ class AlienAccessibilityService : AccessibilityService() {
         val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.rgb(22, 27, 34)); setPadding(dp(8), dp(8), dp(8), dp(8)) }
         fun item(label: String, action: () -> Unit) { column.addView(Button(this).apply { text = label; setOnClickListener { closeMenu(); action() } }) }
         if (app.coordinator.active || app.coordinator.finishing) item("Cancel dictation") { app.coordinator.cancel() }
-        item("Settings") { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        item("Settings") { startActivity(Intent(this, MainActivity::class.java).setAction(MainActivity.OPEN_SETTINGS)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)) }
         item("Diagnostics / share report") {
             startActivity(Intent(this, DiagnosticsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
