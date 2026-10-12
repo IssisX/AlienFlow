@@ -1,0 +1,79 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version": "0.1.15",
+  "version_code": 16,
+  "branch": "AlienFlow2",
+  "compiled_source_sha": "782dd0d45f33b0ffaa7c20f1046cead5a129a0ce",
+  "compiled_tree_sha": "9c6dff5c01ac1335bfbcef4191a87ecee1a9f84e",
+  "workflow_run": "https://github.com/IssisX/AlienFlow/actions/runs/38298279058",
+  "artifact_id": 11769741499,
+  "unsigned_bundle_sha256": "ef3768351b8e691e45fbfd7f49af66aec2209d75412f0b956e40923023943076",
+  "member_hashes_verified": 118,
+  "tests": {
+    "executed": 168,
+    "total": 168,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "not run"
+  },
+  "lint": {
+    "issues": 38,
+    "errors": 0
+  },
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.15.apk",
+    "size_bytes": 4519889,
+    "sha256": "531d5554148656f707552ef9932253422fbc72b8d048a0b990f043e8f9c267d5",
+    "signature_scheme": "APK v3",
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "payload_entries_unchanged": 25
+  },
+  "device_verification": "Not performed. Fold6, installed Gboard/ChatGPT, provider latency and physical microphone behavior remain unverified.",
+  "scope": "Robolectric SDK 35 uses production coordinator/bridge and native EditText/InputConnection. OS focus/remote accessibility IPC/selection callbacks are simulated, with AOSP finishComposingText before accessibility commitText.",
+  "supported_repairs": [
+    "Text/cursor changes do not revoke the same-field binding or stop capture/transcription.",
+    "New speech tail inserts at the current cursor; previously dispatched speech is protected after user interaction.",
+    "No space, composing-word completion, pause state, or restart tap is required before speech writes.",
+    "Both node and keyboard routes preserve typed words and external anchors.",
+    "Strict confirmation, no field adoption/submission, cancellation preservation and existing startup/UI/Termux behavior remain."
+  ],
+  "initial_gate_failure": {
+    "workflow_run": "https://github.com/IssisX/AlienFlow/actions/runs/38296840244",
+    "tests": 166,
+    "failures": 1,
+    "classification": "Introduced fixture arithmetic error: the exact inserted phrase length is 17, not 16. Actual text and cursor met the contract. Assertion now derives its expected cursor from the literal phrase length."
+  },
+  "source_correction": "Broad API reference phrasing was insufficient: AOSP accessibility implementation explicitly finishes composing text before committing. Unnecessary composition wait removed; native regressions exercise ongoing real composition without typing space.",
+  "delivery": "Signed installable APK saved successfully; local file identity applied; file bytes/hash unchanged after save.",
+  "changed_path_suites": [
+    {
+      "name": "io.github.issisx.alienflow.EditorBridgeNodeRouteTest",
+      "tests": "16",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.EditorSynchronizationTest",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.NodeEditorWriterTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.SpeechContinuationTest",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ]
+}
