@@ -55,9 +55,12 @@ class SettingsNavigationTest {
             assertTrue(tagged(activity, "size") is SeekBar)
             val preview = tagged(activity, "bubble-preview") as BubblePreview
             assertEquals((32 * activity.resources.displayMetrics.density).toInt(), preview.diameterPixels)
-            app(activity).store.prefs.edit().putInt("size", 64).putInt("opacity", 10).apply()
-            preview.invalidate()
-            assertEquals((64 * activity.resources.displayMetrics.density).toInt(), preview.diameterPixels)
+            val size = tagged(activity, "size") as SeekBar
+            assertTrue(size.onKeyDown(android.view.KeyEvent.KEYCODE_DPAD_RIGHT,
+                android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DPAD_RIGHT)))
+            val storedSize = app(activity).store.prefs.getInt("size", 32)
+            assertTrue(storedSize > 32)
+            assertEquals((storedSize * activity.resources.displayMetrics.density).toInt(), preview.diameterPixels)
             assertFalse(texts(activity).contains("Writing style"))
             render(activity, "bubble-settings-0.1.13.png")
             tagged(activity, "back").performClick()
