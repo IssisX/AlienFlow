@@ -1,0 +1,63 @@
+{
+  "repository": "IssisX/AlienFlow",
+  "branch": "AlienFlow(chat)",
+  "copied_from_branch": "AlienFlow2",
+  "copy_source_sha": "185665b2451e1ce3b9a78e2cb4ba4697bd70e581",
+  "compiled_source_sha": "0d0d6e6a67d221d24f96353ceaf0097ec8576240",
+  "version_name": "0.1.18-chat.1",
+  "version_code": 20,
+  "application_id": "io.github.issisx.alienflow",
+  "ci_url": "https://github.com/IssisX/AlienFlow/actions/runs/38315352858",
+  "artifact_id": 11776329022,
+  "bundle_sha256": "656b2545e14aa404fd768600fd6db208c4ff98da388b2cab6487b14ef2384282",
+  "verified_bundle_members": 139,
+  "tests": {
+    "executed": 192,
+    "total": 192,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "Installed Termux on API36 emulator; transcript fixtures, no physical microphone/provider"
+  },
+  "lint": {"issues": 38, "errors": 0},
+  "baseline_reproduction": {
+    "baseline_sha": "7ebe095bfaa83456690b46d8934c0cad2590a94a",
+    "candidate_sha": "0d0d6e6a67d221d24f96353ceaf0097ec8576240",
+    "tests": 3,
+    "expected_failed_cases": [
+      "accessibilityEventsDuringSpeechKeepTheTerminalBoundAndFinalTextCommitsOnce",
+      "finishingEventsCannotSendPartialTerminalTextBeforeTheLastTranscript"
+    ],
+    "actual_failed_cases": [
+      "accessibilityEventsDuringSpeechKeepTheTerminalBoundAndFinalTextCommitsOnce",
+      "finishingEventsCannotSendPartialTerminalTextBeforeTheLastTranscript"
+    ],
+    "errors": 0,
+    "exit_code": 1,
+    "scope": "Robolectric with production coordinator/bridge; OS broker, recognition and terminal consumer fixtures"
+  },
+  "installed_termux": {
+    "source": "0d0d6e6a67d221d24f96353ceaf0097ec8576240",
+    "version": "0.1.18-chat.1",
+    "api": 36,
+    "termux": "official v0.118.3 x86_64",
+    "real_bubble_tap": true,
+    "real_accessibility_broker": true,
+    "real_terminal_echo": true,
+    "final_count": 1,
+    "premature_text": false,
+    "microphone_and_provider": "not exercised; transcript fixtures"
+  },
+  "apk": {
+    "filename": "AlienFlow-0.1.18-chat.1.apk",
+    "bytes": 4552856,
+    "sha256": "3cf31595f88ab2e3d1ebd2e807b7d906e3e494a320ef7164555484fb55143660",
+    "scheme": "APK v3",
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "unchanged_payload_entries": 25,
+    "added_signing_metadata": ["META-INF/ALIENFLO.RSA", "META-INF/ALIENFLO.SF", "META-INF/MANIFEST.MF"]
+  },
+  "native_libraries": [],
+  "preserved_artwork_sha256": "48d0ce0aacba2fd4264100fb1af1b6a73f54290f6c5296f4adc07d3974a50671",
+  "limitations": "Installed-Termux test uses real Android 16 emulator, real overlay taps and accessibility/input connection, injected recognition events. No microphone/OpenAI request exercised. User Fold6/Gboard/installed Termux configuration remains untested. Terminal is final-only after Stop; ordinary fields retain live behavior."
+}

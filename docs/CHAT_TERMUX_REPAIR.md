@@ -1,28 +1,29 @@
-# AlienFlow(chat) — isolated Termux repair
+# Termux repair — diagnosis and reproducible evidence
 
-Owner request (2026-10-12): copy AlienFlow2, preserve the reported working 0.1.17 behavior everywhere else, fix the Termux terminal. Actual repository is IssisX/AlienFlow; the source is branch AlienFlow2. The new AlienFlow(chat) branch copied source 185665b2451e1ce3b9a78e2cb4ba4697bd70e581 without writing to another branch. That source already includes a proposed 0.1.18 repair, which is retained with explicit provenance rather than reinvented. Shipped 0.1.17 source is 7ebe095bfaa83456690b46d8934c0cad2590a94a.
+Owner requested an isolated AlienFlow(chat) branch copied from AlienFlow2 and preservation of .17 working outside Termux. Actual repository IssisX/AlienFlow; copy source 185665b2451e1ce3b9a78e2cb4ba4697bd70e581. This source already contained the proposed seven-line coordinator change; it was retained with its provenance.
 
-## Supported defect
+## Bug
 
-An accessibility/selection event calls coordinator.targetEvent(), which previously called pumpWrite without respecting the final-only Termux route. A provisional result during recording therefore enters a terminal adapter that rejects it and clears the binding. During finishing the same callback can consume the one terminal commit before the last transcript arrives. Termux's InputConnection consumes committed text immediately; it is not a document span to repeatedly replace.
+During .17 recording, targetEvent calls pumpWrite despite final-only Termux. The adapter refuses an early write and its binding is discarded. During finishing, that same event can commit a partial result before the final transcript and consume the one terminal send. The central pumpWrite(finalDelivery=false) gate prevents both paths; only tryFinish passes finalDelivery=true once the existing completion requirements hold. No unrelated production refactor was added.
 
-The inherited seven-line coordinator repair centrally blocks non-final writes for terminal/end-only targets. Only tryFinish authorizes final delivery after existing capture drain, recognition and bounded cleanup gates. No new production transport, editor eligibility, Chrome input algorithm, keyboard, storage or icon changes are introduced here.
+## Proof run
 
-## Verification, not agent agreement
+Compiled source 0d0d6e6a67d221d24f96353ceaf0097ec8576240; [run 38315352858](https://github.com/IssisX/AlienFlow/actions/runs/38315352858).
 
-The added CI baseline step runs the exact same TerminalCoordinatorTest against shipped 0.1.17 in a separate worktree. It must expose exactly two specified failures while the focus-loss protection case passes. It fails closed on compilation problems, unrelated errors, unexpected passes or additional failures. The candidate must then pass the complete suite.
+- `python3 scripts/prove_termux_regression.py`: same three tests against shipped .17 source 7ebe095bfaa83456690b46d8934c0cad2590a94a in a separate worktree. Exactly the two premature-write cases fail; changed-field protection passes. Baseline XML and observed failures are retained, not merely source inspection.
+- Candidate full suite: 192 tests pass, none skipped; lint zero errors/38 warnings. Runtime source diff from .17 is confined to the coordinator write gate.
+- `bash scripts/test_installed_termux.sh`: official Termux v0.118.3 installed on Android 16/API36 emulator, actual alien taps and Android accessibility/InputConnection, existing terminal prefix, no partial writes, late final recognition after Stop, exactly one complete text delivery and no Enter. Passed. The resulting real terminal screenshot was visually inspected.
 
-A separate instrumentation test installs official Termux v0.118.3 on a disposable API36 emulator and drives the real floating bubble, accessibility service, cross-process InputConnection and terminal echo. Transcript events are explicit fixtures and an unstarted transport is injected; it does NOT test hardware microphone capture or OpenAI. No API request is made. Existing terminal input must remain; no provisional text appears; the final phrase appears once after Stop and late-final recognition. An Enter would be detectable as duplicate cat echo. Physical Fold6 acceptance remains a separate observation.
+The transcript payloads in the installed-app test are explicit fixtures; the microphone/OpenAI boundary is not exercised. This proves the changed editor integration through real Termux, not end-to-end physical Fold6 speech recognition. Version 0.1.18-chat.1 (20) uses the original app ID/certificate and .17 artwork/preferences.
 
-Only test dependencies are added (AndroidX runner 1.7.0 and junit extension 1.3.0). Test code and transcript fixtures are excluded from release runtime. New delivery version 0.1.18-chat.1 (code 20) distinguishes this branch's installer from the other agent's code 19. Same package and permanent signing key; updates must not require uninstalling.
-
-Current state: tests written and scheduled next; no completed results claimed. Historical implementation files on the copied branch are historical records, not evidence that these new gates have passed.
+Setup failures were environmental: corrupt SDK archive, then AVD directory mismatch. The latter was diagnosed from the actual emulator log and fixed using explicit shared Android state directories and bounded waits. The successful rerun retained all original release gates.
 
 ## Primary sources checked
 
-- https://raw.githubusercontent.com/termux/termux-app/master/terminal-view/src/main/java/com/termux/view/TerminalView.java — commitText and finishComposingText consume/clear the IME buffer, onCheckIsTextEditor returns true, terminal TYPE_NULL is intentional.
-- https://developer.android.com/reference/android/accessibilityservice/InputMethod.AccessibilityInputConnection — accessibility commit/selection contract.
-- https://developer.android.com/reference/android/app/Instrumentation — use UiAutomation across applications and DONT_SUPPRESS_ACCESSIBILITY_SERVICES while exercising AlienFlow.
-- https://github.com/termux/termux-app/releases/tag/v0.118.3 — official pinned installed Termux test package and published checksum.
+- https://raw.githubusercontent.com/termux/termux-app/v0.118.3/terminal-view/src/main/java/com/termux/view/TerminalView.java — commitText/finishComposingText consume and clear the IME buffer; TYPE_NULL is intentional. Terminal text cannot be revised as a normal document span.
+- https://developer.android.com/reference/android/accessibilityservice/InputMethod.AccessibilityInputConnection — accessibility input contract.
+- https://developer.android.com/reference/android/app/Instrumentation — cross-app UiAutomation; retain enabled accessibility services during tests.
+- https://github.com/termux/termux-app/releases/tag/v0.118.3 — pinned official installed package and published checksum.
+- https://developer.android.com/tools/variables — shared Android SDK/emulator/AVD state paths; official page updated 2026-10-05.
 
-Do not edit AlienFlow2, build/first-apk or main. Do not claim paid-release or universal-editor readiness from these tests.
+Physical owner acceptance remains the next observation. See IMPLEMENTATION.md and RELEASE_VERIFICATION_0.1.18-chat.1.json for the exact signed bytes and limits. Do not edit AlienFlow2, main or build/first-apk.

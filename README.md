@@ -1,73 +1,28 @@
-# AlienFlow
+# AlienFlow — isolated chat repair
 
-Personal Android dictation with a movable Gray alien bubble, live text in the focused field, conservative corrections, and a user-supplied OpenAI API key.
+Repository: **IssisX/AlienFlow**. This checkout is **AlienFlow(chat)**, copied from **AlienFlow2** at `185665b2451e1ce3b9a78e2cb4ba4697bd70e581`. No changes from this repair were written to AlienFlow2, main or build/first-apk.
 
-## Current signed update: 0.1.7 (8)
+## Signed update: 0.1.18-chat.1 (20)
 
-**New observed evidence:** On the Fold6, tapping the alien in 0.1.6 brought up **“Stopped • audio saved for recovery”** while AlienFlow remained on-screen. This is NOT the previous WebRTC process crash. It does not identify the initiating stop source, and the old generic completion message did not distinguish a nonempty saved WAV from no captured audio.
+The owner-confirmed baseline is 0.1.17: dictation works outside Termux. This update retains that implementation and fixes premature Termux delivery. Termux receives the completed transcript once after Stop; existing input is preserved and Enter/control actions are not sent. Ordinary supported document fields retain live dictation.
 
-**0.1.7 repair:** The coordinator now treats an uncertain editor focus as *loss of inline editing rights*, not a command to stop microphone capture. The same session continues, and no new text field is adopted. The actual terminal network/provider/service error now survives asynchronous finalization and is shown in the status; if audio was never recorded it explicitly says so. No API, microphone transport, permission or artwork changes were made.
+The copied branch already contained the proposed seven-line coordinator repair. It was preserved, reviewed and verified rather than replaced by another speculative implementation. Accessibility events previously requested writes during speech or before final recognition completed; this detached the terminal binding or consumed its one allowed commit too early. The central write gate now waits for final delivery.
 
-[Actions run 38246391603](https://github.com/IssisX/AlienFlow/actions/runs/38246391603) passed **75 tests**, release lint with zero errors and 28 warnings, verified packaging and artifact upload for compiled source `6db8c29dbf85386b9c6d6a3503a1e5838abe670b`. The privately signed APK's original certificate and versionCode 8 were verified; [0.1.7 release record](docs/RELEASE_VERIFICATION_0.1.7.json) identifies its exact bytes. Physical Fold6 dictation remains pending.
+## Actual verification
 
-### Do this on the Fold6
-Install the **signed** 0.1.7 APK directly over 0.1.6. Focus an empty note, tap alien, and speak. If focus shifts, dictation should continue while the editor detaches safely. If the app genuinely stops, the status now shows the initiating cause and whether any audio was actually recorded. Use the top-level **Diagnostics / share report** button if it still fails, and share the new session events (not merely old WebRTC crash entries).
+[CI run 38315352858](https://github.com/IssisX/AlienFlow/actions/runs/38315352858), compiled source `0d0d6e6a67d221d24f96353ceaf0097ec8576240`:
 
-## Earlier signed update: 0.1.6 (7)
+- The same three regression tests were run against shipped 0.1.17. Exactly the two premature-write cases failed; changed-target protection passed.
+- The candidate passed **192 tests**, zero failures/errors/skips; release lint **zero errors, 38 warnings**; debug/release/test APK assembly passed.
+- **Official installed Termux v0.118.3 on an Android 16/API36 x86_64 emulator passed the cross-app test.** Real screen taps operated the floating alien, and the real accessibility service/InputConnection delivered the completed phrase once into the running terminal. Existing input stayed; provisional text did not arrive; no Enter was sent. Recognition events were injected fixtures: this test does not claim physical microphone, OpenAI, Fold6 or the owner's Gboard/configuration coverage.
+- Downloaded bundle SHA-256 and all 139 recorded member hashes matched. The signed installer verified against the original permanent certificate. All 25 unsigned application payload entries remained byte-identical after signing. The approved artwork and absence of native WebRTC were rechecked.
 
-The Fold6 diagnostic report finally identified the crash owner instead of leaving us to perform interpretive dance around a green microphone dot:
+[Exact release evidence](docs/RELEASE_VERIFICATION_0.1.18-chat.1.json), [signature output](docs/APK_SIGNATURE_0.1.18-chat.1.txt), [current implementation checkpoint](docs/IMPLEMENTATION.md), [diagnosis and reproducible checks](docs/CHAT_TERMUX_REPAIR.md).
 
-- Android recorded `REASON_CRASH_NATIVE`, signal 6 (`SIGABRT`).
-- The crashing thread entered `libjingle_peerconnection_so.so` in every application-owned frame retained by Android.
-- AlienFlow's separate three-second Android `AudioRecord` probe captured 70,560 samples successfully.
-- No Java/Kotlin exception was recorded.
+## Install
 
-That evidence supports a narrow repair: **remove the crashing native WebRTC library from the APK and replace its transport ownership**, rather than adding another permission or randomly changing microphone settings.
+Use the signed `AlienFlow-0.1.18-chat.1.apk` delivered in the development conversation, not the unsigned Actions bundle. Same package `io.github.issisx.alienflow`, original signing certificate, versionCode 20: update in place without uninstalling or clearing app data. Saved key, preferences, history, bubble position and icon formats were not reset or migrated.
 
-AlienFlow 0.1.6 uses Android `AudioRecord` for 24 kHz mono PCM16 capture and an authenticated OpenAI Realtime WebSocket for `gpt-live-transcribe`. It sends Base64 `input_audio_buffer.append` events and client-VAD `input_audio_buffer.commit` events. The existing transcript ledger, guarded editor writes, local WAV recovery, cleanup modes, history, encrypted key storage, overlay behavior, opacity settings, and approved Gray artwork remain.
+On the Fold6, open Termux with the normal keyboard, focus the terminal, tap the alien, speak, and tap Stop. The completed words should arrive once on the current line without submitting it. The owner's physical-device acceptance is still pending. An unexpected failure should be captured using the existing Settings → Help & about → Diagnostics / share report path, not older setup instructions.
 
-The APK contains **no native libraries** and specifically no `libjingle_peerconnection_so.so`.
-
-## Install and test
-
-Install the separately delivered signed **AlienFlow-0.1.6.apk** over the existing installation. Do not uninstall or clear app data. Confirm the landing screen shows **Version 0.1.6 (7)**.
-
-1. Focus an empty ordinary text field with Gboard active.
-2. Tap the approved Gray alien once.
-3. Confirm AlienFlow remains alive and reaches `Listening`.
-4. Speak one short sentence, pause, and confirm text appears in that same field.
-5. Tap the alien again and confirm the Android microphone indicator clears.
-
-If the session stops, errors, or the process exits, open **Diagnostics / share report**, copy the new report, and preserve the newest timestamp. Older WebRTC native-crash records may remain in Android's historical list even though 0.1.6 no longer packages that library.
-
-## Verified build scope
-
-[GitHub Actions run 38159376803](https://github.com/IssisX/AlienFlow/actions/runs/38159376803) compiled source `a60c0278f554b9805e93240f9d324bcbbc902502` and passed:
-
-- 73 automated tests; zero failures, errors, or skips.
-- Release lint with zero errors and 28 recorded warnings.
-- Release assembly, package/version identity, non-debuggable state, and unsigned-artifact checks.
-- A fail-closed packaging gate proving the APK has no `.so` files or native-code declaration.
-- Exact approved Gray artwork hash verification.
-- Android-framework renders of the landing and diagnostics activities.
-
-The downloaded bundle matched GitHub's SHA-256 digest. All 39 manifest-listed bundle members matched their hashes. The final APK was signed with the permanent AlienFlow certificate, verified with APK Signature Scheme v3, and compared against the unsigned payload: all 25 original entries were byte-identical; only three signature metadata entries were added.
-
-[Release verification](docs/RELEASE_VERIFICATION_0.1.6.json) and [signature output](docs/APK_SIGNATURE_0.1.6.txt) identify the exact installer.
-
-**Not yet proven:** the physical Fold6 live dictation path. CI can reject a bad build; it cannot impersonate your Samsung audio stack, Gboard, Chrome editor, network, or OpenAI account.
-
-## Product defaults and continuity
-
-- Exact approved Gray alien; movable bubble; 75% idle opacity by default with sliders.
-- Existing keyboard stays selected.
-- Live in-field text and very light correction by default.
-- Wording, negation, numbers, slang, and profanity preserved.
-- Seven days of text history by default; interrupted audio recoverable.
-- No AlienFlow word quota.
-
-The package ID, permanent signing identity, preferences, key-storage format, history format, and pending-audio format were preserved for an in-place update.
-
-## Engineering handoff
-
-Start with `AGENTS.md`, [product requirements](docs/PRODUCT_SPEC.md), [current checkpoint](docs/IMPLEMENTATION.md), [native-crash repair research](docs/RESEARCH_2026-10-11_NATIVE_CRASH.md), and the current release verification. The branch is `build/first-apk`; PR #1 remains the integration record until physical acceptance is complete.
+Read AGENTS.md before edits. Do not overwrite the other agent's branches or claim paid-release/universal compatibility from these bounded checks.
