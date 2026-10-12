@@ -46,8 +46,9 @@ android {
         applicationId = "io.github.issisx.alienflow"
         minSdk = 33
         targetSdk = 36
-        versionCode = 19
-        versionName = "0.1.18"
+        versionCode = 20
+        versionName = "0.1.18-chat.1"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SOURCE_REVISION", "\"${System.getenv("GITHUB_SHA") ?: "local-unversioned"}\"")
     }
     buildFeatures { buildConfig = true }
@@ -84,6 +85,8 @@ dependencies {
     implementation(libs.coroutines.android)
     implementation(libs.okhttp)
     testImplementation(libs.mockwebserver)
+    androidTestImplementation(libs.androidx.runner)
+    androidTestImplementation(libs.androidx.junit)
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.robolectric)

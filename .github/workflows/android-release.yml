@@ -1,9 +1,9 @@
-name: AlienFlow2 Android release candidate
+name: AlienFlow chat verified Termux repair
 
 on:
   workflow_dispatch:
   push:
-    branches: [AlienFlow2]
+    branches: ['AlienFlow(chat)']
     paths:
       - 'app/**'
       - 'artwork/**'
@@ -35,6 +35,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Set up Java 17
         uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165
         with:
@@ -51,19 +52,36 @@ jobs:
         run: |
           set -euo pipefail
           "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --channel=0 "platforms;android-${COMPILE_SDK}" "build-tools;${BUILD_TOOLS_VERSION}"
+      - name: Reproduce the shipped 0.1.17 Termux regression
+        run: python3 scripts/prove_termux_regression.py
       - name: Unit tests, release lint, and unsigned release
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p build/ci
           bash gradlew --no-daemon --no-configuration-cache --console=plain --stacktrace \
-            :app:testDebugUnitTest :app:lintRelease :app:assembleRelease 2>&1 | tee build/ci/gradle.log
+            :app:testDebugUnitTest :app:lintRelease :app:assembleRelease :app:assembleDebug :app:assembleDebugAndroidTest 2>&1 | tee build/ci/gradle.log
+      - name: Exercise real installed Termux on Android 16 emulator
+        run: bash scripts/test_installed_termux.sh
       - name: Verify release and prepare delivery bundle
         run: python3 scripts/package_release.py
       - name: Upload single delivery ZIP
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          path: build/delivery/AlienFlow-0.1.18-unsigned-release-bundle.zip
+          path: build/delivery/AlienFlow-0.1.18-chat.1-unsigned-release-bundle.zip
           archive: false
           if-no-files-found: error
           retention-days: 14
+
+      - name: Preserve actual regression and device evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: alienflow-chat-test-evidence
+          path: |
+            build/termux-baseline
+            build/installed-termux
+            build/ci
+            app/build/test-results
+          if-no-files-found: warn
+          retention-days: 7

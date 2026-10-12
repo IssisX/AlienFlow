@@ -15,8 +15,8 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = "io.github.issisx.alienflow"
-VERSION_CODE = 19
-VERSION_NAME = "0.1.18"
+VERSION_CODE = 20
+VERSION_NAME = "0.1.18-chat.1"
 MIN_SDK = 33
 TARGET_SDK = 36
 BUILD_TOOLS = "36.0.0"
@@ -67,7 +67,7 @@ def main() -> None:
     if bundle.exists():
         shutil.rmtree(bundle)
     (bundle / "reports").mkdir(parents=True)
-    apk = bundle / "AlienFlow-0.1.18-unsigned.apk"
+    apk = bundle / "AlienFlow-0.1.18-chat.1-unsigned.apk"
     run(str(tools / "zipalign"), "-P", "16", "-f", "4", str(raw_apk), str(apk))
     run(str(tools / "zipalign"), "-c", "-P", "16", "4", str(apk))
 
@@ -140,6 +140,17 @@ def main() -> None:
     require(lint_errors == 0, "Release lint reports errors")
 
     reports = bundle / "reports"
+    # These are mandatory changed-path checks, not optional screenshots.
+    reproduction = json.loads((ROOT / "build/termux-baseline/reproduction.json").read_text())
+    require(reproduction["baseline_sha"] == "7ebe095bfaa83456690b46d8934c0cad2590a94a", "Wrong regression baseline")
+    require(reproduction["candidate_sha"] == source_sha, "Regression candidate SHA mismatch")
+    require(reproduction["actual_failed_cases"] == reproduction["expected_failed_cases"] and reproduction["errors"] == 0,
+            "Baseline did not reproduce the specified Termux failures")
+    installed = json.loads((ROOT / "build/installed-termux/termux-proof/result.json").read_text())
+    require(installed["source"] == source_sha and installed["real_terminal_echo"] and installed["final_count"] == 1,
+            "Actual installed-Termux editor test missing or failed")
+    shutil.copytree(ROOT / "build/termux-baseline", reports / "termux-baseline")
+    shutil.copytree(ROOT / "build/installed-termux/termux-proof", reports / "installed-termux")
     shutil.copytree(ROOT / "app/build/test-results/testDebugUnitTest", reports / "unit-test-xml")
     shutil.copytree(ROOT / "app/build/reports/tests/testDebugUnitTest", reports / "unit-tests")
     ui_proof = ROOT / "app/build/reports/ui-proof"
@@ -151,7 +162,7 @@ def main() -> None:
         "Actual activity render evidence is missing",
     )
     for screen in ("settings", "bubble-settings", "dictation-settings", "privacy-settings", "history", "settings-small-large-text", "language-small-large-text", "bubble-small-large-text", "settings-unfolded"):
-        require((ui_proof / f"{screen}-{VERSION_NAME}.png").is_file(), f"Native {screen} render evidence is missing")
+        require((ui_proof / f"{screen}-0.1.18.png").is_file(), f"Native {screen} render evidence is missing")
     shutil.copytree(ui_proof, reports / "ui-proof")
     for report in (ROOT / "app/build/reports").glob("lint-results-release.*"):
         shutil.copy2(report, reports / report.name)
@@ -168,7 +179,7 @@ def main() -> None:
         f"Unit tests: {tests}; failures: {failures}; errors: {errors}; skipped: {skipped}\n"
         f"Release lint: {len(issues)} issues; errors/fatal: {lint_errors}\n"
         "Gradle gates: :app:testDebugUnitTest :app:lintRelease :app:assembleRelease succeeded.\n"
-        "Device, microphone, provider account, and editor behavior have not been validated by CI.\n"
+        "Termux editor verified on API36 emulator with injected transcript events; physical phone, microphone and provider not tested.\n"
     )
 
     tooling = bundle / "tooling"
@@ -186,9 +197,9 @@ def main() -> None:
         "The APK is deliberately unsigned. Never generate or store a private key in this bundle or repository.\n"
         "With Java 17, sign a COPY using an existing private keystore stored outside the repository:\n"
         "java -jar tooling/apksigner.jar sign --ks /private/path/release.jks --ks-key-alias alienflow "
-        "--out AlienFlow-0.1.18.apk AlienFlow-0.1.18-unsigned.apk\n"
+        "--out AlienFlow-0.1.18-chat.1.apk AlienFlow-0.1.18-chat.1-unsigned.apk\n"
         "Omit password options to use the private interactive password prompt.\n"
-        "java -jar tooling/apksigner.jar verify --verbose --print-certs AlienFlow-0.1.18.apk\n"
+        "java -jar tooling/apksigner.jar verify --verbose --print-certs AlienFlow-0.1.18-chat.1.apk\n"
     )
 
     versions = tomllib.loads((ROOT / "gradle/libs.versions.toml").read_text())["versions"]
@@ -225,9 +236,11 @@ def main() -> None:
             "failures": failures,
             "errors": errors,
             "skipped": skipped,
-            "device_tests": "not run",
+            "device_tests": "Installed Termux on API36 emulator; transcript fixtures, no physical microphone/provider",
         },
         "lint": {"issues": len(issues), "errors": lint_errors},
+        "baseline_reproduction": reproduction,
+        "installed_termux": installed,
         "sha256": {
             str(path.relative_to(bundle)): sha256(path)
             for path in sorted(bundle.rglob("*"))
@@ -236,7 +249,7 @@ def main() -> None:
     }
     (bundle / "build-info.json").write_text(json.dumps(info, indent=2) + "\n")
 
-    zip_path = delivery / "AlienFlow-0.1.18-unsigned-release-bundle.zip"
+    zip_path = delivery / "AlienFlow-0.1.18-chat.1-unsigned-release-bundle.zip"
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
         for path in sorted(bundle.rglob("*")):
             if path.is_file():
