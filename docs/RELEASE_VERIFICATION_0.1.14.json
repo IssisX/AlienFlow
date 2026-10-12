@@ -1,0 +1,96 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version": "0.1.14",
+  "version_code": 15,
+  "branch": "AlienFlow2",
+  "compiled_source_sha": "a17771d4f06a0ac13b9fb5bcd63064f6c3d1ab4c",
+  "compiled_tree_sha": "eea153129e8c04613fefb6a3f0380e05a7762cc0",
+  "workflow_run": "https://github.com/IssisX/AlienFlow/actions/runs/38290252853",
+  "artifact_id": 11765106843,
+  "unsigned_bundle_sha256": "ee43b96d9d6ef0ac2d3ed78ae91f321e37719e8f23022a0c3bc018017848fee7",
+  "member_hashes_verified": 106,
+  "tests": {
+    "executed": 150,
+    "total": 150,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "not run"
+  },
+  "lint": {
+    "issues": 38,
+    "errors": 0
+  },
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.14.apk",
+    "size_bytes": 4507601,
+    "sha256": "b129af3afd2a0c031628402d5b058fc4812dbb8ce95378f26eb1599f826cb56b",
+    "signature_scheme": "APK v3",
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "payload_entries_unchanged": 25
+  },
+  "changed_path_suites": [
+    {
+      "name": "io.github.issisx.alienflow.EditorBridgeNodeRouteTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.EditorSynchronizationTest",
+      "tests": "9",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.EditorFocusDiscoveryTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.EditorEvidenceTest",
+      "tests": "14",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.NodeEditorWriterTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "observations": "Owner reports malformed prompt-like text inside the target field; supplied screenshot shows AF-E01 while ChatGPT composer has a cursor and keyboard. Exact phrase provenance and installed editor metadata are not captured.",
+  "supported_repairs": [
+    "Empty editor capability gate no longer requires a selection action that native EditText omits while empty.",
+    "Virtual discovery traverses only the uniquely input-focused application window, requiring a unique focused eligible visible enabled field.",
+    "No blanket node reconstruction of existing drafts. Node updates require an initially empty and fully dictation-owned field.",
+    "Misreported hint requires explicit metadata and independent empty keyboard contents. Real typed text equal to a hint is preserved.",
+    "Keyboard reads cover actual/proposed field lengths; matching observations succeed immediately within a deadline compatible with platform IPC."
+  ],
+  "initial_gate_failure": {
+    "source": "74e1730ffb7c769fa4fd692bfa8efe7fba356f9f",
+    "run": "https://github.com/IssisX/AlienFlow/actions/runs/38289504735",
+    "total_tests": 149,
+    "failures": 2,
+    "classification": "Introduced capability assumption: requiring selection actions from empty native editors. The actual native action-list check and cold bridge test exposed it; production gate corrected, native test now asserts the observed empty-field action set."
+  },
+  "scope": "Robolectric SDK 35: production service/bridge/resolver, actual native text widgets and native InputConnection. Remote accessibility node/window/keyboard IPC and OS focus delivery are explicitly simulated. Pure ordering tests use virtual coroutine time.",
+  "device_verification": "Not performed. Installed ChatGPT composer, physical Fold6 transitions, the exact original malformed phrase and provider/microphone behavior still require phone acceptance.",
+  "preserved": [
+    "Approved silver interface and pinned live preview",
+    "Existing preference keys and selected keyboard",
+    "Nonfocusable overlay and protected inputs",
+    "Single coordinator/editor writer, guarded ownership, no field submission",
+    "Startup buffering, minimal transcription delay and light readiness haptics",
+    "Termux single final insertion",
+    "Existing signing certificate and application identity"
+  ],
+  "delivery": "Signed installable APK saved successfully; local identity applied; bytes/hash unchanged after save."
+}
