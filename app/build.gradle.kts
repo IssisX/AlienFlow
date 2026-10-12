@@ -21,7 +21,7 @@ abstract class PrepareApprovedAlien : DefaultTask() {
         check(ordered.map { it.name } == (0..7).map { "%02d.b64".format(it) })
         val bytes = Base64.getDecoder().decode(ordered.joinToString("") { it.readText().trim() })
         val sha = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-        check(sha == "8850ac9bbd07c876ba00e5b4339d1b126a14d631194b07379dde0ac676888940") {
+        check(sha == "48d0ce0aacba2fd4264100fb1af1b6a73f54290f6c5296f4adc07d3974a50671") {
             "Approved artwork checksum mismatch"
         }
         val target = outputDirectory.file("drawable/alien_approved.webp").get().asFile
@@ -46,8 +46,8 @@ android {
         applicationId = "io.github.issisx.alienflow"
         minSdk = 33
         targetSdk = 36
-        versionCode = 9
-        versionName = "0.1.8"
+        versionCode = 10
+        versionName = "0.1.9"
         buildConfigField("String", "SOURCE_REVISION", "\"${System.getenv("GITHUB_SHA") ?: "local-unversioned"}\"")
     }
     buildFeatures { buildConfig = true }

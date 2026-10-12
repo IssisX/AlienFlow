@@ -557,3 +557,8 @@ Sources were checked on 10 October 2026. Product requirements and proposed archi
 - **S23.** GitHub Actions, [upload-artifact](https://github.com/actions/upload-artifact).
 - **S24.** OpenAI, [Create a Realtime client secret](https://developers.openai.com/api/reference/resources/realtime/subresources/client_secrets/methods/create).
 - **S25.** AOSP, [Finish ordinary composing text when accessibility input commits](https://android.googlesource.com/platform/frameworks/base/+/d92f3fca7402f54ae59b8fc4a450878332009531%5E%21/).
+
+
+## Owner amendment — 2026-10-12 / AlienFlow2 0.1.9
+
+0.1.8 live dictation is owner-confirmed. Termux support is mandatory. The Termux terminal adapter keeps the existing keyboard and inserts finalized corrected text once after Stop, because terminal input cannot safely use a document-span replacement protocol. Terminal control characters become spaces; AlienFlow never submits a command. Ordinary document fields retain live text and correction behavior. Quiet successful completion replaces the technical notice beside the bubble. The brand mark is redesigned with a silver alien and dual light/dark border for visibility on either background. These changes do not certify Google Play release readiness.

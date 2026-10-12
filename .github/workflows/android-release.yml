@@ -3,7 +3,7 @@ name: Android release candidate
 on:
   workflow_dispatch:
   push:
-    branches: [build/first-apk]
+    branches: [build/first-apk, AlienFlow2]
     paths:
       - 'app/**'
       - 'artwork/**'
@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: alienflow-first-apk
+  group: alienflow-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -63,7 +63,7 @@ jobs:
       - name: Upload single delivery ZIP
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          path: build/delivery/AlienFlow-0.1.8-unsigned-release-bundle.zip
+          path: build/delivery/AlienFlow-0.1.9-unsigned-release-bundle.zip
           archive: false
           if-no-files-found: error
           retention-days: 14

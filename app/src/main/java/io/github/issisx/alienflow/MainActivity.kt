@@ -50,6 +50,7 @@ class MainActivity : Activity() {
         button(screen, "Allow microphone & notifications") { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS), 1) }
         button(screen, "Enable AlienFlow accessibility") { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
         text(screen, "Accessibility lets the alien edit the focused input. Password fields are excluded. Live insertion stops if focus, selection or text changes unexpectedly.")
+        text(screen, "Termux is supported with your existing keyboard. Its corrected text inserts when you stop. Enter stays under your control.")
         title(screen, "3 · Try your first dictation")
         val test = EditText(this).apply { hint = "Tap here, then tap the alien or Start below"; setTextColor(white); setHintTextColor(Color.GRAY); minLines = 3; gravity = android.view.Gravity.TOP; inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES }
         screen.addView(test)

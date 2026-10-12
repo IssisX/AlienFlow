@@ -15,6 +15,9 @@ class EditorBridge(private val service: AlienAccessibilityService) {
     private var ownership: EditorOwnership? = null
     private var first = true
     private var detachedSnapshot: EditorSnapshot? = null
+    var isTerminal = false; private set
+    private var terminalInsertion: TerminalInsertion? = null
+    private var terminalFieldId = 0
     var lastError = ""; private set
     private val app get() = service.application as AlienApp
 
@@ -28,11 +31,32 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         return node.isPassword || password(node.inputType) || password(service.inputMethod?.currentInputEditorInfo?.inputType ?: 0)
     }
     fun focused(): AccessibilityNodeInfo? = service.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-        ?.takeIf { it.isEditable && !isProtected(it) }
+        ?.takeIf { (it.isEditable || terminalNode(it)) && !isProtected(it) }
+
+    private fun terminalNode(target: AccessibilityNodeInfo): Boolean = TerminalDictation.supported(
+        target.className?.toString(), target.packageName?.toString(),
+        service.inputMethod?.currentInputEditorInfo?.packageName,
+        service.inputMethod?.currentInputEditorInfo?.inputType ?: -1)
+
+    private fun terminalValid(): Boolean {
+        val target = node ?: return false
+        return app.screenReady() && target.refresh() && focused() == target && terminalNode(target) &&
+            service.inputMethod?.currentInputEditorInfo?.fieldId == terminalFieldId &&
+            service.inputMethod?.currentInputConnection != null
+    }
 
     fun begin(): Boolean {
         generation++; writeSequence++; ownership = null; first = true; lastError = ""
+        isTerminal = false; terminalInsertion = null
         node = focused() ?: return fail("[AF-E01] Tap inside a text box first. Password fields are excluded")
+        if (terminalNode(node!!)) {
+            if (service.inputMethod?.currentInputConnection == null)
+                return fail("[AF-E04] Tap the Termux terminal to attach its keyboard")
+            isTerminal = true
+            terminalFieldId = service.inputMethod?.currentInputEditorInfo?.fieldId ?: 0
+            terminalInsertion = TerminalInsertion()
+            return true
+        }
         val snapshot = snapshotNode() ?: return false
         if (service.inputMethod?.currentInputConnection == null) {
             return fail("[AF-E04] Android has not attached the keyboard connection; tap the text box again")
@@ -70,12 +94,27 @@ class EditorBridge(private val service: AlienAccessibilityService) {
     } == true
 
     fun valid(): Boolean {
+        if (isTerminal) return terminalInsertion != null && terminalValid()
         val owner = ownership ?: return false
         val snapshot = snapshotNode() ?: return false
         return if (first) owner.canFirstWrite(snapshot) else owner.matches(snapshot)
     }
 
-    fun write(value: String, completion: (Boolean) -> Unit) = writeOwned(value, false, completion)
+    fun write(value: String, completion: (Boolean) -> Unit) {
+        if (!isTerminal) { writeOwned(value, false, completion); return }
+        if (!app.coordinator.finishing || app.coordinator.active) { completion(false); return }
+        try {
+            val connection = service.inputMethod?.currentInputConnection
+            val ok = terminalInsertion?.send(value, connection != null && terminalValid()) {
+                connection!!.commitText(it, 1, null)
+            } == true
+            if (!ok) fail("[AF-T01] Termux focus changed; text is saved in AlienFlow")
+            completion(ok)
+        } catch (_: Exception) {
+            fail("[AF-T02] Termux input could not be confirmed; text is saved in AlienFlow")
+            completion(false)
+        }
+    }
 
     private fun writeOwned(value: String, restoring: Boolean, completion: (Boolean) -> Unit) {
         val owner = ownership ?: return completion(false)
@@ -147,6 +186,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         }
     }
     fun cancel(completion: (Boolean) -> Unit) {
+        if (isTerminal) { completion(terminalInsertion?.sent != true); return }
         val owner = ownership ?: return completion(false)
         if (first) { completion(true); return }
         if (!valid()) { owner.invalidate(); completion(false); return }
@@ -154,7 +194,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
     }
     fun detachForCapture() { invalidate(); detachedSnapshot = snapshotNode() }
     fun detachedTargetUnchanged() = detachedSnapshot?.let { it == snapshotNode() } == true
-    fun invalidate() { generation++; writeSequence++; ownership?.invalidate() }
+    fun invalidate() { generation++; writeSequence++; ownership?.invalidate(); terminalInsertion = null }
     private fun rejected(reason: String): EditorSnapshot? { fail(reason); return null }
     private fun fail(reason: String): Boolean {
         lastError = reason

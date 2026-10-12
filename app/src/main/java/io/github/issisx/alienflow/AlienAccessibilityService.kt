@@ -73,6 +73,8 @@ class AlienAccessibilityService : AccessibilityService() {
     /** Non-touchable feedback is visible in the app the owner is dictating into. */
     fun presentStatus(message: String) {
         if (!::wm.isInitialized || bubble?.isAttachedToWindow != true) return
+        val feedback = CompletionFeedback.bubble(message)
+        if (feedback == null) { clearStatusNotice(); return }
         handler.removeCallbacks(hideStatusNotice)
         val label = statusNotice ?: TextView(this).apply {
             setTextColor(Color.rgb(230, 235, 241))
@@ -85,7 +87,7 @@ class AlienAccessibilityService : AccessibilityService() {
                 setStroke(dp(1), Color.rgb(126, 139, 154))
             }
         }
-        label.text = message
+        label.text = feedback
         val system = wm.currentWindowMetrics.windowInsets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
         val noticeWidth = dp(280).coerceAtMost((bounds().width() - system.left - system.right).coerceAtLeast(1))
         val noticeBottom = max(safeTop + 1, bounds().height() - imeBottom - safeBottom)

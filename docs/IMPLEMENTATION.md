@@ -1,27 +1,28 @@
-# AlienFlow implementation checkpoint — 0.1.8
+# AlienFlow2 implementation checkpoint — 0.1.9
 
-Repository: IssisX/AlienFlow. Target branch: build/first-apk. Baseline: 768f46e5b63637dd74bf2edaaad746f6607aef8b. Date: 2026-10-12.
+Repository: IssisX/AlienFlow. Branch: AlienFlow2. Base: 1f5fe9693e030e45155e1ec54de0c67baa8ee1f4. Date: 2026-10-12.
 
-The complete prior 0.1.7 checkpoint is preserved at [history/IMPLEMENTATION_0.1.7.md](history/IMPLEMENTATION_0.1.7.md). Product requirements and runtime evidence are separate.
+## Owner-observed baseline
 
-## Observed failure
+The owner confirmed that 0.1.8 works on the Fold6. Preserve its AudioRecord capture, transcription-intent WebSocket, live ordinary-editor insertion, light corrections, selected keyboard, encrypted key and existing recovery/history formats. The previous implementation checkpoint is retained at history/IMPLEMENTATION_0.1.8.md. The concurrent build/first-apk branch is untouched.
 
-After updating to 0.1.7 the owner supplied two screenshots. Saved-recording recovery had successfully recognized a deliberately dictated short phrase. Another screenshot showed a transient notice ending in “No microphone audio captured”; the beginning of that notice is cropped. This proves saved WAV recovery works but does not establish the initiating live failure code.
+## Requested changes
 
-## Concrete code defect and repair
+- Quiet successful completion: remove the routine completion notice beside the alien. An unavailable editor uses a brief plain-language message; genuine connection failures retain their details in Diagnostics. A final transcript already confirmed in the editor remains delivered even if edit authority is later revoked.
+- Termux: the bubble also recognizes Termux's focused non-editable terminal View with its TYPE_NULL keyboard connection. The terminal adapter inserts corrected text once, after Stop and completion, through Android's accessibility InputConnection. It neither moves the terminal cursor nor deletes existing terminal input. No Enter, newline, Escape, Tab or other control characters are emitted. Control characters in recognized formatting become spaces. This is a terminal-specific adaptation, not a change to live document editing. No silent retries follow uncertain commits, and target changes prevent insertion.
+- Brand icon: a newly generated silver alien in a navy circular badge, with dark outer and light inner borders. The asset is used for both bubble and launcher, retains 75% default idle opacity, and is visually inspected at small sizes on white and dark backgrounds. Packaged asset SHA-256: 48d0ce0aacba2fd4264100fb1af1b6a73f54290f6c5296f4adc07d3974a50671.
+- Release identity: 0.1.9, versionCode 10, same application ID and existing permanent signing certificate. CI runs independently per branch, so the other model's workflow is not canceled or blocked by a shared concurrency group.
 
-The 0.1.6 WebSocket replacement used `wss://api.openai.com/v1/realtime?model=gpt-live-transcribe`, erroneously treating a transcription-only model as a conversational Realtime model in the URL. The official OpenAI Node SDK uses `intent=transcription` for transcription-only connections and specifies the transcription model inside the session configuration. See [current primary-source research](RESEARCH_2026-10-12_LIVE_HANDSHAKE.md). This is a concrete routing bug, but the cropped screenshot does not prove it was the only reason for the owner's stop.
+## Evidence and limits
 
-0.1.8 introduces RealtimeHandshake so both normal dictation and the explicit key/model check use the same transcription-intent WebSocket and `session.update`. The explicit check waits for an acknowledged transcription session and selected model and then closes before audio capture. A mere key acceptance, HTTP upgrade or session-created notification no longer counts as passing. The one Android AudioRecord input path is unchanged.
+Termux's primary TerminalView source (blob f4f82ad7c51efd95db914f26d39dc6a535a2f7e4) creates a BaseInputConnection, consumes commitText into the terminal and clears its Editable. Ordinary document-span corroboration cannot work against that empty IME buffer. The new regression fixture exercises Android BaseInputConnection with those documented consume-and-clear semantics; it is not installed-Termux proof.
 
-Early HTTP upgrade failures are recorded even when they arrive before onOpen or newWebSocket returns. Connection generation ownership prevents a failed socket from reviving. Only bounded typed failure metadata (HTTP status, code, type, param, request ID) enters the private diagnostic; never arbitrary server error messages, keys, dictated text or audio.
+Primary references:
+- https://github.com/termux/termux-app/blob/master/terminal-view/src/main/java/com/termux/view/TerminalView.java
+- https://developer.android.com/reference/android/accessibilityservice/InputMethod.AccessibilityInputConnection
 
-Overlay failure notices measure their actual height and stay within the usable screen bounds above the keyboard; their complete metadata remains copyable in Diagnostics. The approved Gray art, 75% default opacity, encrypted key, recovery WAV/history formats, guarded editor, package identity and signing certificate are preserved.
+Required release checks: unit tests, release lint, APK packaging, exact compiled revision, artwork hash, unchanged package ID and matching installed certificate. Actual Termux visibility/insertion, final caption behavior and the new icon on the physical Fold6 still require a device observation. The owner's 0.1.8 live dictation confirmation is baseline evidence, not proof of these new changes.
 
-## Verification boundary
+## Phone check
 
-At the initial source checkpoint, regression tests exercise actual OkHttp WebSocket upgrades/frames against local MockWebServer, the production transport's synchronous failure race, and error notice placement. The real provider and hardware are not mocked into a claimed acceptance pass. Complete CI compilation/tests, release lint and artifact verification are required before signing. Record outcomes against the exact compiled SHA.
-
-## Fold6 acceptance still pending
-
-Install 0.1.8 (versionCode 9) over 0.1.7 without clearing data. First run Check key & transcription model: it must say live connection accepted after acknowledged configuration, not just token issuance. Focus a text field with Gboard, tap the alien, speak and observe live words, pause for a completed turn, then stop and confirm microphone release. If it fails, copy Diagnostics immediately and capture the fresh AF-N01 code/param; old WebRTC history may still appear. Passing GitHub tests is NOT physical-device proof.
+Install over 0.1.8 without clearing data. Open Termux, tap its terminal with Gboard visible, tap the alien, speak, Stop, and verify the words arrive once without submitting the line. Repeat in an ordinary text field: confirm live insertion, corrections and quiet completion. If the target changes, the transcript must be retained rather than inserted into another app.

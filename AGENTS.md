@@ -1,6 +1,8 @@
 # AlienFlow implementation contract
 
-Repository: IssisX/AlienFlow. Working branch: build/first-apk. Application ID: io.github.issisx.alienflow.
+Repository: IssisX/AlienFlow. Working branch for this checkout: AlienFlow2. Application ID: io.github.issisx.alienflow.
+
+- AlienFlow2 is the owner's isolated takeover branch. Preserve the concurrent build/first-apk branch; do not merge, reset, or write to it.
 
 Read docs/PRODUCT_SPEC.md for the product requirements and docs/IMPLEMENTATION.md for actual implementation/evidence status. Requirements are not runtime evidence.
 

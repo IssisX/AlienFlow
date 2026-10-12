@@ -54,6 +54,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     private var liveFailed = false
     /** Captured before finish so a real rejection is never masked by the recovery banner. */
     private var terminalReason: String? = null
+    private var terminalTarget = false
     private fun update(value: String? = null) {
         val changed = value != null && value != status
         if (value != null) status = value
@@ -77,7 +78,8 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         app.crashJournal.mark("editor.begin")
         if (!bridge.begin()) { update(bridge.lastError); return }
         app.crashJournal.mark("editor.ready")
-        displayLive = store.prefs.getBoolean("live_display", true); cleanLive = store.prefs.getBoolean("live_cleanup", true); correctionMode = store.mode(); fillersEnabled = store.prefs.getBoolean("fillers", false); continueLocal = store.prefs.getBoolean("continue_local", true)
+        terminalTarget = bridge.isTerminal
+        displayLive = store.prefs.getBoolean("live_display", true) && !terminalTarget; cleanLive = store.prefs.getBoolean("live_cleanup", true); correctionMode = store.mode(); fillersEnabled = store.prefs.getBoolean("fillers", false); continueLocal = store.prefs.getBoolean("continue_local", true)
         session++; ledger = TranscriptLedger(); original = ""; result = ""; desired = ""; lastWritten = ""
         saved = false; liveFailed = false; terminalReason = null; microphoneConfirmed = false; interrupted = false; finalizing = false; audioClosing = false; corrections.clear(); cleaned.clear(); writing = false; commits = 0; completeItems.clear(); committedItems.clear(); seenErrors.clear(); editor = bridge; captureTarget = bridge
         active = true; finishing = false; update("Starting microphone and realtime connection…")
@@ -138,7 +140,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
             detachInlineEditor()
         }
     }
-    override fun captured() { app.crashJournal.mark("microphone.frames"); microphoneConfirmed = true; if (active) update("Listening • tap the alien to stop") }
+    override fun captured() { app.crashJournal.mark("microphone.frames"); microphoneConfirmed = true; if (active) update(if (terminalTarget) "Listening • Termux text inserts when you stop" else "Listening • tap the alien to stop") }
     override fun turnCommitted() { commits++ }
     override fun event(value: JSONObject) {
         if (!active && !finishing) return
@@ -200,7 +202,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                     // still must match. A completion never doubles an earlier provisional span.
                     if (session == token && ledger.finals().any { it.first == item && it.second == source }) {
                         corrections[item] = output; result = ledger.displayed(corrections); desired = result
-                        if (displayLive || finishing) pumpWrite()
+                        if (displayLive || (finishing && !terminalTarget)) pumpWrite()
                         update()
                     }
                 }
@@ -237,9 +239,11 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         finalizing = true; active = false; finishing = true
         transport?.close(); transport = null; CaptureService.instance?.stopSelf()
         val captured = audio; val token = session; val source = original.ifBlank { ledger.text() }; val finalText = result
-        val retainAudio = keepAudio || (liveFailed && store.prefs.getInt("retention", 7) == -1)
         val reason = terminalReason
-        val outcome = if (retainAudio) "Incomplete • audio pending" else if (liveFailed) "Preserved • live insertion failed" else "Completed"
+        val delivered = CompletionFeedback.inlineDelivered(finalText, lastWritten)
+        val insertionFailed = liveFailed && !delivered
+        val retainAudio = keepAudio || (insertionFailed && store.prefs.getInt("retention", 7) == -1)
+        val outcome = if (retainAudio) "Incomplete • audio pending" else if (terminalTarget && delivered) "Sent to Termux" else if (insertionFailed) "Preserved • live insertion failed" else "Completed"
         finalizationJob = io.launch {
             var storageOk = false
             var audioDeleteFailed = false
@@ -268,7 +272,8 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                         reason != null -> "$reason • $recoveryLabel"
                         audioDeleteFailed -> "Result saved, but audio deletion failed; discard it in pending recovery"
                         retainAudio -> if (hasSpeechFile) "Stopped • audio saved for recovery" else "Stopped • no microphone audio captured"
-                        liveFailed -> "Result saved • inline editing unavailable; copy the transcript"
+                        insertionFailed -> "Result saved • inline editing unavailable; copy the transcript"
+                        terminalTarget && delivered -> "Sent to Termux • press Enter yourself"
                         else -> "Complete • ready for another dictation"
                     })
                     if (storageOk && keepAudio && interrupted && captured != null && continueLocal) recover(captured.file)

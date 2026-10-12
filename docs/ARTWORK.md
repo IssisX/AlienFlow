@@ -1,9 +1,7 @@
-# Approved Gray alien asset
+# AlienFlow2 brand asset
 
-The owner approved the generated image in this conversation. It is used without a redesign or a replacement face.
+0.1.9 uses an original imagegen asset produced for the owner's requested commercial icon redesign: a luminous silver alien on navy, encircled by dark outer and white inner borders, transparent outside the badge. It is packaged losslessly at 256 pixels from the generated original. SHA-256: 48d0ce0aacba2fd4264100fb1af1b6a73f54290f6c5296f4adc07d3974a50671. The eight base64 source parts are authoritative; the Gradle generator validates their order and decoded hash. Launcher and bubble consume the same generated resource.
 
-Original: menacing_metallic_alien_head_icon.png, 1254 × 1254 RGBA. SHA-256: 8ea348a1821cfeb4f33f39fed849a593cb14808c7623ce2dcfafaed4daed2305.
-Packaged derivative: generated drawable/alien_approved.webp, 192 × 192, Lanczos downsample and WebP quality 86. SHA-256: 8850ac9bbd07c876ba00e5b4339d1b126a14d631194b07379dde0ac676888940.
-The only transformations are size reduction and asset encoding. Both the floating bubble and launcher reference this drawable. The original remains attached to the conversation.
+Prompt: Create one premium Android speech-to-text icon: a bold circular badge with charcoal outer and pearl inner border, navy disc, luminous silver-gray alien with black almond eyes, calm confident expression and restrained cyan accents; crisp geometry and legibility at 32 dp; transparent exterior, no text or watermark.
 
-The derivative is stored as eight ordered base64 source fragments under artwork/approved-gray for verified connector transport. The per-variant Gradle PrepareApprovedAlien task joins and decodes them, verifies the complete image SHA-256, and writes the generated Android drawable before resource processing. The fragments are one encoded asset, not runtime state. No image is downloaded at runtime; no substitute image is built.
+Small-size inspection on dark and white backgrounds passed. Physical-device appearance remains untested. The owner requested replacing the prior approved-gray visual; the directory name is retained to avoid unrelated asset-pipeline migration.
