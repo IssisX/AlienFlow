@@ -1,4 +1,4 @@
-name: Source handoff for diagnostic repair
+name: Source handoff for live-transcription repair
 on:
   workflow_dispatch:
   push:
