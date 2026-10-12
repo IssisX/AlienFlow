@@ -151,6 +151,15 @@ class SettingsNavigationTest {
             assertEquals("Fixture draft from home", (tagged(activity, "practice") as EditText).text.toString())
         }
     }
+    @Test fun resumingHomeKeepsTheSameEditorAndItsDraft() {
+        Robolectric.buildActivity(MainActivity::class.java).setup().use { controller ->
+            val field = tagged(controller.get(), "practice") as EditText
+            field.setText("Fixture editor ownership"); field.requestFocus()
+            controller.pause().resume()
+            assertSame("Resume must not replace a focused dictation editor", field, tagged(controller.get(), "practice"))
+            assertEquals("Fixture editor ownership", field.text.toString())
+        }
+    }
     @Test @Config(qualifiers = "w360dp-h800dp-xhdpi")
     fun settingsRemainReachableOnSmallPhoneWithLargerText() {
         Robolectric.buildActivity(MainActivity::class.java).setup().use { controller ->

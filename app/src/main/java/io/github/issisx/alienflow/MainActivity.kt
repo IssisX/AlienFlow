@@ -59,6 +59,9 @@ class MainActivity : Activity() {
     private var recoveryRow: TextView? = null
     private var recoverySignature = ""
     private var accountKeyState: TextView? = null
+    private var setupCard: LinearLayout? = null
+    private var microphoneState: TextView? = null
+    private var accessibilityState: TextView? = null
     private val back = OnBackInvokedCallback { goBack() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -104,10 +107,12 @@ class MainActivity : Activity() {
     }
     override fun onResume() {
         super.onResume()
-        app.coordinator.listener = { renderStatus(); refreshHistory(); refreshRecovery() }
-        renderStatus(); refreshHistory(); refreshRecovery()
-        // Permissions/accessibility can change in Android Settings without recreating us.
-        if (page == Page.ACCOUNT || page == Page.HOME) { rememberPage(); renderPage() }
+        app.coordinator.listener = {
+            renderStatus()
+            if (!app.coordinator.active && !app.coordinator.finishing) refreshHistory()
+            refreshRecovery()
+        }
+        renderStatus(); refreshHistory(); refreshRecovery(); refreshSetup()
     }
     override fun onPause() { app.coordinator.listener = null; super.onPause() }
     override fun onSaveInstanceState(outState: Bundle) {
@@ -146,6 +151,7 @@ class MainActivity : Activity() {
         host.removeAllViews()
         status = null; resultPreview = null; record = null; cancel = null; test = null
         historyList = null; historyAdapter = null; historySummary = null; historyNotice = null; recoveryRow = null; accountKeyState = null; scroll = null
+        setupCard = null; microphoneState = null; accessibilityState = null
         val body = ui.column().apply { setPadding(ui.dp(22), ui.dp(16), ui.dp(22), ui.dp(24)); isFocusableInTouchMode = true }
         if (page == Page.HISTORY) {
             host.addView(body, FrameLayout.LayoutParams(-1, -1)); historyPage(body)
@@ -200,8 +206,8 @@ class MainActivity : Activity() {
         body.addView(brand, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = ui.dp(24) })
         ui.text(body, "Make room for\nyour words.", 32, bold = true)
         ui.text(body, "Speak naturally. Keep your keyboard.", 16, ui.muted).apply { setPadding(0, 0, 0, ui.dp(14)) }
-        if (!ready()) {
-            val setup = ui.card(body)
+        run {
+            val setup = ui.card(body).also { setupCard = it; it.visibility = if (ready()) View.GONE else View.VISIBLE }
             ui.text(setup, "A little setup. Then just speak.", 18, bold = true)
             ui.text(setup, "Connect your account and allow AlienFlow to hear you and place your words in a text field.", color = ui.muted)
             ui.button(setup, "Finish setup", primary = true) { open(Page.ACCOUNT) }
@@ -229,6 +235,11 @@ class MainActivity : Activity() {
         record?.isEnabled = !coordinator.finishing
         cancel?.visibility = if (coordinator.active || coordinator.finishing) View.VISIBLE else View.GONE
     }
+    private fun refreshSetup() {
+        setupCard?.visibility = if (ready()) View.GONE else View.VISIBLE
+        microphoneState?.text = if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) "Microphone allowed" else "Microphone access needed"
+        accessibilityState?.text = if (app.coordinator.service != null) "Accessibility connected" else "Accessibility needs to be enabled"
+    }
     private fun settings(body: LinearLayout) {
         heading(body, "Settings", "Make AlienFlow feel like you.", leaf = false)
         ui.row(body, "Floating alien", "Size, visibility and how you start dictation") { open(Page.BUBBLE) }
@@ -243,7 +254,7 @@ class MainActivity : Activity() {
         heading(body, "Floating alien", "A small companion that stays out of your way.")
         val appearance = ui.card(body)
         ui.text(appearance, "Appearance", 18, bold = true)
-        slider(appearance, "Size", "size", 32, 24, 64) { "$it dp" }
+        slider(appearance, "Size", "size", 32, 24, 64) { "${it * 100 / 32}%" }
         slider(appearance, "Visibility when idle", "opacity", BubbleOpacity.DEFAULT_IDLE_PERCENT, 10, 100) { "$it%" }
         slider(appearance, "Visibility while dictating", "active_opacity", 100, 50, 100) { "$it%" }
         ui.text(appearance, "Higher visibility makes the alien more solid. Lower visibility lets more of your screen show through.", 14, ui.muted)
@@ -336,15 +347,15 @@ class MainActivity : Activity() {
         ui.button(connection, "Remove saved key", destructive = true) { confirm("Remove your API key?", "You will need to add a key again to dictate. Saved transcripts stay on this phone.") { app.store.saveKey(""); accountKeyState?.text = "No API key saved"; key.setText("") } }
         val permissions = ui.card(body)
         ui.text(permissions, "Phone permissions", 18, bold = true)
-        ui.text(permissions, if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) "Microphone allowed" else "Microphone access needed", 14, ui.accent)
+        microphoneState = ui.text(permissions, if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) "Microphone allowed" else "Microphone access needed", 14, ui.accent)
         ui.button(permissions, "Allow microphone & notifications") { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS), 1) }
-        ui.text(permissions, if (app.coordinator.service != null) "Accessibility connected" else "Accessibility needs to be enabled", 14, ui.accent)
+        accessibilityState = ui.text(permissions, if (app.coordinator.service != null) "Accessibility connected" else "Accessibility needs to be enabled", 14, ui.accent)
         ui.text(permissions, "Accessibility lets the floating alien place text in the field you select while keeping your keyboard. Password fields are excluded. If you move or edit the field, recording continues and you can copy the result afterward.", 14, ui.muted)
         ui.button(permissions, "Open accessibility settings") { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
     }
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (page == Page.ACCOUNT || page == Page.HOME) { rememberPage(); renderPage() }
+        refreshSetup(); renderStatus()
     }
     private fun help(body: LinearLayout) {
         heading(body, "Help & about", "A few things worth knowing.")
@@ -381,7 +392,6 @@ class MainActivity : Activity() {
     private var entries = emptyList<JSONObject>()
     private fun refreshHistory() {
         if (page != Page.HISTORY) return
-        if (app.coordinator.active || app.coordinator.finishing) return
         try {
             entries = app.store.history()
             val period = when (val days = prefs.getInt("retention", 7)) { -1 -> "Saving is off"; 0 -> "Kept until you delete them"; 1 -> "Kept for 1 day"; else -> "Kept for $days days" }
