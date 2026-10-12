@@ -28,7 +28,7 @@ class RealtimeStartupFailureTest {
         override fun cancel() { cancelled = true }
     }
     @Test fun failureBeforeFactoryReturnsCannotBeIgnoredOrReviveTheSocket() {
-        val app = RuntimeEnvironment.getApplication<AlienApp>()
+        val app = (RuntimeEnvironment.getApplication() as AlienApp)
         val file = File(app.cacheDir, "never-captured-test.wav")
         val audio = PendingAudio(file)
         val failures = mutableListOf<String>()
