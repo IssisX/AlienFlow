@@ -181,7 +181,7 @@ class EditorBridgeNodeRouteTest {
             assertEquals(EditorWriteResult.FAILED, write(service, "hello"))
             assertEquals("abcdefghijklmnopqrstuvwxyXY", field!!.text.toString())
             assertTrue(committedTexts.isEmpty()); assertTrue(selections.isEmpty()); assertEquals(0, mutations)
-            val report = (service.application as AlienApp).crashJournal.report()!!
+            val report = (service.application as AlienApp).crashJournal.diagnostic()
             assertTrue(report, report.contains("evidence_code=10"))
             assertFalse(report.contains("abcdefghijklmnopqrstuvwxy"))
         }
