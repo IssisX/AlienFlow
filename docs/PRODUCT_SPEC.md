@@ -92,7 +92,7 @@ When configured to appear for active fields, the bubble stays visible through li
 
 ### 2.4 Interruptions and editing
 
-Focus changes, unexpected selection changes, manual typing, microphone interruptions, locking the screen, permission revocation, or service disconnection invalidate assumptions about the target field. Stop automatic replacement immediately, preserve the result or pending audio, and show a concise reason. A late response must not appear in the newly focused application.
+Manual typing and cursor movement must not pause capture, transcription, or detach dictation. Preserve keyboard edits in the same field and insert newly recognized speech at the current cursor without a restart tap. Previously dispatched speech becomes protected from late recognition/correction rewrites after a keyboard interaction. Serialize only conflicting Android composing transactions; keep the speech pipeline running and deliver queued words automatically as soon as the keyboard transaction allows a safe write. Focus changes, microphone interruptions, locking the screen, permission revocation, or service disconnection invalidate the target binding. A late response must not appear in a newly focused application.
 
 Default behavior on losing the active field is to stop capture and preserve unfinished work. Re-entering that field does not silently resume microphone capture or retrospective edits. A fresh tap starts a fresh dictation session.
 

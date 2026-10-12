@@ -29,6 +29,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     private var captureTarget: EditorBridge? = null
     private var finalizationJob: Job? = null
     private var writing = false
+    private var writeRetryScheduled = false
     private var desired = ""
     private var lastWritten = ""
     private var cleanup: Job? = null
@@ -88,7 +89,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         terminalTarget = bridge.isTerminal
         displayLive = store.prefs.getBoolean("live_display", true) && !terminalTarget; cleanLive = store.prefs.getBoolean("live_cleanup", true); correctionMode = store.mode(); fillersEnabled = store.prefs.getBoolean("fillers", false); continueLocal = store.prefs.getBoolean("continue_local", true)
         session++; ledger = TranscriptLedger(); original = ""; result = ""; desired = ""; lastWritten = ""
-        saved = false; liveFailed = false; userEdited = false; terminalReason = null; microphoneConfirmed = false; serverConnected = false; interrupted = false; finalizing = false; audioClosing = false; corrections.clear(); cleaned.clear(); writing = false; commits = 0; completeItems.clear(); committedItems.clear(); seenErrors.clear(); editor = bridge; captureTarget = bridge
+        saved = false; liveFailed = false; userEdited = false; terminalReason = null; microphoneConfirmed = false; serverConnected = false; interrupted = false; finalizing = false; audioClosing = false; corrections.clear(); cleaned.clear(); writing = false; writeRetryScheduled = false; commits = 0; completeItems.clear(); committedItems.clear(); seenErrors.clear(); editor = bridge; captureTarget = bridge
         active = true; finishing = false; update("Starting microphone and realtime connection…")
         app.crashJournal.mark("service.start-requested")
         try { app.startForegroundService(Intent(app, CaptureService::class.java).setAction(CaptureService.START)); app.crashJournal.mark("service.start-returned") }
@@ -132,7 +133,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
             if (interrupted) {
                 if (captureTarget != null && captureTarget?.detachedTargetUnchanged() != true) detachInlineEditor()
             } else if (InlineEditorContinuity.action(editor != null, writing,
-                    editor?.valid() == true) == InlineEditorContinuity.Action.DETACH) {
+                    editor?.sameTarget() == true) == InlineEditorContinuity.Action.DETACH) {
                 detachInlineEditor()
             }
             monitorTarget(token)
@@ -143,9 +144,10 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         if (interrupted) {
             if (captureTarget != null && captureTarget?.detachedTargetUnchanged() != true) detachInlineEditor()
         } else if (InlineEditorContinuity.action(editor != null, writing,
-                editor?.valid() == true) == InlineEditorContinuity.Action.DETACH) {
+                editor?.sameTarget() == true) == InlineEditorContinuity.Action.DETACH) {
             detachInlineEditor()
         }
+        if (!interrupted && !writing) pumpWrite()
     }
     override fun captured() {
         if (!active) return
@@ -206,12 +208,28 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         editor!!.write(proposed) { outcome ->
             if (token != session) return@write
             writing = false
+            userEdited = userEdited || editor?.hasUserInteraction == true
             when (outcome) {
-                EditorWriteResult.USER_EDIT -> { userEdited = true; editor = null; captureTarget = null; update("Inline dictation paused for your edit; recording continues") }
+                EditorWriteResult.USER_EDIT -> detachInlineEditor()
+                EditorWriteResult.RETRY -> {
+                    userEdited = true
+                    if (!writeRetryScheduled) {
+                        writeRetryScheduled = true
+                        main.postDelayed({
+                            if (token == session) {
+                                writeRetryScheduled = false
+                                if (finishing && System.currentTimeMillis() - stoppingAt >= 15_000) {
+                                    liveFailed = true; editor = null; tryFinish(); return@postDelayed
+                                }
+                                if (active || finishing) { pumpWrite(); if (finishing) tryFinish() }
+                            }
+                        }, 30L)
+                    }
+                }
                 EditorWriteResult.FAILED -> { liveFailed = true; update(editor?.lastError ?: "[AF-E14] Insertion unconfirmed; see Diagnostics"); editor = null }
                 EditorWriteResult.APPLIED -> { lastWritten = proposed; pumpWrite() }
             }
-            if (finishing) tryFinish()
+            if (finishing && outcome != EditorWriteResult.RETRY) tryFinish()
         }
     }
     private fun scheduleCleanup() {
@@ -260,8 +278,14 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         if (audioClosing || finalizing) return
         if (interrupted && finishing) { finish(true); return }
         if (!finishing || active || System.currentTimeMillis() - stoppingAt < 1000 || commits > completeItems.size || commits > committedItems.size || ledger.pending()) return
-        if (cleanup?.isActive == true || writing) return
-        if (!displayLive && desired != lastWritten && editor != null) { pumpWrite(); return }
+        if (cleanup?.isActive == true || writing || writeRetryScheduled) return
+        if (desired != lastWritten && editor != null) {
+            // Composition cannot hold microphone/finalization resources forever.
+            // After Stop, retain any still-unwritten result in History.
+            if (System.currentTimeMillis() - stoppingAt >= 15_000) {
+                liveFailed = true; editor = null
+            } else { pumpWrite(); return }
+        }
         finish(transport?.hasPendingCoverage == true)
     }
     private fun finish(keepAudio: Boolean) {

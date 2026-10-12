@@ -18,6 +18,11 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35], application = AlienApp::class)
 @OptIn(ExperimentalCoroutinesApi::class)
 class NodeEditorWriterTest {
+    private suspend fun writeFresh(before: EditorSnapshot, expected: EditorSnapshot, emptySession: Boolean,
+                                  current: () -> Boolean, read: () -> EditorSnapshot?,
+                                  setText: (String) -> Boolean) = NodeEditorWriter.writeMerged(before, expected,
+        EditorOwnership(before), true, emptySession, current, read, setText, null, {})
+
     @Test fun nativeAccessibilityRouteInsertsAndRevisesWithoutAnyTerminalWarmup() = runTest {
         Robolectric.buildActivity(Activity::class.java).setup().use { controller ->
             val field = EditText(controller.get()).apply { setText(""); setSelection(0) }
@@ -32,8 +37,8 @@ class NodeEditorWriterTest {
             assertFalse("Empty fields do not advertise a selection action", AccessibilityNodeInfo.ACTION_SET_SELECTION in actions)
             suspend fun insert(value: String): EditorWriteResult {
                 val before = read()!!
-                val outcome = NodeEditorWriter.write(before, owner.proposedSnapshot(value), owner.ownsWholeField(), { true }, ::read,
-                    { text -> field.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply { putString(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) }) })
+                val outcome = NodeEditorWriter.writeMerged(before, owner.proposedSnapshot(value), owner, owner.owned.isEmpty(), true, { true }, ::read,
+                    { text -> field.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply { putString(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) }) }, null, {})
                 if (outcome == EditorWriteResult.APPLIED) assertTrue(owner.confirm(read()!!, value))
                 return outcome
             }
@@ -47,29 +52,29 @@ class NodeEditorWriterTest {
         val before = EditorSnapshot(1, "", 0, 0)
         val expected = EditorSnapshot(1, "words", 5, 5)
         var snapshot = before; var reads = 0; var commits = 0
-        val result = NodeEditorWriter.write(before, expected, true, { true }, { reads++; if (reads > 5) snapshot = expected; snapshot },
+        val result = writeFresh(before, expected, true, { true }, { reads++; if (reads > 5) snapshot = expected; snapshot },
             { commits++; true })
         assertEquals(EditorWriteResult.APPLIED, result); assertEquals(1, commits)
         var current = true
-        assertEquals(EditorWriteResult.USER_EDIT, NodeEditorWriter.write(before, expected, true, { current }, { before }, { current = false; true }))
+        assertEquals(EditorWriteResult.USER_EDIT, writeFresh(before, expected, true, { current }, { before }, { current = false; true }))
         snapshot = before
-        assertEquals(EditorWriteResult.USER_EDIT, NodeEditorWriter.write(before, expected, true, { true }, { snapshot },
+        assertEquals(EditorWriteResult.RETRY, writeFresh(before, expected, true, { true }, { snapshot },
             { snapshot = EditorSnapshot(1, "my manual words", 3, 3); true }))
     }
     @Test fun rejectedAndUnconfirmedMutationsDoNotFallThroughToAnotherWriter() = runTest {
         val before = EditorSnapshot(1, "", 0, 0); val expected = EditorSnapshot(1, "words", 5, 5)
         var commits = 0
-        assertEquals(EditorWriteResult.FAILED, NodeEditorWriter.write(before, expected, true, { true }, { before }, { commits++; false }))
+        assertEquals(EditorWriteResult.FAILED, writeFresh(before, expected, true, { true }, { before }, { commits++; false }))
         assertEquals(1, commits)
         commits = 0
-        assertEquals(EditorWriteResult.FAILED, NodeEditorWriter.write(before, expected, true, { true }, { before }, { commits++; true }))
+        assertEquals(EditorWriteResult.FAILED, writeFresh(before, expected, true, { true }, { before }, { commits++; true }))
         assertEquals(1, commits)
     }
     @Test fun existingExternalTextNeverUsesTheWholeFieldAction() = runTest {
         val before = EditorSnapshot(1, "left selected right", 5, 13)
         val owner = EditorOwnership(before)
         assertFalse(owner.ownsWholeField())
-        assertEquals(EditorWriteResult.FAILED, NodeEditorWriter.write(before, owner.proposedSnapshot("words"),
+        assertEquals(EditorWriteResult.FAILED, writeFresh(before, owner.proposedSnapshot("words"),
             owner.ownsWholeField(), { true }, { before }, { error("Must not rebuild an unrelated field") }))
     }
 }

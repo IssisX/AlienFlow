@@ -126,10 +126,10 @@ suspend fun cleanChunks(source: String, mode: String, fillers: Boolean, request:
 }
 
 data class EditorSnapshot(val generation: Long, val text: String, val start: Int, val end: Int, val composing: Boolean = false)
-class EditorOwnership(private val initial: EditorSnapshot) {
+class EditorOwnership(private val initial: EditorSnapshot, private val replaceSelection: Boolean = true) {
     var owned = ""; private set
     var certain = !initial.composing && initial.start >= 0 && initial.end >= initial.start && initial.end <= initial.text.length; private set
-    private val prefix = initial.text.take(initial.start.coerceAtLeast(0))
+    private val prefix = initial.text.take((if (replaceSelection) initial.start else initial.end).coerceAtLeast(0))
     private val suffix = initial.text.drop(initial.end.coerceAtLeast(0))
     fun expected() = prefix + owned + suffix
     fun cursor() = prefix.length + owned.length
@@ -139,6 +139,9 @@ class EditorOwnership(private val initial: EditorSnapshot) {
         snapshot.text == expected() && snapshot.start == cursor() && snapshot.end == cursor() && !snapshot.composing
     fun canFirstWrite(snapshot: EditorSnapshot) = certain && snapshot == initial
     fun range() = prefix.length until (prefix.length + owned.length)
+    fun initialRange() = (if (replaceSelection) initial.start else initial.end) until initial.end
+    fun preservesAnchors(snapshot: EditorSnapshot) = snapshot.text.startsWith(prefix) && snapshot.text.endsWith(suffix) &&
+        snapshot.start == snapshot.end && snapshot.end == snapshot.text.length - suffix.length
     fun ownsWholeField() = prefix.isEmpty() && suffix.isEmpty() && initial.text.isEmpty()
     fun confirm(snapshot: EditorSnapshot, proposed: String): Boolean {
         val old = owned; owned = proposed
@@ -146,5 +149,5 @@ class EditorOwnership(private val initial: EditorSnapshot) {
         return true
     }
     fun invalidate() { certain = false }
-    fun originalSelection() = initial.text.substring(initial.start, initial.end)
+    fun originalSelection() = if (replaceSelection) initial.text.substring(initial.start, initial.end) else ""
 }

@@ -21,6 +21,10 @@ class EditorBridge(private val service: AlienAccessibilityService) {
     private var terminalInsertion: TerminalInsertion? = null
     private var terminalFieldId = 0
     private var nodeActions = false
+    private val continuation = SpeechContinuation()
+    private var userInteracted = false
+    private var bound = false
+    val hasUserInteraction: Boolean get() = userInteracted
     var lastError = ""; private set
     private val app get() = service.application as AlienApp
 
@@ -51,7 +55,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
     /** A same-editor IME restart is a refresh, not proof that focus or text ownership moved. */
     fun inputStarted(info: EditorInfo, restarting: Boolean) {
         val target = node
-        if (!restarting || target == null || !target.refresh() || focused() != target ||
+        if (target == null || !target.refresh() || focused() != target ||
             info.packageName != target.packageName?.toString() || isProtected(target)) invalidate()
     }
 
@@ -69,7 +73,9 @@ class EditorBridge(private val service: AlienAccessibilityService) {
 
     fun begin(): Boolean {
         generation++; writeSequence++; ownership = null; first = true; lastError = ""
+        bound = false
         isTerminal = false; terminalInsertion = null; nodeActions = false
+        continuation.reset(); userInteracted = false
         node = focused() ?: return fail("[AF-E01] Tap inside a text box first. Password fields are excluded")
         if (terminalNode(node!!)) {
             if (service.inputMethod?.currentInputConnection == null)
@@ -77,6 +83,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
             isTerminal = true
             terminalFieldId = service.inputMethod?.currentInputEditorInfo?.fieldId ?: 0
             terminalInsertion = TerminalInsertion()
+            bound = true
             return true
         }
         // Capture without guessing contents. Existing drafts use range edits through
@@ -95,9 +102,11 @@ class EditorBridge(private val service: AlienAccessibilityService) {
             return fail(if (ambiguousHint) "[AF-E16] This field’s placeholder cannot be separated from its text; no text was changed"
                 else "[AF-E04] Can't safely edit the existing text; select the field again or start in an empty field")
         }
-        if (snapshot.composing) return fail("[AF-E08] Finish the keyboard's composing word before dictating")
-        ownership = EditorOwnership(snapshot)
-        return ownership?.certain == true
+        // Binding permits microphone startup during typing; every actual write
+        // still requires a fresh noncomposing snapshot in writeOwned.
+        ownership = EditorOwnership(snapshot.copy(composing = false))
+        bound = ownership?.certain == true
+        return bound
     }
 
     /** Fast metadata validation for focus events/polling. It never reads the keyboard synchronously. */
@@ -134,6 +143,14 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         return if (first) owner.canFirstWrite(snapshot) else owner.matches(snapshot)
     }
 
+    /** Focus identity, not text/cursor equality, decides whether dictation stays attached. */
+    fun sameTarget(): Boolean {
+        if (!bound) return false
+        if (isTerminal) return terminalValid()
+        val target = node ?: return false
+        return ownership != null && app.screenReady() && target.refresh() && focused() == target && !isProtected(target)
+    }
+
     fun write(value: String, completion: (EditorWriteResult) -> Unit) {
         if (!isTerminal) { writeOwned(value, false, completion); return }
         if (!app.coordinator.finishing || app.coordinator.active) { completion(EditorWriteResult.FAILED); return }
@@ -164,22 +181,45 @@ class EditorBridge(private val service: AlienAccessibilityService) {
             var observation = EditorSynchronization.Reading(null, null)
             try {
                 if (!current()) return@launch
-                var before = snapshotNode() ?: run { outcome = EditorWriteResult.FAILED; return@launch }
+                var before = snapshotNode() ?: run {
+                    outcome = if (sameTarget()) EditorWriteResult.RETRY else EditorWriteResult.USER_EDIT
+                    return@launch
+                }
+                // An IME commit replaces its composing region regardless of selection.
+                // Serialize only that transaction; capture/transcription never stop.
+                if (before.composing) { outcome = EditorWriteResult.RETRY; return@launch }
                 if (!(if (first) owner.canFirstWrite(before) else owner.matches(before))) {
+                    if (restoring) return@launch
+                    userInteracted = true
+                    continuation.protectDispatched()
                     owner.invalidate()
-                    return@launch // User typing/cursor movement is an interaction, not a failure.
+                    owner = EditorOwnership(before, replaceSelection = false); ownership = owner; first = true
+                    if (nodeActions && !node!!.isShowingHintText && !node!!.hintText.isNullOrEmpty() &&
+                        node!!.text?.toString() == node!!.hintText.toString()) {
+                        fail("[AF-E16] This field’s placeholder cannot be separated from its text; no text was changed")
+                        outcome = EditorWriteResult.FAILED; return@launch
+                    }
+                }
+                val inserted = if (restoring) value else continuation.tail(value)
+                if (!restoring && first && inserted.isEmpty()) {
+                    continuation.dispatched(value); outcome = EditorWriteResult.APPLIED; return@launch
                 }
                 if (nodeActions) {
                     phase = "node"
-                    val expected = owner.proposedSnapshot(value)
-                    if (!owner.ownsWholeField()) { fail("[AF-E16] The field contains text outside dictation; no text was replaced"); outcome = EditorWriteResult.FAILED; return@launch }
-                    outcome = NodeEditorWriter.write(before, expected, owner.ownsWholeField(), ::current,
+                    val expected = owner.proposedSnapshot(inserted)
+                    val selection: ((Int) -> Boolean)? = if (node!!.actionList.any { it.id == AccessibilityNodeInfo.ACTION_SET_SELECTION })
+                        { cursor -> current() && node!!.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION,
+                            Bundle().apply { putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, cursor); putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, cursor) }) }
+                        else null
+                    outcome = NodeEditorWriter.writeMerged(before, expected, owner, first, nodeActions, ::current,
                         read = { snapshotNode().also { observation = EditorSynchronization.Reading(it, null, it?.composing == true) } },
                         setText = { text -> current() && node!!.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,
-                            Bundle().apply { putString(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) }) })
+                            Bundle().apply { putString(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) }) },
+                        setSelection = selection,
+                        dispatched = { if (!restoring) continuation.dispatched(value) })
                     if (outcome == EditorWriteResult.APPLIED) {
                         val confirmed = observation.node
-                        if (confirmed == null || !owner.confirm(confirmed, value)) outcome = EditorWriteResult.FAILED
+                        if (confirmed == null || !owner.confirm(confirmed, inserted)) outcome = EditorWriteResult.FAILED
                         else first = false
                     }
                     return@launch
@@ -187,7 +227,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 val connection = service.inputMethod?.currentInputConnection
                     ?: run { fail("[AF-E04] Android detached the keyboard connection"); outcome = EditorWriteResult.FAILED; return@launch }
                 val initialEvidence = before
-                val requested = maxOf(before.text.length, owner.proposedSnapshot(value).text.length) + 1
+                val requested = maxOf(before.text.length, owner.proposedSnapshot(inserted).text.length) + 1
                 var rawObservation: EditorSnapshot? = null
                 suspend fun read(): EditorSynchronization.Reading {
                     val surrounding = withContext(Dispatchers.IO) {
@@ -223,16 +263,17 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 outcome = EditorSynchronization.await(before, before, ::current, ::initialRead)
                 if (outcome != EditorWriteResult.APPLIED) return@launch
                 if (!current() || snapshotNode() != rawObservation) { outcome = EditorWriteResult.USER_EDIT; return@launch }
-                val range = if (first) before.start until before.end else owner.range()
+                val range = if (first) owner.initialRange() else owner.range()
                 connection.setSelection(range.first, range.last + 1)
-                connection.commitText(value, 1, null)
+                connection.commitText(inserted, 1, null)
+                if (!restoring) continuation.dispatched(value)
                 phase = "after"
                 // A single 100ms sample can read a new IME buffer and an old browser node.
                 // Only exact proposed text AND cursor in both sources authorize another write.
-                outcome = EditorSynchronization.await(before, owner.proposedSnapshot(value), ::current, ::read)
+                outcome = EditorSynchronization.await(before, owner.proposedSnapshot(inserted), ::current, ::read)
                 if (outcome == EditorWriteResult.APPLIED) {
                     val confirmed = observation.node
-                    if (confirmed == null || !owner.confirm(confirmed, value)) outcome = EditorWriteResult.FAILED
+                    if (confirmed == null || !owner.confirm(confirmed, inserted)) outcome = EditorWriteResult.FAILED
                     else first = false
                 }
             } catch (_: CancellationException) {
@@ -241,7 +282,14 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 fail("[AF-E15] Android rejected the editor operation; words are saved in AlienFlow")
                 outcome = EditorWriteResult.FAILED
             } finally {
-                if (outcome != EditorWriteResult.APPLIED) owner.invalidate()
+                // An interaction during confirmation retires only the dispatched span.
+                // The next write adopts fresh evidence in this same field, never another.
+                if (outcome == EditorWriteResult.USER_EDIT && current()) outcome = EditorWriteResult.RETRY
+                if (outcome == EditorWriteResult.RETRY) {
+                    continuation.protectDispatched()
+                    userInteracted = true
+                    owner.invalidate()
+                } else if (outcome != EditorWriteResult.APPLIED) owner.invalidate()
                 if (outcome == EditorWriteResult.FAILED && current()) {
                     app.crashJournal.editorObservation(phase, observation)
                     val structuralError = observation.node == null && Regex("^\\[AF-E(?:04|05|07|15)\\]").containsMatchIn(lastError)
@@ -256,6 +304,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
     }
     fun cancel(completion: (Boolean) -> Unit) {
         if (isTerminal) { completion(terminalInsertion?.sent != true); return }
+        if (userInteracted) { completion(false); return }
         val owner = ownership ?: return completion(false)
         if (first) { completion(true); return }
         if (!valid()) { owner.invalidate(); completion(false); return }
@@ -263,7 +312,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
     }
     fun detachForCapture() { invalidate(); detachedSnapshot = snapshotNode() }
     fun detachedTargetUnchanged() = detachedSnapshot?.let { it == snapshotNode() } == true
-    fun invalidate() { generation++; writeSequence++; ownership?.invalidate(); terminalInsertion = null; isTerminal = false }
+    fun invalidate() { bound = false; generation++; writeSequence++; ownership?.invalidate(); terminalInsertion = null; isTerminal = false }
     private fun rejected(reason: String): EditorSnapshot? { fail(reason); return null }
     private fun fail(reason: String): Boolean {
         lastError = reason

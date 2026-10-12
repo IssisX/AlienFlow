@@ -4,7 +4,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 
-enum class EditorWriteResult { APPLIED, USER_EDIT, FAILED }
+enum class EditorWriteResult { APPLIED, USER_EDIT, RETRY, FAILED }
 
 /** Wait for independently observed node/IME state; never resend a mutation. */
 object EditorSynchronization {

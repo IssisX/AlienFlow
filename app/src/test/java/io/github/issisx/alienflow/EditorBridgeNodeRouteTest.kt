@@ -119,8 +119,7 @@ class EditorBridgeNodeRouteTest {
         service.bridge.inputStarted(EditorInfo().apply { packageName = focused!!.packageName.toString() }, true)
         assertTrue(service.bridge.valid())
         assertEquals(EditorWriteResult.APPLIED, write(service, "Hello.")); assertEquals("Hello.", field!!.text.toString())
-        val prior = mutations; field!!.setSelection(1)
-        assertEquals(EditorWriteResult.USER_EDIT, write(service, "unsafe overwrite")); assertEquals(prior, mutations)
+        assertTrue(service.bridge.sameTarget())
     }
     @Test fun existingDraftWithoutARangeConnectionIsNeverRebuilt() = withField("left selected right") { service ->
         field!!.setSelection(5, 13)
@@ -150,5 +149,97 @@ class EditorBridgeNodeRouteTest {
         assertTrue(service.bridge.lastError, service.bridge.begin()); activate(service)
         assertEquals(EditorWriteResult.APPLIED, write(service, " words")); assertEquals("Start words a note", field!!.text.toString())
         assertEquals(listOf(5 to 5), selections); assertEquals(0, mutations)
+    }
+
+    @Test fun keyboardTypingKeepsTheCoordinatorAttachedAndSpeechContinuesInTheSameTurn() = withField(keyboard = true) { service ->
+        assertTrue(service.bridge.begin()); activate(service)
+        val coordinator = (service.application as AlienApp).coordinator
+        fun set(name: String, value: Any?) = coordinator.javaClass.getDeclaredField(name).apply { isAccessible = true }.set(coordinator, value)
+        set("editor", service.bridge); set("captureTarget", service.bridge); set("correctionMode", "A")
+        fun delta(id: String, text: String) {
+            coordinator.event(org.json.JSONObject().put("type", "conversation.item.input_audio_transcription.delta")
+                .put("event_id", id).put("item_id", "turn").put("delta", text))
+            val until = System.currentTimeMillis() + 10_000
+            do { shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(5) }
+            while (coordinator.javaClass.getDeclaredField("writing").apply { isAccessible = true }.getBoolean(coordinator) && System.currentTimeMillis() < until)
+        }
+        delta("a", "hello"); assertEquals("hello", field!!.text.toString())
+        field!!.append(" typed"); field!!.setSelection(field!!.length()); coordinator.targetEvent()
+        assertTrue(coordinator.active); assertSame(service.bridge, coordinator.javaClass.getDeclaredField("editor").apply { isAccessible = true }.get(coordinator))
+        delta("b", " there"); assertEquals("hello typed there", field!!.text.toString()); assertTrue(coordinator.active)
+        field!!.append(" again"); field!!.setSelection(field!!.length()); coordinator.targetEvent()
+        delta("c", " friend"); assertEquals("hello typed there again friend", field!!.text.toString())
+        assertFalse(coordinator.status.contains("paused", ignoreCase = true))
+    }
+
+    @Test fun nodeOnlyEditorPreservesKeyboardTextAndContinuesWithoutAModeSwitch() = withField { service ->
+        assertTrue(service.bridge.begin()); activate(service)
+        assertEquals(EditorWriteResult.APPLIED, write(service, "hello"))
+        field!!.append(" typed"); field!!.setSelection(field!!.length())
+        assertTrue(service.bridge.sameTarget())
+        assertEquals(EditorWriteResult.APPLIED, write(service, "Hello. there"))
+        assertEquals("hello typed there", field!!.text.toString())
+        assertEquals(EditorWriteResult.APPLIED, write(service, "Hello. there friend"))
+        assertEquals("hello typed there friend", field!!.text.toString())
+    }
+
+    @Test fun editingRecognizedWordsAndLateFinalizationNeverOverwriteKeyboardEdits() = withField("left  right", keyboard = true) { service ->
+        field!!.setSelection(5); assertTrue(service.bridge.begin()); activate(service)
+        assertEquals(EditorWriteResult.APPLIED, write(service, "hello world"))
+        field!!.setText("left hello Cory right"); field!!.setSelection(15)
+        assertEquals(EditorWriteResult.APPLIED, write(service, "Hello, world."))
+        assertEquals("left hello Cory right", field!!.text.toString())
+        assertEquals(EditorWriteResult.APPLIED, write(service, "Hello, world. next"))
+        assertEquals("left hello Cory next right", field!!.text.toString())
+    }
+
+    @Test fun cursorMovementInsertsNewSpeechWithoutDeletingSelectedUserText() = withField("left  right", keyboard = true) { service ->
+        field!!.setSelection(5); assertTrue(service.bridge.begin()); activate(service)
+        assertEquals(EditorWriteResult.APPLIED, write(service, "hello"))
+        field!!.setSelection(0, 4)
+        assertEquals(EditorWriteResult.APPLIED, write(service, "hello next"))
+        assertEquals("left next hello right", field!!.text.toString())
+    }
+
+    @Test fun composingKeyboardTransactionKeepsCaptureAndQueuesSpeechAutomatically() = withField(keyboard = true) { service ->
+        assertTrue(service.bridge.begin()); activate(service)
+        assertEquals(EditorWriteResult.APPLIED, write(service, "hello"))
+        field!!.append(" typ"); field!!.setSelection(field!!.length())
+        val prior = mutations
+        service.javaClass.getDeclaredField("composing").apply { isAccessible = true }.setBoolean(service, true)
+        assertEquals(EditorWriteResult.RETRY, write(service, "hello there"))
+        assertEquals("hello typ", field!!.text.toString()); assertEquals(prior, mutations)
+        assertTrue((service.application as AlienApp).coordinator.active); assertTrue(service.bridge.sameTarget())
+        service.confirmEmptyComposition(); field!!.append("ed"); field!!.setSelection(field!!.length())
+        assertEquals(EditorWriteResult.APPLIED, write(service, "hello there"))
+        assertEquals("hello typed there", field!!.text.toString())
+    }
+
+    @Test fun microphoneBindingDoesNotRequireTheUserToStopTypingFirst() = withField("typ", keyboard = true) { service ->
+        service.javaClass.getDeclaredField("composing").apply { isAccessible = true }.setBoolean(service, true)
+        assertTrue(service.bridge.lastError, service.bridge.begin()); activate(service)
+        assertEquals(EditorWriteResult.RETRY, write(service, "hello"))
+        assertTrue((service.application as AlienApp).coordinator.active)
+        field!!.append("ed"); field!!.setSelection(field!!.length()); service.confirmEmptyComposition()
+        assertEquals(EditorWriteResult.APPLIED, write(service, " hello"))
+        assertEquals("typed hello", field!!.text.toString())
+    }
+
+    @Test fun switchingFieldsCannotAdoptTheNewTargetDuringDictation() = withField(keyboard = true) { service ->
+        assertTrue(service.bridge.begin()); activate(service)
+        assertEquals(EditorWriteResult.APPLIED, write(service, "hello"))
+        focused = null
+        assertFalse(service.bridge.sameTarget())
+        assertEquals(EditorWriteResult.USER_EDIT, write(service, "hello there"))
+        assertEquals("hello", field!!.text.toString())
+    }
+
+    @Test fun cancelAfterKeyboardInteractionCannotUndoUserText() = withField { service ->
+        assertTrue(service.bridge.begin()); activate(service)
+        assertEquals(EditorWriteResult.APPLIED, write(service, "hello"))
+        field!!.append(" typed"); field!!.setSelection(field!!.length())
+        assertEquals(EditorWriteResult.APPLIED, write(service, "hello there"))
+        var restored: Boolean? = null; service.bridge.cancel { restored = it }
+        assertEquals(false, restored); assertEquals("hello typed there", field!!.text.toString())
     }
 }
