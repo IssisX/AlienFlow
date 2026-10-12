@@ -1,6 +1,7 @@
 package io.github.issisx.alienflow
 
 import android.os.Looper
+import kotlinx.coroutines.test.StandardTestDispatcher
 import okhttp3.*
 import okio.ByteString
 import org.json.JSONObject
@@ -48,7 +49,7 @@ class RealtimeStartupFailureTest {
             override fun interrupted() { error("Startup failure is terminal") }
             override fun reconnected() { error("No reconnect expected") }
             override fun failure(message: String) { failures.add(message) }
-        })
+        }, captureDispatcher = StandardTestDispatcher())
         try {
             transport.connect(api, "test-placeholder-not-a-key", "en", "")
             shadowOf(Looper.getMainLooper()).idle()

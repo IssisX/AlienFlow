@@ -567,3 +567,8 @@ Sources were checked on 10 October 2026. Product requirements and proposed archi
 ## Owner amendment — 2026-10-12 / AlienFlow2 0.1.10
 
 The 0.1.9 icon is owner-approved. Routine status and expected manual-edit messages must not appear beside/on the icon. Useful diagnostic errors may appear while debugging; a persisted setting disables all overlay notices. Manual edits preserve the user's field and pause automatic replacement while capture continues; a new dictation starts fresh from the currently focused field. Genuine insertion failures must not be hidden or treated as verified writes. Terminal-to-document switching clears old terminal binding and stale notices. Final capture serialization must complete before final audio commit and WAV closure.
+
+
+## Owner amendment — 2026-10-12 / AlienFlow2 0.1.11
+
+Tap-to-listening must be as quick as the physical microphone allows. Start microphone capture concurrently with network setup after Android foreground-service permission gates; preserve startup audio and turn order, including a quick Stop before setup completes. Do not keep an idle microphone running. Expose a very small, elegant indicator on the accepted icon: first actual captured frames mean safe to speak, and validated server acknowledgement has a distinct connected treatment. Routine overlay status text remains disabled. Automatic low-latency tuning must preserve guarded editor writes, private recoverable audio, keyboard choice and terminal behavior. Measure real phone startup boundaries in metadata-only Diagnostics before claiming a latency number or choosing a provider from marketing figures.

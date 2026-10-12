@@ -11,16 +11,17 @@ object RealtimeProtocol {
     const val SAMPLE_RATE = 24_000
     const val CHANNELS = 1
     const val BYTES_PER_SAMPLE = 2
-    const val CHUNK_MILLIS = 100
+    const val CHUNK_MILLIS = 20
     const val CHUNK_SAMPLES = SAMPLE_RATE * CHUNK_MILLIS / 1_000
     const val CHUNK_BYTES = CHUNK_SAMPLES * BYTES_PER_SAMPLE
+    const val MIN_COMMIT_BYTES = SAMPLE_RATE * BYTES_PER_SAMPLE / 10
     const val MAX_WEBSOCKET_QUEUE_BYTES = 2L * 1024 * 1024
     const val TRANSPORT_NAME = "Android AudioRecord + OpenAI Realtime WebSocket"
 
     fun sessionConfig(language: String, vocabulary: String): JSONObject {
         val transcription = JSONObject()
             .put("model", MODEL)
-            .put("delay", "low")
+            .put("delay", "minimal")
         if (language.isNotBlank()) {
             transcription.put("languages", JSONArray().put(language.trim()))
         }

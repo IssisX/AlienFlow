@@ -1,0 +1,13 @@
+# Startup latency protocol check — 2026-10-12
+
+Actual configuration: Android AudioRecord PCM16, 24kHz mono; authenticated OpenAI Realtime WebSocket with intent=transcription; gpt-live-transcribe; client turn commits; no native WebRTC; phone-held encrypted OpenAI key. Baseline 132cc25dd0349b3adc083ebdd536c809e05f5ce3.
+
+Primary sources opened for this release:
+
+- [OpenAI realtime transcription](https://developers.openai.com/api/docs/guides/realtime-transcription), read 2026-10-12. Streaming deltas arrive while audio is appended; audio.input.transcription.delay supports minimal, low, medium, high and xhigh. Minimal is the documented latency-sensitive choice. Lower delay has less audio context and can affect recognition quality. The guide requires representative real microphones/audio for comparisons and warns that milliseconds are configuration dependent.
+- [Deepgram Flux quickstart](https://developers.deepgram.com/docs/flux/quickstart) and [migration guide](https://developers.deepgram.com/docs/flux/nova-3-migration), inspected 2026-10-12. These offer a different authenticated WebSocket protocol and model-integrated end-of-turn detection. Published end-of-turn latency is not tap-to-microphone readiness.
+- [ElevenLabs Scribe v2 Realtime](https://elevenlabs.io/realtime-speech-to-text) and [transcription documentation](https://elevenlabs.io/docs/overview/capabilities/speech-to-text/), inspected 2026-10-12. Published approximately 150ms transcription latency is a vendor figure, not a measurement of an Android cold connection plus microphone startup under this app's key/account/network.
+
+Decision: first remove AlienFlow's confirmed serial microphone-after-handshake dependency and routine diagnostic fsyncs from the startup path, decrease frame duration, and request the existing model's documented minimal delay. Keep the working OpenAI route and stored key. No source establishes a fastest provider for this owner. A provider migration requires a representative end-to-end latency/word-error comparison and its real account/credential integration; it is not justified by unlike marketing metrics. No claimed provider millisecond benchmark or accuracy ranking is part of this APK.
+
+The conservative 100ms minimum network commit envelope preserves the old transport's minimum full-frame duration when switching to 20ms reads. Only nonempty short turns receive zero-valued trailing silence. This is an app-side compatibility envelope, not a claim that the current API reference establishes a universal 100ms rule. The recovery recording is never padded; metadata counts microphone bytes only.

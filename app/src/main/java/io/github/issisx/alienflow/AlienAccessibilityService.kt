@@ -6,6 +6,7 @@ import android.graphics.*
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.*
 import android.view.accessibility.AccessibilityEvent
 import android.widget.*
@@ -185,7 +186,7 @@ class AlienAccessibilityService : AccessibilityService() {
         super.onDestroy()
     }
     private inner class AlienView : View(this@AlienAccessibilityService) {
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val indicator = DictationIndicator()
         private var rawX = 0f; private var rawY = 0f; private var x0 = 0; private var y0 = 0
         private var dragged = false; private var longPressed = false; private var holdStarted = false
         private val threshold = ViewConfiguration.get(context).scaledTouchSlop
@@ -205,13 +206,9 @@ class AlienAccessibilityService : AccessibilityService() {
             val top = (height - diameter) / 2
             artwork.setBounds(left, top, left + diameter, top + diameter)
             artwork.draw(canvas)
-            if (app.coordinator.active || app.coordinator.finishing) {
-                paint.color = Color.rgb(85, 216, 236)
-                paint.style = Paint.Style.STROKE
-                paint.strokeWidth = dp(2).toFloat()
-                canvas.drawCircle(width / 2f, height / 2f, diameter / 2f, paint)
-                paint.style = Paint.Style.FILL
-            }
+            val animate = indicator.draw(canvas, width / 2f, height / 2f, diameter / 2f,
+                resources.displayMetrics.density, app.coordinator.readiness, SystemClock.uptimeMillis())
+            if (animate && isShown) postInvalidateOnAnimation()
         }
         override fun onTouchEvent(event: MotionEvent): Boolean {
             when (event.actionMasked) {

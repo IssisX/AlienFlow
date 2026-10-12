@@ -21,7 +21,7 @@ class RealtimeCapturePolicyTest {
         assertTrue(input.isNull("turn_detection"))
         val transcription = input.getJSONObject("transcription")
         assertEquals("gpt-live-transcribe", transcription.getString("model"))
-        assertEquals("low", transcription.getString("delay"))
+        assertEquals("minimal", transcription.getString("delay"))
         assertEquals("en", transcription.getJSONArray("languages").getString(0))
         assertEquals("ScraperX AC-42", transcription.getString("prompt"))
     }
@@ -57,16 +57,16 @@ class RealtimeCapturePolicyTest {
         )
         val quiet = ByteArray(RealtimeProtocol.CHUNK_BYTES)
         var now = 10_000L
-        repeat(2) {
+        repeat(10) {
             assertFalse(vad.inspect(loud, now, 0).commit)
-            now += 100
+            now += RealtimeProtocol.CHUNK_MILLIS
         }
-        repeat(8) {
+        repeat(42) {
             assertFalse(vad.inspect(quiet, now, 0).commit)
-            now += 100
+            now += RealtimeProtocol.CHUNK_MILLIS
         }
         assertTrue(vad.inspect(quiet, now, 0).commit)
-        now += 100
+        now += RealtimeProtocol.CHUNK_MILLIS
         assertFalse(vad.inspect(quiet, now, 0).commit)
     }
 

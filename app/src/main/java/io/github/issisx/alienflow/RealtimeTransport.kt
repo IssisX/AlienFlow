@@ -1,11 +1,6 @@
 package io.github.issisx.alienflow
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
-import android.media.AudioFormat
-import android.media.AudioRecord
-import android.media.MediaRecorder
 import android.os.Handler
 import android.os.Looper
 import kotlinx.coroutines.*
@@ -22,14 +17,18 @@ import java.io.IOException
  * the Fold6 supplied an Android tombstone proving SIGABRT inside that exact ELF,
  * while the app's direct AudioRecord probe captured 70,560 samples successfully.
  */
-class RealtimeTransport(
+class RealtimeTransport internal constructor(
     private val context: Context,
     private val audio: PendingAudio,
     private val listener: Listener,
+    private val microphoneFactory: () -> MicrophoneInput = { AndroidMicrophoneInput(context) },
+    captureDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    controlDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
 ) {
     interface Listener {
         fun event(value: JSONObject)
         fun captured()
+        fun connected() {}
         fun turnCommitted()
         fun interrupted()
         fun reconnected()
@@ -39,15 +38,18 @@ class RealtimeTransport(
     private val app = context.applicationContext as AlienApp
     private val main = Handler(Looper.getMainLooper())
     private val state = Any()
-    private val controlScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val captureScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val controlScope = CoroutineScope(SupervisorJob() + controlDispatcher)
+    private val captureScope = CoroutineScope(SupervisorJob() + captureDispatcher)
     private val vad = ClientSideVad()
     private val coverage = AudioCoverage()
 
     @Volatile private var closed = false
     @Volatile private var capturing = true
     @Volatile private var localOnly = false
-    @Volatile private var recorder: AudioRecord? = null
+    @Volatile private var microphone: MicrophoneInput? = null
+    @Volatile private var terminalFailure = false
+    private val startup = StartupAudioBuffer()
+    private val firstConnection = CompletableDeferred<Boolean>()
 
     private var api: OpenAiClient? = null
     private var key = ""
@@ -73,6 +75,7 @@ class RealtimeTransport(
         this.key = key
         this.language = language
         this.vocabulary = vocabulary
+        startCapture()
         openSocket(reconnect = false)
     }
 
@@ -90,7 +93,7 @@ class RealtimeTransport(
             val pendingSocket = api!!.realtimeWebSocket(key, object : WebSocketListener() {
                 override fun onOpen(webSocket: WebSocket, response: Response) {
                     val accepted = synchronized(state) {
-                        if (closed || !capturing || generation != socketGeneration) false
+                        if (closed || terminalFailure || generation != socketGeneration) false
                         else {
                             socket = webSocket
                             true
@@ -108,7 +111,7 @@ class RealtimeTransport(
                     app.crashJournal.mark("websocket.session-update")
                     main.postDelayed({
                         val waiting = synchronized(state) {
-                            !closed && capturing && generation == socketGeneration && !sessionReady
+                            !closed && !terminalFailure && generation == socketGeneration && !sessionReady
                         }
                         if (waiting) transportLost(
                             generation,
@@ -122,15 +125,14 @@ class RealtimeTransport(
                 override fun onMessage(webSocket: WebSocket, text: String) {
                     if (synchronized(state) { closed || generation != socketGeneration || socket !== webSocket }) return
                     val value = try { JSONObject(text) } catch (_: Exception) {
-                        postFailure("Invalid realtime event received")
+                        postFailure("Invalid realtime event received", generation)
                         return
                     }
                     val type = value.optString("type")
                     if (RealtimeProtocol.isSessionReadyEvent(type)) {
                         val problem = RealtimeHandshake.acknowledgementProblem(value)
                         if (problem != null) {
-                            app.crashJournal.liveConnectionFailure(problem)
-                            postFailure(problem.message())
+                            postFailure(problem.message(), generation, problem)
                         } else sessionBecameReady(generation, webSocket, reconnect)
                         return
                     }
@@ -159,7 +161,7 @@ class RealtimeTransport(
                 }
             })
             val retain = synchronized(state) {
-                if (closed || !capturing || generation != socketGeneration) false
+                if (closed || terminalFailure || generation != socketGeneration) false
                 else { socket = pendingSocket; true }
             }
             if (!retain) pendingSocket.cancel()
@@ -170,20 +172,31 @@ class RealtimeTransport(
     }
 
     private fun sessionBecameReady(generation: Int, webSocket: WebSocket, reconnect: Boolean) {
-        var startCapture = false
-        var reportReconnect = false
+        var failed: WebSocket? = null
         synchronized(state) {
-            if (closed || !capturing || generation != socketGeneration || socket !== webSocket) return
+            if (closed || terminalFailure || generation != socketGeneration || socket !== webSocket || sessionReady) return
             sessionReady = true
             localOnly = false
             interruptionReported = false
             reconnecting = false
-            startCapture = captureJob == null
-            reportReconnect = reconnect && !startCapture
+            // The same lock orders startup replay, turn commits, and newly captured frames.
+            val flushed = startup.drain { entry ->
+                when (entry) {
+                    is StartupAudioBuffer.Entry.Audio -> appendLocked(webSocket, entry.pcm)
+                    StartupAudioBuffer.Entry.Commit -> commitLocked(webSocket)
+                }
+            }
+            if (!flushed) failed = breakStreamLocked()
+            else firstConnection.complete(true)
         }
+        if (failed != null) { reportSendFailure(failed); return }
         app.crashJournal.mark("websocket.session-ready")
-        if (startCapture) startCapture()
-        if (reportReconnect) main.post { if (!closed && capturing) listener.reconnected() }
+        main.post {
+            if (!closed && synchronized(state) { generation == socketGeneration && sessionReady }) {
+                listener.connected()
+                if (reconnect && capturing) listener.reconnected()
+            }
+        }
     }
 
     private fun startCapture() {
@@ -194,39 +207,20 @@ class RealtimeTransport(
     }
 
     private suspend fun captureLoop() {
-        var owned: AudioRecord? = null
+        var owned: MicrophoneInput? = null
         try {
+            if (!capturing || closed) return
             app.crashJournal.mark("audiorecord.creating")
-            val minimum = AudioRecord.getMinBufferSize(
-                RealtimeProtocol.SAMPLE_RATE,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-            )
-            check(minimum > 0) { "Unsupported microphone format" }
-            if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                throw SecurityException("Microphone permission was revoked before capture started")
-            }
-            val current = AudioRecord.Builder()
-                .setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
-                .setAudioFormat(
-                    AudioFormat.Builder()
-                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                        .setSampleRate(RealtimeProtocol.SAMPLE_RATE)
-                        .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
-                        .build(),
-                )
-                .setBufferSizeInBytes(maxOf(minimum * 2, RealtimeProtocol.CHUNK_BYTES * 4))
-                .build()
+            val current = microphoneFactory()
             owned = current
-            check(current.state == AudioRecord.STATE_INITIALIZED) { "Microphone did not initialize" }
-            recorder = current
-            current.startRecording()
-            check(current.recordingState == AudioRecord.RECORDSTATE_RECORDING) { "Microphone did not start" }
+            microphone = current
+            if (!capturing || closed) return
+            current.start()
+            if (!capturing || closed) return
             app.crashJournal.mark("audiorecord.started")
-
             val samples = ShortArray(RealtimeProtocol.CHUNK_SAMPLES)
             while (capturing && currentCoroutineContext().isActive) {
-                val count = current.read(samples, 0, samples.size, AudioRecord.READ_BLOCKING)
+                val count = current.read(samples)
                 if (count > 0) {
                     val pcm = RealtimeProtocol.pcm16LittleEndian(samples, count)
                     audio.append(pcm, RealtimeProtocol.SAMPLE_RATE, RealtimeProtocol.CHANNELS)
@@ -241,9 +235,7 @@ class RealtimeTransport(
                 } else if (count < 0) {
                     if (!capturing || closed) break
                     throw IOException("AudioRecord read failed ($count)")
-                } else {
-                    delay(5)
-                }
+                } else delay(5)
             }
         } catch (_: CancellationException) {
             // Explicit stop/close owns cancellation.
@@ -253,74 +245,89 @@ class RealtimeTransport(
                 postFailure("Android microphone capture failed")
             }
         } finally {
-            synchronized(state) { if (recorder === owned) recorder = null }
-            try {
-                if (owned?.recordingState == AudioRecord.RECORDSTATE_RECORDING) owned.stop()
-            } catch (_: Exception) { }
+            synchronized(state) { if (microphone === owned) microphone = null }
+            try { owned?.stop() } catch (_: Exception) { }
             try { owned?.release() } catch (_: Exception) { }
             app.crashJournal.mark("audiorecord.released")
         }
     }
 
     private fun sendAudio(pcm: ByteArray) {
-        var failedSocket: WebSocket? = null
-        var notify = false
+        var failed: WebSocket? = null
+        var overflow = false
         synchronized(state) {
+            if (closed || terminalFailure || localOnly) return
             val current = socket
-            if (closed || localOnly || !sessionReady || current == null) return
-            if (current.queueSize() + pcm.size > RealtimeProtocol.MAX_WEBSOCKET_QUEUE_BYTES ||
-                !current.send(RealtimeProtocol.appendEvent(pcm))) {
-                coverage.markUncertain()
-                localOnly = true
-                sessionReady = false
-                socket = null
-                failedSocket = current
-                if (!interruptionReported) {
-                    interruptionReported = true
-                    notify = true
+            if (!sessionReady || current == null) {
+                if (!startup.append(pcm)) {
+                    overflow = true
+                    failed = breakStreamLocked()
                 }
-            } else {
-                remoteBufferedBytes += pcm.size
-            }
+            } else if (!appendLocked(current, pcm)) failed = breakStreamLocked()
         }
-        failedSocket?.cancel()
-        if (notify) main.post { if (!closed && capturing) listener.interrupted() }
+        if (failed != null || overflow) reportSendFailure(failed)
+    }
+
+    private fun appendLocked(current: WebSocket, pcm: ByteArray): Boolean {
+        // OkHttp counts encoded messages, not the original PCM bytes.
+        if (current.queueSize() + (pcm.size * 4L / 3L) + 128 > RealtimeProtocol.MAX_WEBSOCKET_QUEUE_BYTES ||
+            !current.send(RealtimeProtocol.appendEvent(pcm))) return false
+        remoteBufferedBytes += pcm.size
+        return true
     }
 
     fun commit(): Boolean = sendCommit()
 
     private fun sendCommit(): Boolean {
-        var failedSocket: WebSocket? = null
-        var notify = false
+        var failed: WebSocket? = null
         var committed = false
         synchronized(state) {
-            if (remoteBufferedBytes <= 0L) return false
+            if (closed || terminalFailure || localOnly) return false
             val current = socket
-            if (closed || localOnly || !sessionReady || current == null) {
-                coverage.markUncertain()
+            if (!sessionReady || current == null) {
+                startup.commit() // Announce the turn only when its actual commit is sent.
                 return false
             }
-            val id = "commit-$socketGeneration-${++commitSequence}"
-            if (current.send(RealtimeProtocol.commitEvent(id))) {
-                coverage.sent(id, remoteBufferedBytes)
-                remoteBufferedBytes = 0L
-                committed = true
-            } else {
-                coverage.markUncertain()
-                localOnly = true
-                sessionReady = false
-                socket = null
-                failedSocket = current
-                if (!interruptionReported) {
-                    interruptionReported = true
-                    notify = true
-                }
-            }
+            if (remoteBufferedBytes <= 0L) return false
+            committed = commitLocked(current)
+            if (!committed) failed = breakStreamLocked()
         }
-        failedSocket?.cancel()
-        if (committed) main.post { if (!closed) listener.turnCommitted() }
-        if (notify) main.post { if (!closed && capturing) listener.interrupted() }
+        if (failed != null) reportSendFailure(failed)
         return committed
+    }
+
+    private fun commitLocked(current: WebSocket): Boolean {
+        if (remoteBufferedBytes <= 0L) return true
+        val capturedBytes = remoteBufferedBytes
+        // Preserve a short final frame: silence extends only the network envelope to 100ms.
+        // The authoritative recovery WAV and coverage counts contain captured audio only.
+        val padding = (RealtimeProtocol.MIN_COMMIT_BYTES - capturedBytes).coerceAtLeast(0L).toInt()
+        if (padding > 0 && !appendLocked(current, ByteArray(padding))) return false
+        val id = "commit-$socketGeneration-${++commitSequence}"
+        if (!current.send(RealtimeProtocol.commitEvent(id))) return false
+        coverage.sent(id, capturedBytes)
+        remoteBufferedBytes = 0L
+        main.post { if (!closed) listener.turnCommitted() }
+        return true
+    }
+
+    /** Caller holds state. The WAV becomes the sole authority after any discontinuity. */
+    private fun breakStreamLocked(): WebSocket? {
+        coverage.markUncertain()
+        localOnly = true
+        sessionReady = false
+        startup.clear()
+        firstConnection.complete(false)
+        socketGeneration += 1
+        return socket.also { socket = null }
+    }
+
+    private fun reportSendFailure(failed: WebSocket?) {
+        failed?.cancel()
+        val notify = synchronized(state) {
+            if (interruptionReported) false else { interruptionReported = true; true }
+        }
+        if (notify) main.post { if (!closed && capturing) listener.interrupted() }
     }
 
     fun rejectEmptyCommit(clientEventId: String): Boolean =
@@ -335,22 +342,24 @@ class RealtimeTransport(
         reconnecting = false
         stopRecorder()
         controlScope.launch {
-            CaptureDrain.finish(captureJob, {
-                if (!closed) {
-                    synchronized(state) { if (localOnly || !sessionReady) coverage.markUncertain() }
-                    sendCommit()
-                }
-            }, { if (!closed) complete(synchronized(state) { !coverage.uncertain }) })
+            captureJob?.join()
+            if (closed) return@launch
+            // A quick Stop during startup still sends the captured words once setup completes.
+            val waiting = synchronized(state) { !localOnly && !sessionReady && startup.bytes > 0 }
+            if (waiting && withTimeoutOrNull(15_000L) { firstConnection.await() } != true) {
+                val old = synchronized(state) { breakStreamLocked() }
+                old?.cancel()
+            }
+            if (closed) return@launch
+            synchronized(state) { if (localOnly || !sessionReady) coverage.markUncertain() }
+            sendCommit()
+            if (!closed) complete(synchronized(state) { !coverage.uncertain })
         }
     }
 
     private fun stopRecorder() {
-        val current = recorder ?: return
-        try {
-            if (current.recordingState == AudioRecord.RECORDSTATE_RECORDING) current.stop()
-        } catch (problem: Exception) {
-            app.crashJournal.recordFailure("audiorecord.failure", problem)
-        }
+        try { microphone?.stop() }
+        catch (problem: Exception) { app.crashJournal.recordFailure("audiorecord.failure", problem) }
     }
 
     fun continueLocally() {
@@ -359,6 +368,8 @@ class RealtimeTransport(
             coverage.markUncertain()
             localOnly = true
             sessionReady = false
+            startup.clear()
+            firstConnection.complete(false)
         }
         scheduleReconnect()
     }
@@ -388,6 +399,9 @@ class RealtimeTransport(
             socketGeneration += 1
             socket = null
             sessionReady = false
+            val startupBytes = startup.bytes
+            startup.clear()
+            firstConnection.complete(false)
             if (response?.code in setOf(401, 403, 429)) {
                 terminal = true
             } else if (capturing && captureJob != null) {
@@ -399,7 +413,7 @@ class RealtimeTransport(
                 }
             } else if (capturing) {
                 terminal = true
-            } else if (remoteBufferedBytes > 0L) {
+            } else if (remoteBufferedBytes > 0L || startupBytes > 0 || coverage.uncertain) {
                 coverage.markUncertain()
                 terminal = true
             }
@@ -410,7 +424,16 @@ class RealtimeTransport(
         else if (notifyInterrupted) main.post { if (!closed && capturing) listener.interrupted() }
     }
 
-    private fun postFailure(message: String) {
+    private fun postFailure(message: String, generation: Int? = null, detail: LiveConnectionProblem? = null) {
+        val old = synchronized(state) {
+            if (closed || terminalFailure || (generation != null && generation != socketGeneration)) return
+            terminalFailure = true
+            capturing = false
+            breakStreamLocked()
+        }
+        detail?.let { app.crashJournal.liveConnectionFailure(it) }
+        stopRecorder()
+        old?.cancel()
         main.post { if (!closed) listener.failure(message) }
     }
 
@@ -428,6 +451,8 @@ class RealtimeTransport(
             socketGeneration += 1
             sessionReady = false
             localOnly = true
+            startup.clear()
+            firstConnection.complete(false)
             socket.also { socket = null }
         }
         current?.cancel()

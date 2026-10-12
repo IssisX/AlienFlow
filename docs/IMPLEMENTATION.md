@@ -1,27 +1,32 @@
-# AlienFlow2 implementation checkpoint — 0.1.10
+# AlienFlow2 implementation checkpoint — 0.1.11
 
-Repository: IssisX/AlienFlow. Branch: AlienFlow2. Baseline: f3b928a0d37f1b7290d5606d210bc16ccdce27e5. Date: 2026-10-12. VersionCode: 11.
+Repository: IssisX/AlienFlow. Branch: AlienFlow2. Baseline: 132cc25dd0349b3adc083ebdd536c809e05f5ce3. Date: 2026-10-12. VersionCode: 12.
 
-## Owner observations and diagnosis
+## Owner request and source diagnosis
 
-The owner approves the 0.1.9 icon and confirms partial Termux functionality. Three phone screenshots show AF-E14 insertion confirmation failure in the app test field, a provider final-audio-buffer warning in Termux, and AF-E10 node/keyboard disagreement in Chrome. The ordinary editor path emits E10/E14; these screenshots do not establish that Chrome was routed through the terminal adapter. begin() already reset the mode on every new dictation.
+The owner reports a one-to-two-second tap-to-listening wait and cannot tell when it is safe to speak. The accepted artwork stays. Routine status text remains suppressed beside the icon. Speed and a small polished readiness indicator are the requested release scope.
 
-Concrete defects: editor confirmation sampled only once after an arbitrary 100ms delay and permanently invalidated ownership on that sample; expected manual edits used the same Boolean failure result as integration errors. Input finish/start invalidated the owner but left the terminal-mode flag set. At Stop, the WAV could close before the capture callback returned, while the final commit used another arbitrary 250ms delay. A delayed final callback can therefore fall outside the finalization boundary. These are source-supported mechanisms; the screenshots alone do not prove which timing caused each phone error.
+The 0.1.10 transport starts AudioRecord only after an authenticated WebSocket and session-update acknowledgement. That serial dependency necessarily places network setup before microphone availability. Routine startup checkpoints also synchronously commit preferences on the tap/capture path. These are confirmed source mechanisms, not a measured attribution of every millisecond on the Fold6.
 
-## Implemented repair
+## Implemented behavior
 
-- EditorSynchronization is the production confirmation gate. It reads node and IME metadata, waits for exact proposed text and selection to agree, and never resends the insertion. Persistent disagreement rejects further writes. Coherent manual text/cursor changes, composition and target changes pause inline writes quietly. The existing field and user's edits remain authoritative. Capture continues and the complete recognized transcript remains available in AlienFlow. A new tap after Stop starts a fresh session; live insertion does not silently adopt a new field mid-session.
-- Input lifecycle callbacks clear terminal mode and old overlay notices, then refresh availability for the current field. Existing terminal final-only insertion behavior is preserved.
-- CaptureDrain joins the real capture task before the final commit and before coordinator WAV closure. No guessed final-read timer remains. Empty/rejected commits still retain audio; Diagnostics records commit bytes, capture state and connection generation. The provider's exact reason for rejecting the pictured commit remains unresolved without that metadata or a provider response. Do not call it a proven device fix.
-- The icon shows only useful diagnostic failures, not starting/listening/finishing/completion or manual-edit notices. Settings has a persistent Show diagnostic errors beside alien switch; off disables all overlay notices without disabling diagnostic records. No change to the accepted icon, opacity, package, signing key or provider route.
-- Diagnostic records contain lengths, cursor offsets, phase and state only, never editor text, credentials or recorded audio. A fresh session clears old failure metadata.
+- One transport starts its physical microphone and WebSocket concurrently, only after the foreground microphone service has been promoted. The first accepted PCM frame drives readiness. No idle microphone or background paid session is introduced.
+- A bounded 15-second startup FIFO preserves all captured PCM and local turn boundaries until validated session acknowledgement. Its single transport lock orders replay before new frames; successful replay is consumed once. A send failure, overflow, cancellation, stale socket or acknowledgement timeout cannot fake an intact stream. The same complete private WAV remains the recovery authority.
+- Stop first stops and joins the real capture task. If setup is still pending, finalization awaits the validated connection for at most 15 seconds, then flushes and commits in capture order or retains the WAV. Starting and immediately stopping cannot silently omit the first words.
+- AudioRecord reads 20ms PCM frames instead of 100ms. For a nonempty final network turn shorter than 100ms, the network envelope gets only the missing silence; the private WAV and audio-coverage metadata contain actual microphone bytes. No empty commit or fabricated recording is produced.
+- The documented gpt-live-transcribe delay changes from low to minimal. This requests earlier partial text and can trade accuracy for latency; it is not a fixed millisecond guarantee. Existing word-preserving cleanup and guarded editor ownership remain.
+- The approved icon gets a tiny dual-contrast status jewel: pale rotating arc while the microphone starts; steady green dot once actual frames are captured and can be buffered; thin cyan rim once the validated server session is connected; amber dot for local recovery capture; small amber arc while finishing. A server acknowledgement alone never means microphone-ready. Neither elapsed time nor animation controls readiness. The existing nonfocusable overlay and selected keyboard remain.
+- Routine startup checkpoint fsyncs are serialized on a dedicated I/O owner. The diagnostic stage and trace update in memory immediately. Fatal Kotlin failures drain that queue before writing their private error record, with a bounded wait. An abrupt native/process kill can precede the latest asynchronous checkpoint; Android exit evidence and previous durable checkpoints remain available.
+- Diagnostics records monotonic tap-to-first-frame, tap-to-session-acknowledgement and tap-to-first-text observations at the coordinator boundary. It records numeric durations only. These values are actual phone observations after use, not synthetic benchmark promises.
 
 ## Verification contract
 
-Regression tests exercise delayed node/IME convergence, manual edits, composition, persistent disagreement, stale target rejection, production input lifecycle mode reset, delayed capture completion, error-only feedback and true rejected-commit byte counts. Existing editor, terminal, protocol, cancellation, storage and render checks remain required. Tests and CI are not hardware/provider proof. Record compile/test/lint/signature outcomes against the exact artifact SHA in RELEASE_VERIFICATION_0.1.10.json.
+Required regressions use the production transport, startup FIFO, actual PCM/WAV pipeline, state selector and native Android Canvas renderer with explicitly simulated microphone/network boundaries. They cover capture before connection, quick Stop before acknowledgement, turn ordering, one-shot replay, failed replay, short final envelope, in-flight final read, access denial after capture, cancellation and late acknowledgement. Existing editor, terminal, synchronization, focus, storage, crash privacy and handshake gates remain required.
+
+Actual activity and production-indicator renders on both light and dark backgrounds are required in the release bundle. Compilation, lint, test and artifact results will be recorded against the exact source and APK hashes in RELEASE_VERIFICATION_0.1.11.json after those gates run. No real provider account or physical Fold6 was exercised by these JVM/CI checks.
 
 ## Phone acceptance still required
 
-Install over 0.1.9. Dictate in Termux, Stop, then start a fresh dictation in the app test field and Chrome. Edit/cursor-move during dictation: your edit stays intact, recording continues, inline replacement pauses, and no interaction-error notice appears. Turn Show diagnostic errors beside alien off and confirm no overlay messages. If AF-E10, AF-E14 or AF-N02 recurs, copy Diagnostics immediately; it now distinguishes before/after editor state and sent audio byte counts.
+Install over 0.1.10. Tap and begin speaking when the green dot appears; a cyan rim confirms the remote session. Try a short phrase with immediate Stop while startup is still connecting. Check Diagnostics startup timings on Wi-Fi and mobile data. Compare recognized words, names, numbers and negations with 0.1.10 because minimal delay has a latency/accuracy tradeoff. Recheck Termux, then a fresh app/Chrome field, manual edits and the diagnostic-notice setting. Actual provider latency, accuracy and hardware/editor compatibility are unverified until these phone checks.
 
-Prior checkpoint: history/IMPLEMENTATION_0.1.9.md.
+Prior checkpoint: history/IMPLEMENTATION_0.1.10.md. Current primary references and provider decision: RESEARCH_2026-10-12_STARTUP_LATENCY.md.

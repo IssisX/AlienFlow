@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import kotlinx.coroutines.*
 import org.json.JSONObject
 import java.io.File
@@ -45,6 +46,10 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     private var fillersEnabled = false
     private var continueLocal = true
     private var microphoneConfirmed = false
+    private var serverConnected = false
+    private val startupTimings = StartupTimings()
+    val readiness: DictationReadiness get() = DictationReadiness.from(active, finishing,
+        microphoneConfirmed, serverConnected, interrupted)
     private var commits = 0
     private val completeItems = mutableSetOf<String>()
     private val committedItems = mutableSetOf<String>()
@@ -69,6 +74,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     fun start() {
         if (active || finishing) return
         if (keyTestJob?.isActive == true) { update("Wait for the live connection check to finish"); return }
+        startupTimings.begin(SystemClock.elapsedRealtime())
         app.crashJournal.mark("tap.received")
         if (!app.screenReady()) { update("Unlock the screen before starting dictation"); return }
         if (recoveryJob?.isActive == true) { update("Wait for audio recovery to finish before starting a new dictation"); return }
@@ -82,7 +88,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         terminalTarget = bridge.isTerminal
         displayLive = store.prefs.getBoolean("live_display", true) && !terminalTarget; cleanLive = store.prefs.getBoolean("live_cleanup", true); correctionMode = store.mode(); fillersEnabled = store.prefs.getBoolean("fillers", false); continueLocal = store.prefs.getBoolean("continue_local", true)
         session++; ledger = TranscriptLedger(); original = ""; result = ""; desired = ""; lastWritten = ""
-        saved = false; liveFailed = false; userEdited = false; terminalReason = null; microphoneConfirmed = false; interrupted = false; finalizing = false; audioClosing = false; corrections.clear(); cleaned.clear(); writing = false; commits = 0; completeItems.clear(); committedItems.clear(); seenErrors.clear(); editor = bridge; captureTarget = bridge
+        saved = false; liveFailed = false; userEdited = false; terminalReason = null; microphoneConfirmed = false; serverConnected = false; interrupted = false; finalizing = false; audioClosing = false; corrections.clear(); cleaned.clear(); writing = false; commits = 0; completeItems.clear(); committedItems.clear(); seenErrors.clear(); editor = bridge; captureTarget = bridge
         active = true; finishing = false; update("Starting microphone and realtime connection…")
         app.crashJournal.mark("service.start-requested")
         try { app.startForegroundService(Intent(app, CaptureService::class.java).setAction(CaptureService.START)); app.crashJournal.mark("service.start-returned") }
@@ -141,11 +147,28 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
             detachInlineEditor()
         }
     }
-    override fun captured() { app.crashJournal.mark("microphone.frames"); microphoneConfirmed = true; if (active) update(if (terminalTarget) "Listening • Termux text inserts when you stop" else "Listening • tap the alien to stop") }
+    override fun captured() {
+        if (!active) return
+        app.crashJournal.mark("microphone.frames")
+        microphoneConfirmed = true
+        startupTimings.captured(SystemClock.elapsedRealtime())
+        app.crashJournal.startupTiming(startupTimings.metadata())
+        update(if (terminalTarget) "Listening • Termux text inserts when you stop" else "Listening • tap the alien to stop")
+    }
+    override fun connected() {
+        serverConnected = true
+        startupTimings.connected(SystemClock.elapsedRealtime())
+        app.crashJournal.startupTiming(startupTimings.metadata())
+        update()
+    }
     override fun turnCommitted() { commits++ }
     override fun event(value: JSONObject) {
         if (!active && !finishing) return
         val type = value.optString("type")
+        if ((type == "conversation.item.input_audio_transcription.delta" && value.optString("delta").isNotBlank()) ||
+            (type == "conversation.item.input_audio_transcription.completed" && value.optString("transcript").isNotBlank())) {
+            if (startupTimings.text(SystemClock.elapsedRealtime())) app.crashJournal.startupTiming(startupTimings.metadata())
+        }
         val rawId = value.optString("item_id", value.optJSONObject("item")?.optString("id").orEmpty())
         val id = "${value.optInt("_connection_generation")}:$rawId"
         val previous = value.optString("previous_item_id").takeIf { it.isNotEmpty() }?.let { "${value.optInt("_connection_generation")}:$it" }
@@ -298,6 +321,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
 
     override fun interrupted() {
         if (!active) return
+        serverConnected = false
         interrupted = true; cleanup?.cancel(); editor?.detachForCapture(); editor = null; liveFailed = true
         if (continueLocal) {
             transport?.continueLocally()

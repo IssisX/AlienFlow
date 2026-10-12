@@ -7,6 +7,8 @@ import android.os.Process
 import java.io.File
 import android.util.AtomicFile
 import java.time.Instant
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * Stores only startup checkpoints and source locations. Never writes exception
@@ -52,23 +54,38 @@ class CrashJournal(private val application: Application) {
         "audiorecord.creating", "audiorecord.started", "audiorecord.released",
         "audiorecord.failure", "editor.detached", "failure.terminal"
     )
-    private var persistFailed = false
+    @Volatile private var persistFailed = false
+    private val checkpointWriter = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "AlienFlow-checkpoints").apply { isDaemon = true }
+    }
+    @Volatile private var currentStage = prefs.getString("stage", "idle") ?: "idle"
+    private var currentSession = prefs.getLong("session", 0)
+    @Volatile private var currentTrace = prefs.getString("trace", "").orEmpty()
     @Synchronized fun mark(stage: String) {
         if (stage !in allowedStages) return
         if (stage != "tap.received" && stage == lastStage()) return
-        val session = if (stage == "tap.received") System.currentTimeMillis() else prefs.getLong("session", 0)
-        try {
-            if (stage == "tap.received") prefs.edit().remove("live_problem").remove("editor_code")
-                .remove("editor_observation").remove("audio_commit").commit()
-            val entry = "${Instant.now()} $stage"
-            val lines = (prefs.getString("trace", "").orEmpty().lines().filter { it.isNotBlank() } + entry).takeLast(80)
-            if (!prefs.edit().putString("stage", stage).putLong("session", session)
-                    .putString("trace", lines.joinToString("\n")).commit()) persistFailed = true
+        val session = if (stage == "tap.received") System.currentTimeMillis() else currentSession
+        if (stage == "tap.received") prefs.edit().remove("live_problem").remove("editor_code")
+            .remove("editor_observation").remove("audio_commit").remove("startup_timing").apply()
+        val entry = "${Instant.now()} $stage"
+        val trace = (currentTrace.lines().filter { it.isNotBlank() } + entry).takeLast(80).joinToString("\n")
+        currentStage = stage; currentSession = session; currentTrace = trace
+        // UI/capture observes the in-memory checkpoint immediately. One I/O owner serializes
+        // durable writes; a fatal Kotlin failure drains them before writing its crash record.
+        checkpointWriter.execute {
             try {
-                application.getSystemService(ActivityManager::class.java)
-                    .setProcessStateSummary("AF${BuildConfig.VERSION_CODE}:$session:$stage".toByteArray())
-            } catch (_: Exception) { /* OEM/rate limit: durable local trace remains. */ }
-        } catch (_: Exception) { persistFailed = true }
+                if (!prefs.edit().putString("stage", stage).putLong("session", session)
+                        .putString("trace", trace).commit()) persistFailed = true
+                try {
+                    application.getSystemService(ActivityManager::class.java)
+                        .setProcessStateSummary("AF${BuildConfig.VERSION_CODE}:$session:$stage".toByteArray())
+                } catch (_: Exception) { /* Durable local trace remains. */ }
+            } catch (_: Exception) { persistFailed = true }
+        }
+    }
+    fun startupTiming(metadata: String) {
+        // Generated from numeric monotonic observations; never accepts a server response.
+        prefs.edit().putString("startup_timing", metadata).apply()
     }
     @Synchronized fun editorFailure(message: String) {
         val code = Regex("^\\[AF-E([0-9]{2})\\]").find(message)?.groupValues?.get(1) ?: return
@@ -114,13 +131,15 @@ class CrashJournal(private val application: Application) {
         try { prefs.edit().putInt("probe_samples", samples.coerceAtLeast(0)).commit() } catch (_: Exception) { persistFailed = true }
         mark("probe.end")
     }
-    fun lastStage(): String = prefs.getString("stage", "idle") ?: "idle"
+    fun lastStage(): String = currentStage
     fun report(): String? = try {
         crashFile.takeIf { it.exists() }?.inputStream()?.use { it.readNBytes(10000).toString(Charsets.UTF_8) }
     } catch (_: Exception) { null }
     fun diagnostic(): String = buildString {
         appendLine("SESSION EVENTS (metadata only)")
-        appendLine(prefs.getString("trace", "No session events recorded yet."))
+        appendLine(currentTrace.ifBlank { "No session events recorded yet." })
+        appendLine("STARTUP TIMINGS (first coordinator observation; milliseconds)")
+        appendLine(prefs.getString("startup_timing", "No dictation timing recorded yet."))
         appendLine("Latest editor rejection code: " + prefs.getString("editor_code", "none"))
         appendLine("Latest editor observation: " + prefs.getString("editor_observation", "none"))
         appendLine("Latest rejected audio commit: " + prefs.getString("audio_commit", "none"))
@@ -137,6 +156,8 @@ class CrashJournal(private val application: Application) {
         try { writeFailure(problem) } catch (_: Exception) { persistFailed = true }
     }
     private fun writeFailure(problem: Throwable) {
+        try { checkpointWriter.submit {}.get(2, TimeUnit.SECONDS) }
+        catch (_: Exception) { persistFailed = true }
         val file = AtomicFile(crashFile)
         val out = file.startWrite()
         try {
@@ -145,9 +166,11 @@ class CrashJournal(private val application: Application) {
             out.write(report.toByteArray(Charsets.UTF_8)); file.finishWrite(out)
         } catch (e: Exception) { file.failWrite(out); throw e }
     }
-    fun clear() {
+    @Synchronized fun clear() {
+        try { checkpointWriter.submit {}.get(2, TimeUnit.SECONDS) } catch (_: Exception) { persistFailed = true }
+        currentStage = "idle"; currentSession = 0L; currentTrace = ""
         crashFile.delete()
-        prefs.edit().remove("trace").remove("editor_code").remove("editor_observation").remove("audio_commit").remove("session").remove("stage").commit()
+        prefs.edit().remove("trace").remove("editor_code").remove("editor_observation").remove("audio_commit").remove("session").remove("stage").remove("startup_timing").commit()
     }
     fun install() {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
