@@ -34,7 +34,8 @@ class TerminalDictationTest {
             val connection = object : BaseInputConnection(View(activity.get()), true) {
                 override fun commitText(text: CharSequence, newCursorPosition: Int): Boolean {
                     super.commitText(text, newCursorPosition)
-                    terminal.append(editable); editable.clear(); return true
+                    val content = checkNotNull(editable)
+                    terminal.append(content); content.clear(); return true
                 }
             }
             val insertion = TerminalInsertion()
