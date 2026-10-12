@@ -152,6 +152,8 @@ class MainActivity : Activity() {
         val body = ui.column().apply { setPadding(ui.dp(22), ui.dp(16), ui.dp(22), ui.dp(24)); isFocusableInTouchMode = true }
         if (page == Page.HISTORY) {
             host.addView(body, FrameLayout.LayoutParams(-1, -1)); historyPage(body)
+        } else if (page == Page.BUBBLE) {
+            host.addView(body, FrameLayout.LayoutParams(-1, -1)); bubble(body)
         } else {
             scroll = ScrollView(this).apply { isFillViewport = true; addView(body); clipToPadding = false }
             host.addView(scroll, FrameLayout.LayoutParams(-1, -1))
@@ -248,26 +250,38 @@ class MainActivity : Activity() {
         ui.text(body, "Changes save automatically and apply to your next dictation. The alien’s appearance updates right away.", 13, ui.muted)
     }
     private fun bubble(body: LinearLayout) {
-        heading(body, "Floating alien", "A small companion that stays out of your way.")
+        val header = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        header.addView(Button(this).apply {
+            text = "‹ Back"; isAllCaps = false; textSize = 14f; minHeight = ui.dp(48)
+            setTextColor(ui.muted); background = ui.ripple(ui.background)
+            tag = "back"; setOnClickListener { goBack() }
+        }, LinearLayout.LayoutParams(-2, -2))
+        header.addView(ui.text("Floating alien", 22, bold = true).apply { isAccessibilityHeading = true }, LinearLayout.LayoutParams(0, -2, 1f))
+        body.addView(header, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = ui.dp(12) })
         val previewCard = ui.card(body)
         ui.text(previewCard, "Live preview", 18, bold = true)
-        ui.text(previewCard, "See the actual size and visibility on light and dark backgrounds.", 14, ui.muted)
+        ui.text(previewCard, "Your icon on light and dark backgrounds.", 14, ui.muted)
         previewCard.addView(BubblePreview(this, app.store.prefs).apply { tag = "bubble-preview" }, LinearLayout.LayoutParams(-1, ui.dp(120)))
-        val appearance = ui.card(body)
+        val controls = ui.column()
+        scroll = ScrollView(this).apply { addView(controls); isFillViewport = true }
+        body.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        val appearance = ui.card(controls)
         ui.text(appearance, "Appearance", 18, bold = true)
         slider(appearance, "Size", "size", 32, 24, 64) { "${it * 100 / 32}%" }
         slider(appearance, "Visibility when idle", "opacity", BubbleOpacity.DEFAULT_IDLE_PERCENT, 10, 100) { "$it%" }
         slider(appearance, "Visibility while dictating", "active_opacity", 100, 50, 100) { "$it%" }
         ui.text(appearance, "Higher visibility makes the alien more solid. Lower visibility lets more of your screen show through.", 14, ui.muted)
-        val behaviour = ui.card(body)
+        val behaviour = ui.card(controls)
         toggle(behaviour, "Always show the alien", "Leave off to show it only when a supported text field is selected.", "always", false)
         toggle(behaviour, "Hold to talk", "Press and hold to start; release to finish. A short tap still starts or stops dictation.", "hold", false)
-        ui.button(body, "Bring the alien back") {
+        ui.button(controls, "Bring the alien back") {
             val service = app.coordinator.service
             if (service == null) notice("Enable accessibility in Account & setup first.")
             else { service.resetPosition(); notice("Position reset. Select a text field to see the alien.") }
         }
-        ui.text(body, "Moves the alien to its starting position and unhides it. Accessibility must be enabled in Account & setup.", 14, ui.muted)
+        ui.text(controls, "Moves the alien to its starting position and unhides it. Accessibility must be enabled in Account & setup.", 14, ui.muted)
+        val currentScroll = scroll!!
+        currentScroll.post { if (scroll === currentScroll) currentScroll.scrollTo(0, scrollPositions[Page.BUBBLE] ?: 0) }
     }
     private fun dictation(body: LinearLayout) {
         heading(body, "Dictation & writing", "Choose how your speech becomes text.")

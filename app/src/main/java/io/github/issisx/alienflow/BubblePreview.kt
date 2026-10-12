@@ -30,7 +30,7 @@ internal class BubblePreview(context: Context, private val prefs: SharedPreferen
             canvas.restoreToCount(layer)
             paint.color = if (side == 0) Color.rgb(50, 62, 78) else Color.rgb(195, 209, 225)
             paint.textAlign = Paint.Align.CENTER; paint.textSize = 12 * resources.displayMetrics.scaledDensity
-            canvas.drawText(if (active == 0) "Idle" else "Recording", cx, height - 12 * density, paint)
+            canvas.drawText(if (active == 0) "Idle" else "Active", cx, height - 12 * density, paint)
         }
     }
 }

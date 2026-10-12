@@ -37,6 +37,10 @@ class SettingsNavigationTest {
         root.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
         root.layout(0, 0, width, height)
         shadowOf(Looper.getMainLooper()).idle()
+        // The framework may have scheduled a layout at its default display size.
+        // Finish at the explicitly tested viewport before drawing or checking bounds.
+        root.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+        root.layout(0, 0, width, height)
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         root.draw(Canvas(bitmap))
         val dir = File("build/reports/ui-proof").apply { mkdirs() }
@@ -63,6 +67,16 @@ class SettingsNavigationTest {
             assertEquals((storedSize * activity.resources.displayMetrics.density).toInt(), preview.diameterPixels)
             assertFalse(texts(activity).contains("Writing style"))
             render(activity, "bubble-settings-0.1.13.png")
+            val point = IntArray(2)
+            tagged(activity, "nav-SETTINGS").getLocationOnScreen(point)
+            assertTrue(point[1] + tagged(activity, "nav-SETTINGS").height <= 1782)
+            val controls = preview.parent.parent as LinearLayout
+            val scroller = (0 until controls.childCount).map { controls.getChildAt(it) }.filterIsInstance<ScrollView>().single()
+            scroller.scrollTo(0, 1000)
+            assertTrue(preview.isShown)
+            val previewPoint = IntArray(2); val scrollPoint = IntArray(2)
+            preview.getLocationOnScreen(previewPoint); scroller.getLocationOnScreen(scrollPoint)
+            assertTrue(previewPoint[1] + preview.height <= scrollPoint[1])
             tagged(activity, "back").performClick()
             assertTrue(row(activity, "Language & vocabulary").isShown)
             row(activity, "Dictation & writing").performClick()
@@ -187,6 +201,13 @@ class SettingsNavigationTest {
             row(activity, "Language & vocabulary").performClick()
             render(activity, "language-small-large-text-0.1.13.png", 720, 1600)
             assertTrue(tagged(activity, "vocabulary").isShown)
+            tagged(activity, "nav-SETTINGS").performClick(); row(activity, "Floating alien").performClick()
+            render(activity, "bubble-small-large-text-0.1.13.png", 720, 1600)
+            val preview = tagged(activity, "bubble-preview")
+            val position = IntArray(2); preview.getLocationOnScreen(position)
+            assertTrue(position[1] >= 0 && position[1] + preview.height < 1600)
+            tagged(activity, "nav-SETTINGS").getLocationOnScreen(position)
+            assertTrue(position[1] + tagged(activity, "nav-SETTINGS").height <= 1600)
         }
     }
     @Test @Config(qualifiers = "w840dp-h891dp-xhdpi")

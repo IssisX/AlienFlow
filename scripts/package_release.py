@@ -150,7 +150,7 @@ def main() -> None:
         and (ui_proof / "indicator-dark-0.1.13.png").is_file(),
         "Actual activity render evidence is missing",
     )
-    for screen in ("settings", "bubble-settings", "dictation-settings", "privacy-settings", "history", "settings-small-large-text", "language-small-large-text", "settings-unfolded"):
+    for screen in ("settings", "bubble-settings", "dictation-settings", "privacy-settings", "history", "settings-small-large-text", "language-small-large-text", "bubble-small-large-text", "settings-unfolded"):
         require((ui_proof / f"{screen}-{VERSION_NAME}.png").is_file(), f"Native {screen} render evidence is missing")
     shutil.copytree(ui_proof, reports / "ui-proof")
     for report in (ROOT / "app/build/reports").glob("lint-results-release.*"):
