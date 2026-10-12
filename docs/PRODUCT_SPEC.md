@@ -2,13 +2,13 @@
 
 **Version:** 0.1.17 contract · **Updated:** 12 October 2026 · **Stage:** Implemented Android client; exact verification and remaining device limits are in IMPLEMENTATION.md.
 
-**Working product name:** AlienFlow. This is a personal Android dictation application inspired by the interaction of Wispr Flow. The name is provisional and has not been checked for publication or trademark use.
+**Working product name:** AlienFlow. This is an Android dictation application inspired by the interaction of Wispr Flow, with a personal-key development client and a planned paid Google Play release. The name is provisional and has not been checked for publication or trademark use.
 
 **Goal:** Tap a small, translucent alien bubble while using an existing Android keyboard; speak naturally; see words and very light corrections appear in the focused input field; stop when finished. Use a personal OpenAI API key with no application word allowance or subscription gate.
 
 **Architecture:** A native Android application with a user-enabled accessibility service, a nonfocusable accessibility overlay, a microphone foreground service, a single dictation coordinator, direct OpenAI integration, and lightweight local storage. The existing keyboard remains selected.
 
-**Technology direction:** Kotlin; Android Views for the overlay and Jetpack Compose for application screens; coroutines and Flow; Android accessibility input APIs; a single Room database; DataStore preferences; Android Keystore; Gradle; GitHub Actions. Minimum Android 13 / API 33 is proposed because the intended accessibility input connection starts there. [S2]
+**Current implementation:** Kotlin; Android Views for the overlay and application screens; coroutines; Android accessibility input APIs; AtomicFile history; SharedPreferences; Android Keystore; Gradle; GitHub Actions. Minimum Android 13 / API 33 is proposed because the intended accessibility input connection starts there. [S2]
 
 **Spec and plan:** This document contains the product specification, engineering decisions, acceptance criteria, and implementation plan. Requirements described as confirmed come from the conversation. Engineering defaults are proposed implementation choices, now selected under the user's instruction to use sensible defaults.
 
@@ -31,7 +31,7 @@ The user has supplied enough information to finish planning. Routine choices sho
 | Remembering | Lightweight recent text history, seven days initially. |
 | Connectivity | Preserve pending audio through temporary disconnections and resume processing when possible. |
 | Limits | No app-imposed word quota. OpenAI charges and limits, connectivity, and device resources still apply. |
-| Delivery | Personal sideloaded APK built through GitHub Actions. |
+| Delivery | Signed development APKs through GitHub Actions; planned paid Google Play release after device and store validation. |
 | Options | Main behavior choices are editable; internal algorithms and integrity checks are not exposed as dozens of switches. |
 
 Wispr's current Android help describes its floating control and a workflow that inserts a result after finishing. AlienFlow should preserve the familiar interaction while including the user's explicit addition: live words and live corrections inside the input field. This is a product requirement, irrespective of the inspiration app's current implementation. [S1]
@@ -44,7 +44,7 @@ The specification covers observable behavior. It does not claim knowledge of Wis
 
 ### 1.2 Boundaries of the current work
 
-This stage produces documentation. No Android project, repository, signing key, APK, paid transcription request, GitHub workflow run, or device test has been created or completed as part of this planning work. The current working directory is not an existing Git repository.
+The initial 10 October planning stage produced documentation only. The Android project, existing repository, signed APKs and GitHub Actions pipeline now exist; IMPLEMENTATION.md and release verification records own the current evidence. Public trial provisioning and store publication remain separate from development APK delivery.
 
 The first implementation target is the Galaxy Z Fold6. Its installed Android version, One UI version, keyboard version, and relevant permission state must be recorded during actual device validation. None has been inferred as an observed fact.
 

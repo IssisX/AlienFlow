@@ -1,0 +1,133 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version": "0.1.17",
+  "version_code": 18,
+  "branch": "AlienFlow2",
+  "compiled_source_sha": "7ebe095bfaa83456690b46d8934c0cad2590a94a",
+  "compiled_tree_sha": "e4ed980f5cc3cb01e91c48eaf08dc793c03953fd",
+  "workflow_run": "https://github.com/IssisX/AlienFlow/actions/runs/38305707830",
+  "artifact_id": 11772072756,
+  "unsigned_bundle_sha256": "6c013d54a8aa782bf1c1ee1350b145877df4118da2efab31136c559014468e97",
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.17.apk",
+    "size_bytes": 4548561,
+    "sha256": "ef9d75ef80e43a67e7ed5fae448bb15b8198eef578ffa5d6546279678d0720ee",
+    "signature_scheme": "APK v3",
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "payload_entries_unchanged": 25
+  },
+  "workflow_conclusion": "success",
+  "member_hashes_verified": 128,
+  "tests": {
+    "executed": 188,
+    "total": 188,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "not run"
+  },
+  "lint": {
+    "issues": 38,
+    "errors": 0
+  },
+  "changed_path_suites": [
+    {
+      "name": "io.github.issisx.alienflow.StopDeliveryTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.BackgroundReadinessTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.EditorBridgeNodeRouteTest",
+      "tests": "18",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.EditorEvidenceTest",
+      "tests": "17",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.EditorSynchronizationTest",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.RequestEfficiencyTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "supported_repairs": [
+    "Stop cancels the actual unfinished live-cleanup HTTP call and does not queue remaining live phrase requests; recognized text and accepted corrections remain.",
+    "Explicit after-stop polishing uses one combined transcript with existing lossless chunking, within one 2500ms budget; stalled/failed polish preserves recognized words.",
+    "Streaming keyboard updates retain the confirmed common prefix and replace only the changed tail, preserving UTF-16 pairs and external anchors.",
+    "Explicit-offset keyboard windows corroborate exact node text and absolute cursor positions when they cover the whole mutation; unknown offsets remain full-text only.",
+    "Placeholder resolution rebinds the initial mutation range to the resolved owner. Existing initial selection behavior is preserved.",
+    "Actual unacknowledged-commit state prevents closing the stream before UI counter callbacks; audio drain and final transcripts remain mandatory.",
+    "One foreground service remains Ready across apps and through delivery, promoting to microphone only after a dictation tap. Hardware Stop precedes removal of the microphone service type.",
+    "Ready notification offers Hide; active capture offers Stop; finishing offers Cancel. Hide/disabled accessibility stop readiness; Reset position restores it. No idle mic or API connection.",
+    "Unchanged notification text is not reposted on every transcript update. Stop-phase metadata distinguishes recognition, polish and saving without speech logging."
+  ],
+  "test_evidence": {
+    "http": "Real OpenAiClient and coordinator on loopback; injected non-secret key and transcript fixtures. Stalled request cancellation observed on the actual Call; no remaining live cleanup requests after Stop.",
+    "stop_bounds": "Default stalled-cleanup fixture completes within a 1000ms assertion after Stop. After-stop fixture uses one full transcript request and completes within its 3500ms assertion after takeRequest. These are test-environment bounds, not provider/device latency promises.",
+    "editor": "Production bridge, native EditText/InputConnection and bounded surrounding-text IPC fixture. Long existing and owned drafts preserve anchors/cursor, with changed-tail commits. OS broker/remote IPC/selection callbacks are simulated.",
+    "background": "Production coordinator/transport/service foreground and notification paths at Robolectric SDK 33/35; hardware boundary simulated for release ordering. No idle microphone transport constructed by Ready."
+  },
+  "preserved_contract": [
+    "Selected keyboard and nonfocusable overlay",
+    "Typing during dictation, including composing words without waiting for a space",
+    "Same-field ownership, protected keyboard edits and cancel/field-switch safety",
+    "gpt-live-transcribe minimal delay, 20ms native PCM frames and parallel startup",
+    "Approved silver artwork verified by packaged bytes",
+    "Termux final-only insertion without Enter",
+    "Opt-in vocabulary, short no-reasoning cleanup and per-recording validated memo"
+  ],
+  "limitations": [
+    "Installed Chrome/Fold6 behavior and the screenshot\u2019s exact node/keyboard mismatch were not reproduced; offset/range defects are verified under controlled native fixtures.",
+    "No physical microphone, installation, Samsung persistence, paid provider performance, latency or invoice measurement was performed.",
+    "Protected/password fields remain excluded; unsupported editor integrations cannot be claimed as all-input-box compatibility.",
+    "specialUse subtype and permission are declared, but Google Play approval and production launch are unverified.",
+    "Sponsor-paid trial backend, expiry and spend controls remain outside this release."
+  ],
+  "prior_gates": [
+    {
+      "source_sha": "eeb5c3f243b2cdedbefffa942f3b1cb9b49cda4e",
+      "run": 38304774788,
+      "conclusion": "failure",
+      "tests": 185,
+      "failures": 3,
+      "classification": "Introduced stale required range after placeholder resolution plus removal of original initial selection dispatch. Repaired without changing expectations or extending test deadlines."
+    },
+    {
+      "source_sha": "6508ddcda1a55f5cbf58d40201dfc0382a3b2105",
+      "run": 38305224830,
+      "conclusion": "success",
+      "note": "Intermediate candidate; final release adds microphone-before-ready ordering and SDK33/35 regression."
+    }
+  ],
+  "primary_sources": [
+    "https://developer.android.com/reference/android/view/inputmethod/SurroundingText",
+    "https://chromium.googlesource.com/chromium/src/+/refs/heads/main/content/public/android/java/src/org/chromium/content/browser/input/TextInputState.java",
+    "https://developer.android.com/develop/background-work/services/fgs/handle-user-stopping",
+    "https://developer.android.com/develop/background-work/services/fgs/service-types"
+  ],
+  "delivery": "Signed installable APK saved successfully, original update certificate matched, all 25 ZIP payload entries unchanged by signing; local file identity applied and SHA256 unchanged after save."
+}
