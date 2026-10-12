@@ -1,0 +1,36 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version": "0.1.10",
+  "version_code": 11,
+  "branch": "AlienFlow2",
+  "compiled_source_sha": "2ceabdf4296bcde9fe7dceb87c5dc0d35215a802",
+  "compiled_tree_sha": "4aef9685d09f8a44edd64b75600be50bd21de383",
+  "workflow_run": "https://github.com/IssisX/AlienFlow/actions/runs/38260698310",
+  "artifact_id": 11752465973,
+  "unsigned_bundle_sha256": "0c029cc155cec5f0d40aed46637ec1c3e5fd1dbe554fd30bb7b8b922e830a930",
+  "member_hashes_verified": 52,
+  "tests": {
+    "executed": 100,
+    "total": 100,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "not run"
+  },
+  "lint": {
+    "issues": 33,
+    "errors": 0
+  },
+  "lint_warning_delta": "Two ApplySharedPref suggestions from intentionally synchronous durable failure-metadata writes; no lint suppressions introduced.",
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.10.apk",
+    "size_bytes": 4413393,
+    "sha256": "f3f52e7436339443ccbf3739bb80d7e2a7c7e4774780609073f3337a0fa76e9f",
+    "signature_scheme": "APK v3",
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "payload_entries_unchanged": 25
+  },
+  "owner_baseline_observation": "0.1.9 icon approved; Termux works partially; AF-E10/AF-E14 and provider buffer rejection observed in screenshots.",
+  "verification_scope": "Production synchronization gate and input lifecycle callbacks; capture-drain order; diagnostic bubble policy; rejected commit counts; existing regression suite; release build, lint, activity renders and APK signature.",
+  "device_verification": "Not performed for 0.1.10. Exact cause of pictured provider buffer rejection remains unresolved; drain ordering repairs a supported finalization race and bounded metadata supports device diagnosis."
+}
