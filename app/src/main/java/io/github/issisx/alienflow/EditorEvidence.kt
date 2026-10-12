@@ -27,8 +27,8 @@ object EditorEvidence {
         if (start < 0 || end > text.length) {
             return Read(error = "[AF-E07] The text box has not provided a usable cursor. Tap inside it again")
         }
-        // Unknown composition is not proof of active composition. Consequential writes
-        // are still corroborated against the keyboard connection before mutation.
+        // Unknown composition is not proof of active composition. The bridge chooses
+        // range edits or a wholly-owned empty-field route before any mutation.
         return Read(EditorSnapshot(generation, text, start, end,
             composing = !emptyCursor && composing))
     }
@@ -49,5 +49,14 @@ object EditorEvidence {
         // -1 means unknown, not invalid. Exact FULL node contents plus identical
         // selection independently anchor this window. Never align using a substring.
         return Read(node)
+    }
+
+    /** Explicit hint metadata + independent empty editor contents, never a phrase blacklist. */
+    fun corroborateWithHint(node: EditorSnapshot, hint: String?, keyboard: KeyboardText): Read {
+        if (!node.composing && !hint.isNullOrEmpty() && node.text == hint && keyboard.text.isEmpty() &&
+            keyboard.start == 0 && keyboard.end == 0 && keyboard.offset in setOf(0, -1)) {
+            return corroborate(EditorSnapshot(node.generation, "", 0, 0), keyboard)
+        }
+        return corroborate(node, keyboard)
     }
 }

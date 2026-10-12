@@ -23,7 +23,9 @@ object EditorSynchronization {
     suspend fun await(before: EditorSnapshot, expected: EditorSnapshot,
                       current: () -> Boolean, read: suspend () -> Reading,
                       attempts: Int = 16, intervalMs: Long = 50): EditorWriteResult {
-        return withTimeoutOrNull(1_000L) {
+        // The platform's surrounding-text IPC may take a couple of seconds. This
+        // is a ceiling, never a startup delay; the first matching observation wins.
+        return withTimeoutOrNull(3_000L) {
             repeat(attempts) { index ->
                 if (!current()) return@withTimeoutOrNull EditorWriteResult.USER_EDIT
                 val reading = read()

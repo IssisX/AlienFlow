@@ -139,6 +139,7 @@ class EditorOwnership(private val initial: EditorSnapshot) {
         snapshot.text == expected() && snapshot.start == cursor() && snapshot.end == cursor() && !snapshot.composing
     fun canFirstWrite(snapshot: EditorSnapshot) = certain && snapshot == initial
     fun range() = prefix.length until (prefix.length + owned.length)
+    fun ownsWholeField() = prefix.isEmpty() && suffix.isEmpty() && initial.text.isEmpty()
     fun confirm(snapshot: EditorSnapshot, proposed: String): Boolean {
         val old = owned; owned = proposed
         if (!matches(snapshot)) { owned = old; certain = false; return false }

@@ -35,8 +35,12 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         return node.isPassword || password(node.inputType) ||
             (info?.packageName == node.packageName?.toString() && password(info?.inputType ?: 0))
     }
-    fun focused(): AccessibilityNodeInfo? = service.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-        ?.takeIf { (it.isEditable || supportsNodeActions(it) || terminalNode(it)) && !isProtected(it) }
+    fun focused(): AccessibilityNodeInfo? {
+        val found = EditorFocusDiscovery.resolve(service.findFocus(AccessibilityNodeInfo.FOCUS_INPUT),
+            { service.windows }, { (it.isEditable || supportsNodeActions(it) || terminalNode(it)) && !isProtected(it) }, ::isProtected)
+        (service.application as? AlienApp)?.crashJournal?.editorFocus(found)
+        return found.node
+    }
 
     private fun supportsNodeActions(target: AccessibilityNodeInfo): Boolean {
         val actions = target.actionList.map { it.id }
@@ -73,10 +77,21 @@ class EditorBridge(private val service: AlienAccessibilityService) {
             terminalInsertion = TerminalInsertion()
             return true
         }
+        // Capture without guessing contents. Existing drafts use range edits through
+        // the keyboard connection; node SET_TEXT is allowed only for an empty field
+        // whose entire contents will be our owned dictation.
         nodeActions = supportsNodeActions(node!!)
         val snapshot = snapshotNode() ?: return false
+        val ambiguousHint = !node!!.isShowingHintText && !node!!.hintText.isNullOrEmpty() && node!!.text?.toString() == node!!.hintText.toString()
+        val emptyEvidence = node!!.isShowingHintText || node!!.text != null ||
+            (node!!.textSelectionStart == 0 && node!!.textSelectionEnd == 0)
+        nodeActions = nodeActions && snapshot.text.isEmpty() && emptyEvidence && !ambiguousHint
+        app.crashJournal.editorBinding(snapshot, node!!.hintText?.length ?: 0,
+            !node!!.hintText.isNullOrEmpty() && node!!.text?.toString() == node!!.hintText.toString(), node!!.isShowingHintText,
+            nodeActions, service.inputMethod?.currentInputConnection != null)
         if (!nodeActions && service.inputMethod?.currentInputConnection == null) {
-            return fail("[AF-E04] Android has not attached the keyboard connection; tap the text box again")
+            return fail(if (ambiguousHint) "[AF-E16] This field’s placeholder cannot be separated from its text; no text was changed"
+                else "[AF-E04] Can't safely edit the existing text; select the field again or start in an empty field")
         }
         if (snapshot.composing) return fail("[AF-E08] Finish the keyboard's composing word before dictating")
         ownership = EditorOwnership(snapshot)
@@ -134,7 +149,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
     }
 
     private fun writeOwned(value: String, restoring: Boolean, completion: (EditorWriteResult) -> Unit) {
-        val owner = ownership ?: return completion(EditorWriteResult.USER_EDIT)
+        var owner = ownership ?: return completion(EditorWriteResult.USER_EDIT)
         lastError = ""
         val writeGeneration = generation
         val sequence = ++writeSequence
@@ -147,7 +162,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
             var observation = EditorSynchronization.Reading(null, null)
             try {
                 if (!current()) return@launch
-                val before = snapshotNode() ?: run { outcome = EditorWriteResult.FAILED; return@launch }
+                var before = snapshotNode() ?: run { outcome = EditorWriteResult.FAILED; return@launch }
                 if (!(if (first) owner.canFirstWrite(before) else owner.matches(before))) {
                     owner.invalidate()
                     return@launch // User typing/cursor movement is an interaction, not a failure.
@@ -155,7 +170,8 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 if (nodeActions) {
                     phase = "node"
                     val expected = owner.proposedSnapshot(value)
-                    outcome = NodeEditorWriter.write(before, expected, ::current,
+                    if (!owner.ownsWholeField()) { fail("[AF-E16] The field contains text outside dictation; no text was replaced"); outcome = EditorWriteResult.FAILED; return@launch }
+                    outcome = NodeEditorWriter.write(before, expected, owner.ownsWholeField(), ::current,
                         read = { snapshotNode().also { observation = EditorSynchronization.Reading(it, null, it?.composing == true) } },
                         setText = { text -> current() && node!!.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,
                             Bundle().apply { putString(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) }) },
@@ -170,18 +186,43 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 }
                 val connection = service.inputMethod?.currentInputConnection
                     ?: run { fail("[AF-E04] Android detached the keyboard connection"); outcome = EditorWriteResult.FAILED; return@launch }
+                val initialEvidence = before
+                val requested = maxOf(before.text.length, owner.proposedSnapshot(value).text.length) + 1
+                var rawObservation: EditorSnapshot? = null
                 suspend fun read(): EditorSynchronization.Reading {
                     val surrounding = withContext(Dispatchers.IO) {
-                        connection.getSurroundingText(100000, 100000, InputConnection.GET_TEXT_WITH_STYLES)
+                        connection.getSurroundingText(requested, requested, InputConnection.GET_TEXT_WITH_STYLES)
                     }
                     val keyboard = surrounding?.let { EditorEvidence.KeyboardText(
                         it.text.toString(), it.selectionStart, it.selectionEnd, it.offset) }
-                    observation = EditorSynchronization.Reading(snapshotNode(), keyboard,
-                        service.composing || hasComposition(surrounding?.text))
+                    val snapshot = snapshotNode()
+                    rawObservation = snapshot
+                    val composed = service.composing || hasComposition(surrounding?.text)
+                    val agreed = if (snapshot != null && keyboard != null)
+                        EditorEvidence.corroborateWithHint(snapshot, node?.hintText?.toString(), keyboard).snapshot else null
+                    observation = EditorSynchronization.Reading(agreed ?: snapshot, keyboard, composed)
                     return observation
                 }
-                outcome = EditorSynchronization.await(before, before, ::current, ::read)
+                val initialReading = withTimeoutOrNull(3_000L) { read() }
+                    ?: run { fail("[AF-E10] Keyboard read timed out; words are saved in AlienFlow"); outcome = EditorWriteResult.FAILED; return@launch }
+                // Only independent empty keyboard contents plus matching hint metadata
+                // may disambiguate a misreported placeholder. Never strip matching words
+                // merely because they look like a prompt.
+                val resolvedInitial = initialReading.node
+                if (first && resolvedInitial != null && resolvedInitial.text.isEmpty() && initialEvidence.text.isNotEmpty() &&
+                    node?.hintText?.toString() == initialEvidence.text && initialReading.keyboard?.text == "" &&
+                    !initialReading.composing && !resolvedInitial.composing && snapshotNode() == initialEvidence) {
+                    before = resolvedInitial
+                    owner = EditorOwnership(before); ownership = owner
+                }
+                var initialPending = true
+                suspend fun initialRead(): EditorSynchronization.Reading {
+                    if (initialPending) { initialPending = false; return initialReading }
+                    return read()
+                }
+                outcome = EditorSynchronization.await(before, before, ::current, ::initialRead)
                 if (outcome != EditorWriteResult.APPLIED) return@launch
+                if (!current() || snapshotNode() != rawObservation) { outcome = EditorWriteResult.USER_EDIT; return@launch }
                 val range = if (first) before.start until before.end else owner.range()
                 connection.setSelection(range.first, range.last + 1)
                 connection.commitText(value, 1, null)

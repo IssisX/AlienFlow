@@ -101,6 +101,17 @@ class CrashJournal(private val application: Application) {
         try { prefs.edit().putString("editor_code", code).commit() } catch (_: Exception) { persistFailed = true }
         mark("editor.rejected")
     }
+    internal fun editorFocus(result: EditorFocusDiscovery.Result) {
+        val metadata = "direct=${result.direct}; input_window=${result.focusedWindow}; " +
+            "visited=${result.visited}; candidates=${result.candidates}; exhausted=${result.exhausted}; resolved=${result.node != null}"
+        if (prefs.getString("editor_focus", "") != metadata) prefs.edit().putString("editor_focus", metadata).apply()
+    }
+    fun editorBinding(snapshot: EditorSnapshot, hintLength: Int, hintEqualsText: Boolean,
+                      showingHint: Boolean, whollyOwnedNode: Boolean, keyboardAttached: Boolean) {
+        prefs.edit().putString("editor_binding", "length=${snapshot.text.length}; cursor=${snapshot.start}:${snapshot.end}; " +
+            "hint_length=$hintLength; hint_equals_text=$hintEqualsText; showing_hint=$showingHint; " +
+            "empty_owned_node=$whollyOwnedNode; keyboard_attached=$keyboardAttached").apply()
+    }
     @Synchronized fun editorObservation(phase: String, observation: EditorSynchronization.Reading) {
         val n = observation.node; val k = observation.keyboard
         val metadata = "phase=${if (phase in setOf("before", "after", "node")) phase else "after"}; " +
@@ -150,6 +161,8 @@ class CrashJournal(private val application: Application) {
         appendLine(prefs.getString("startup_timing", "No dictation timing recorded yet."))
         appendLine("Latest editor rejection code: " + prefs.getString("editor_code", "none"))
         appendLine("Latest editor observation: " + prefs.getString("editor_observation", "none"))
+        appendLine("Latest editor focus resolution (metadata only): " + prefs.getString("editor_focus", "none"))
+        appendLine("Latest editor binding (metadata only): " + prefs.getString("editor_binding", "none"))
         appendLine("Latest rejected audio commit: " + prefs.getString("audio_commit", "none"))
         appendLine("Latest bubble availability (metadata only): " + prefs.getString("bubble_availability", "not observed"))
         appendLine("Diagnostic persistence failure observed: $persistFailed")
@@ -179,7 +192,7 @@ class CrashJournal(private val application: Application) {
         try { checkpointWriter.submit {}.get(2, TimeUnit.SECONDS) } catch (_: Exception) { persistFailed = true }
         currentStage = "idle"; currentSession = 0L; currentTrace = ""
         crashFile.delete()
-        prefs.edit().remove("trace").remove("editor_code").remove("editor_observation").remove("audio_commit").remove("session").remove("stage").remove("startup_timing").commit()
+        prefs.edit().remove("trace").remove("editor_code").remove("editor_observation").remove("editor_focus").remove("editor_binding").remove("audio_commit").remove("session").remove("stage").remove("startup_timing").commit()
     }
     fun install() {
         val previous = Thread.getDefaultUncaughtExceptionHandler()

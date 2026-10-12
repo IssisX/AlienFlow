@@ -4,9 +4,11 @@ import kotlinx.coroutines.delay
 
 /** One mutation route, selected before dispatch. Never retry text or switch transports after dispatch. */
 internal object NodeEditorWriter {
-    suspend fun write(before: EditorSnapshot, expected: EditorSnapshot, current: () -> Boolean,
+    suspend fun write(before: EditorSnapshot, expected: EditorSnapshot, wholeFieldOwned: Boolean, current: () -> Boolean,
                       read: () -> EditorSnapshot?, setText: (String) -> Boolean,
                       setSelection: (Int) -> Boolean): EditorWriteResult {
+        if (!wholeFieldOwned || before.start != before.end || before.end != before.text.length ||
+            expected.start != expected.end || expected.end != expected.text.length) return EditorWriteResult.FAILED
         if (!current() || read() != before) return EditorWriteResult.USER_EDIT
         if (!setText(expected.text)) return EditorWriteResult.FAILED
         var intermediate: EditorSnapshot? = null

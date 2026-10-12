@@ -9,6 +9,14 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EditorSynchronizationTest {
+    @Test fun supportedSlowKeyboardReadIsNotCanceledByAShorterClientDeadline() = runTest {
+        val same = EditorSnapshot(1, "draft", 5, 5)
+        assertEquals(EditorWriteResult.APPLIED, EditorSynchronization.await(same, same, { true }, {
+            kotlinx.coroutines.delay(1500)
+            EditorSynchronization.Reading(same, EditorEvidence.KeyboardText(same.text, 5, 5, 0))
+        }))
+        assertEquals(1500L, currentTime)
+    }
     private val before = EditorSnapshot(1, "draft ", 6, 6)
     private val expected = EditorSnapshot(1, "draft words", 11, 11)
     private fun reading(node: EditorSnapshot, ime: EditorSnapshot = node, composing: Boolean = false) =

@@ -4,6 +4,23 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class EditorEvidenceTest {
+    @Test fun misreportedHintUsesIndependentlyEmptyEditorNotLabelAnchors() {
+        val candidate = EditorSnapshot(7, "Start a note", 1, 1)
+        val empty = EditorEvidence.KeyboardText("", 0, 0, 0)
+        assertNull(EditorEvidence.corroborate(candidate, empty).snapshot)
+        val resolved = EditorEvidence.corroborateWithHint(candidate, "Start a note", empty).snapshot!!
+        assertEquals(EditorSnapshot(7, "", 0, 0), resolved)
+        assertEquals("spoken words", EditorOwnership(resolved).proposedSnapshot("spoken words").text)
+        assertNull(EditorEvidence.corroborateWithHint(candidate, null, empty).snapshot)
+        assertNull(EditorEvidence.corroborateWithHint(candidate, "Start a note", empty.copy(offset = 20)).snapshot)
+        assertNull(EditorEvidence.corroborateWithHint(candidate, "Start a note", empty.copy(start = 1, end = 1)).snapshot)
+    }
+    @Test fun typedTextMatchingAHintRemainsUserContent() {
+        val candidate = EditorSnapshot(7, "Start a note", 5, 5)
+        val keyboard = EditorEvidence.KeyboardText(candidate.text, 5, 5, 0)
+        assertEquals(candidate, EditorEvidence.corroborateWithHint(candidate, candidate.text, keyboard).snapshot)
+        assertEquals("Start words a note", EditorOwnership(candidate).proposedSnapshot(" words").text)
+    }
     private fun node(text: String?, hint: Boolean = false, start: Int = 0, end: Int = start,
                      composing: Boolean = false) = EditorEvidence.fromNode(
         7, EditorEvidence.NodeText(text, hint, start, end), composing)
