@@ -13,6 +13,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.util.ReflectionHelpers
+import java.io.File
 
 /** Production service/notification under a simulated Android broker, not OEM persistence proof. */
 @RunWith(RobolectricTestRunner::class)
@@ -57,5 +58,32 @@ class BackgroundReadinessTest {
             assertNull(app.coordinator.service)
             assertFalse(app.coordinator.active)
         } finally { app.coordinator.service = null; controller.destroy() }
+    }
+    @Test fun microphoneStopPrecedesTheTransitionToBackgroundReadiness() {
+        val app = org.robolectric.RuntimeEnvironment.getApplication() as AlienApp
+        val controller = Robolectric.buildService(CaptureService::class.java).create()
+        val service = controller.get()
+        app.coordinator.service = Robolectric.buildService(AlienAccessibilityService::class.java).create().get()
+        try {
+            service.onStartCommand(Intent(app, CaptureService::class.java).setAction(CaptureService.READY), 0, 1)
+            // Simulate already-established hardware/FGS state; production Stop owns the ordering.
+            service.startForeground(1, shadowOf(service).lastForegroundNotification!!, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+            ReflectionHelpers.setField(service, "currentType", ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+            val audio = PendingAudio(File(app.store.audioDir, "microphone-order.wav"))
+            val transport = RealtimeTransport(app, audio, app.coordinator)
+            var typeAtStop = -1
+            ReflectionHelpers.setField(transport, "microphone", object : MicrophoneInput {
+                override fun start() = Unit
+                override fun read(samples: ShortArray) = 0
+                override fun stop() { typeAtStop = service.foregroundServiceType }
+                override fun release() = Unit
+            })
+            ReflectionHelpers.setField(app.coordinator, "transport", transport)
+            ReflectionHelpers.setField(app.coordinator, "audio", audio)
+            ReflectionHelpers.setField(app.coordinator, "active", true)
+            app.coordinator.stop()
+            assertEquals(ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE, typeAtStop)
+            assertEquals(if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0, service.foregroundServiceType)
+        } finally { app.coordinator.cancel(); app.coordinator.service = null; controller.destroy() }
     }
 }

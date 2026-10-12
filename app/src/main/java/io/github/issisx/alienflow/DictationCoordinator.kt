@@ -272,7 +272,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         // Completed recognition is the deliverable. Optional live polish cannot
         // hold Stop behind a queue of per-turn requests.
         cleanup?.cancel(); cleanup = null
-        active = false; finishing = true; stoppingAt = System.currentTimeMillis(); update("Finishing captured speech…")
+        active = false; finishing = true; stoppingAt = System.currentTimeMillis()
         val token = session
         val capturedAudio = audio; audioClosing = true
         fun closeAudio() {
@@ -284,6 +284,8 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         }
         try { val current = transport; if (current != null) current.finishCapture { closeAudio() } else closeAudio() }
         catch (_: Exception) { failure("Could not finalize capture; pending audio preserved"); return }
+        // Release hardware capture before refresh can remove the microphone FGS type.
+        update("Finishing captured speech…")
         main.postDelayed({ if (session == token && finishing) { if (transport?.hasUnacknowledgedCommit == true || commits > completeItems.size || commits > committedItems.size || ledger.pending()) failure("Final transcription timed out; pending audio preserved") else tryFinish() } }, 15000)
     }
     private fun tryFinish() {
