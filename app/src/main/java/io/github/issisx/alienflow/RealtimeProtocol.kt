@@ -25,9 +25,8 @@ object RealtimeProtocol {
         if (language.isNotBlank()) {
             transcription.put("languages", JSONArray().put(language.trim()))
         }
-        if (vocabulary.isNotBlank()) {
-            transcription.put("prompt", vocabulary.take(4_000))
-        }
+        val hints = VocabularyHints.parse(vocabulary)
+        if (hints.isNotEmpty()) transcription.put("keywords", JSONArray(hints))
         val input = JSONObject()
             .put("format", JSONObject().put("type", "audio/pcm").put("rate", SAMPLE_RATE))
             .put("transcription", transcription)

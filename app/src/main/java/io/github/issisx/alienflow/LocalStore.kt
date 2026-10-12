@@ -68,6 +68,7 @@ class LocalStore(private val context: Context) {
     }
     fun language() = prefs.getString("language", "en")!!.trim()
     fun mode() = prefs.getString("correction", "B")!!
+    fun vocabularyForSession() = if (prefs.getBoolean("use_vocabulary", false)) prefs.getString("vocabulary", "").orEmpty() else ""
     fun pending(): List<File> {
         val cutoff = System.currentTimeMillis() - 86400000L
         return audioDir.listFiles()?.filter { file -> if ((context as? AlienApp)?.coordinator?.ownsAudio(file) == true) false else if (file.lastModified() < cutoff) { file.delete(); false } else file.extension == "wav" && file.length() > 44 }?.sortedByDescending { it.lastModified() } ?: emptyList()

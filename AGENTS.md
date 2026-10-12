@@ -3,6 +3,7 @@
 Repository: IssisX/AlienFlow. Working branch for this checkout: AlienFlow2. Application ID: io.github.issisx.alienflow.
 
 - AlienFlow2 is the owner's isolated takeover branch. Preserve the concurrent build/first-apk branch; do not merge, reset, or write to it.
+- The owner gives standing approval for routine AlienFlow2 source edits, commits, remote updates, existing CI builds, signing and APK delivery. Continue those authorized actions without asking again; this does not authorize publishing private keys or taking over unrelated destinations.
 
 Read docs/PRODUCT_SPEC.md for the product requirements and docs/IMPLEMENTATION.md for actual implementation/evidence status. Requirements are not runtime evidence.
 

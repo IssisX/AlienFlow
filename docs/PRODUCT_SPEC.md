@@ -127,6 +127,8 @@ Remembering includes recent text, explicit vocabulary entries, preferences, and 
 
 Speech recognition itself may revise a provisional word as more audio arrives. All correction modes allow this process; mode A cannot promise a literal transcript of every sound. Additional editing is an independent layer with its own rules, revision identifiers, and saved source text.
 
+Efficiency contract: keep low-latency recognition and correction behavior intact; omit optional vocabulary unless explicitly enabled, use distinct literal keyword hints instead of a prose word-list prompt, keep cleanup instructions concise, disable unnecessary cleanup reasoning, and reuse only validated identical cleanup chunks within the current recording. Preserve the entire recognized input and lossless chunking. A sponsor-funded three-day trial requires server-held credentials and authoritative expiry/spend enforcement; it is separate from the current personal-key client.
+
 Retain the latest stable recognition text separately from the current displayed result. History stores one stable original and one resulting text, not every interim hypothesis. A comparison or restore action can use these two versions without a large revision archive.
 
 ### 4.2 Default B: Very light
