@@ -51,6 +51,16 @@ class EditorFocusDiscoveryTest {
         shadowOf(service).setRootInActiveWindow(node(true, true))
         assertEquals(field, EditorBridge(service).focused())
     }
+    @Test fun emptyVirtualFieldDoesNotNeedASelectionActionToBeDiscovered() {
+        val root = node(focused = true); val field = node(focused = true)
+        field.text = ""; field.setTextSelection(0, 0)
+        field.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_TEXT)
+        assertFalse(field.actionList.any { it.id == AccessibilityNodeInfo.ACTION_SET_SELECTION })
+        shadowOf(root).addChild(field)
+        val service = Robolectric.buildService(AlienAccessibilityService::class.java).create().get()
+        Broker.direct = root; shadowOf(service).setWindows(listOf(window(root)))
+        assertEquals(field, EditorBridge(service).focused())
+    }
     @Test fun activeOverlayKeyboardAndUnfocusedApplicationNeverSupplyAField() {
         val wanted = node(true, true); val root = node()
         shadowOf(root).addChild(wanted)

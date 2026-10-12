@@ -44,7 +44,9 @@ class EditorBridge(private val service: AlienAccessibilityService) {
 
     private fun supportsNodeActions(target: AccessibilityNodeInfo): Boolean {
         val actions = target.actionList.map { it.id }
-        return AccessibilityNodeInfo.ACTION_SET_TEXT in actions && AccessibilityNodeInfo.ACTION_SET_SELECTION in actions
+        // Empty editors commonly omit SET_SELECTION: there is nothing to select.
+        // SET_TEXT already moves the cursor to its end. Nonempty drafts use IME ranges.
+        return AccessibilityNodeInfo.ACTION_SET_TEXT in actions
     }
     /** A same-editor IME restart is a refresh, not proof that focus or text ownership moved. */
     fun inputStarted(info: EditorInfo, restarting: Boolean) {
@@ -174,9 +176,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                     outcome = NodeEditorWriter.write(before, expected, owner.ownsWholeField(), ::current,
                         read = { snapshotNode().also { observation = EditorSynchronization.Reading(it, null, it?.composing == true) } },
                         setText = { text -> current() && node!!.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,
-                            Bundle().apply { putString(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) }) },
-                        setSelection = { cursor -> current() && node!!.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION,
-                            Bundle().apply { putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, cursor); putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, cursor) }) })
+                            Bundle().apply { putString(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) }) })
                     if (outcome == EditorWriteResult.APPLIED) {
                         val confirmed = observation.node
                         if (confirmed == null || !owner.confirm(confirmed, value)) outcome = EditorWriteResult.FAILED
