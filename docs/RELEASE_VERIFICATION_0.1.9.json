@@ -1,0 +1,34 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "branch": "AlienFlow2",
+  "version": "0.1.9",
+  "version_code": 10,
+  "compiled_source_sha": "21cc3f8b82a5695434a2a06591fe94984c511df8",
+  "compiled_tree_sha": "466e463f9c5ee7f173e161f7e5e02316bd2511a9",
+  "workflow_run": "https://github.com/IssisX/AlienFlow/actions/runs/38255159908",
+  "artifact_id": 11750236117,
+  "unsigned_bundle_sha256": "8ad555e835edeb69dad05e7eb62f7ac182722080e815401709553683743da0dc",
+  "member_hashes_verified": 48,
+  "tests": {
+    "executed": 91,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "lint": {
+    "errors": 0,
+    "issues": 31
+  },
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.9.apk",
+    "size_bytes": 4392913,
+    "sha256": "ffa9f64c49ee732b5e4443c836cd4d4f388a1f005f435b60275a792982a3a228",
+    "signature_scheme": "APK v3",
+    "signing_certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "payload_entries_unchanged": 25
+  },
+  "baseline_device_observation": "Owner confirmed 0.1.8 works on Fold6.",
+  "new_device_observations": "Not performed. Termux visibility/insertion and completion/icon changes require a phone check.",
+  "checks": "Termux BaseInputConnection fixture; control character neutralization; no duplicate writes; stale focus rejection; completion notice policy; actual activity renders; release compilation/lint/package; signature and payload verification."
+}
+
