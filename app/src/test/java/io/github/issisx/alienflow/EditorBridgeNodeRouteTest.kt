@@ -193,7 +193,7 @@ class EditorBridgeNodeRouteTest {
         assertEquals(EditorWriteResult.APPLIED, write(service, "Hello there friend"))
         assertEquals("Cory friend there", field!!.text.toString()); assertEquals(11, field!!.selectionStart)
         assertEquals(EditorWriteResult.APPLIED, write(service, "Hello there friend again"))
-        assertEquals("Cory friend again there", field!!.text.toString()); assertEquals(16, field!!.selectionStart)
+        assertEquals("Cory friend again there", field!!.text.toString()); assertEquals("Cory friend again".length, field!!.selectionStart)
     }
 
     @Test fun editingRecognizedWordsAndLateFinalizationNeverOverwriteKeyboardEdits() = withField("left  right", keyboard = true) { service ->
