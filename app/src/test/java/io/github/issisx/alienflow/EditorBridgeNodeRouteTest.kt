@@ -34,13 +34,13 @@ class EditorBridgeNodeRouteTest {
     @Implements(AccessibilityNodeInfo::class)
     class NodeIpc : ShadowAccessibilityNodeInfo() {
         @RealObject private lateinit var actual: AccessibilityNodeInfo
-        @Implementation fun refresh(): Boolean {
+        @Implementation override fun refresh(): Boolean {
             val source = field?.createAccessibilityNodeInfo() ?: return false
             actual.text = source.text; actual.isShowingHintText = source.isShowingHintText
             actual.setTextSelection(source.textSelectionStart, source.textSelectionEnd)
             return true
         }
-        @Implementation fun performAction(action: Int, arguments: Bundle?): Boolean {
+        @Implementation override fun performAction(action: Int, arguments: Bundle?): Boolean {
             mutations++
             return field?.performAccessibilityAction(action, arguments) ?: false
         }
