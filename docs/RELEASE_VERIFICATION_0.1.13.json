@@ -1,0 +1,67 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version": "0.1.13",
+  "version_code": 14,
+  "branch": "AlienFlow2",
+  "compiled_source_sha": "32b3c3d07d6c5980cd23e3fb2bcf576e75159e05",
+  "compiled_tree_sha": "d459a4d1ad21b8a6249a8a6dfcc70c677b806262",
+  "workflow_run": "https://github.com/IssisX/AlienFlow/actions/runs/38281864797",
+  "artifact_id": 11762185184,
+  "unsigned_bundle_sha256": "9b64f4a610fa3268157b87b87506dfdb042e5b78bc421af7744a756c5b81348c",
+  "member_hashes_verified": 99,
+  "tests": {
+    "executed": 135,
+    "total": 135,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "not run"
+  },
+  "lint": {
+    "issues": 38,
+    "errors": 0
+  },
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.13.apk",
+    "size_bytes": 4495313,
+    "sha256": "0fa479f321f95c514ee33a10d41b4467d1c765d9fd3413c90e497ffdc093d93d",
+    "signature_scheme": "APK v3",
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "payload_entries_unchanged": 25
+  },
+  "new_regressions": {
+    "settings_navigation": 9,
+    "native_node_writer": 3,
+    "production_editor_bridge_with_simulated_os_broker": 1,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "render_evidence": {
+    "environment": "Robolectric SDK 35 with native graphics; synthetic transcript fixtures only",
+    "inspected": [
+      "Home",
+      "Settings",
+      "History",
+      "Dictation and writing",
+      "Floating alien with pinned live preview",
+      "narrow settings at 1.5 font scale",
+      "narrow pinned preview at 1.5 font scale",
+      "unfolded centered settings"
+    ],
+    "not_device_screenshots": true
+  },
+  "editor_mechanism": "Normal fields previously required an attached accessibility-IME connection and non-null exact surrounding text; fields exposing standard SET_TEXT and SET_SELECTION now choose a guarded node-action route before mutation. Same-editor restart does not revoke the still-focused captured identity. No transport switch or retry follows uncertain dispatch.",
+  "verification_scope": "Actual native widget actions, production bridge/service with simulated OS node IPC and focus, preferences/navigation, delayed publication, rejection, user edits, no-IME cold startup, native renders, unchanged transport regressions, exact APK identity/member hashes and signature.",
+  "device_verification": "Not performed. Precise original Fold6 failure, installed ChatGPT composer capabilities, Termux-to-normal-field transitions, real microphone/provider latency and tactile feel require phone acceptance.",
+  "preserved_behavior": [
+    "Accepted icon bytes",
+    "Selected keyboard and nonfocusable overlay",
+    "Protected-input exclusion",
+    "Never submit a field",
+    "Single editor writer and coordinator",
+    "Startup PCM buffering and minimal transcription delay",
+    "Existing signing certificate and preferences"
+  ],
+  "delivery": "Signed installable APK saved successfully; local file identity applied; hash unchanged after save."
+}
