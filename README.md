@@ -2,7 +2,19 @@
 
 Personal Android dictation with a movable Gray alien bubble, live text in the focused field, conservative corrections, and a user-supplied OpenAI API key.
 
-## Current signed update: 0.1.7 (8)
+## Signed update 0.1.8 (9) — live transcription handshake
+
+Your Fold6 recovered saved audio successfully, but live recording stopped before the microphone was activated. The prior live connection used the wrong query parameter: `?model=gpt-live-transcribe` for a transcription-only session. Current OpenAI SDK routing instead uses `?intent=transcription` and configures `gpt-live-transcribe` in `session.update`. The 0.1.8 implementation corrects that route.
+
+**Check key & transcription model** now opens that exact WebSocket, sends the actual transcription session configuration, waits for an acknowledged transcription session/model, and closes before activating the mic. It cannot report success merely because a token was issued. HTTP/WebSocket failures display **AF-N01** and retain sanitized code/type/parameter/request ID in private Diagnostics. Failure notices are sized to stay visible near the keyboard.
+
+[Exact build and signing evidence](docs/RELEASE_VERIFICATION_0.1.8.json): [Actions run 38252056770](https://github.com/IssisX/AlienFlow/actions/runs/38252056770) passed **85 tests**, no failures/errors/skips; release lint zero errors (31 warnings), APK identity/artwork/bundle checks, and signing with the original certificate. The installed payload has no native WebRTC and preserves prior encrypted-key, history, bubble, approved Gray image, opacity, and editor data.
+
+**Install the privately signed `AlienFlow-0.1.8.apk` over your current version. Do not uninstall or clear app data.** The unsigned Actions bundle is not an installable APK.
+
+Phone acceptance is still pending: run the new key check, then start dictation, see real partial text before Stop and confirm microphone release. If a failure remains, copy the newest private diagnostic; do not mistake an offline regression test for a successful provider session.
+
+## Earlier signed update: 0.1.7 (8)
 
 **New observed evidence:** On the Fold6, tapping the alien in 0.1.6 brought up **“Stopped • audio saved for recovery”** while AlienFlow remained on-screen. This is NOT the previous WebRTC process crash. It does not identify the initiating stop source, and the old generic completion message did not distinguish a nonempty saved WAV from no captured audio.
 

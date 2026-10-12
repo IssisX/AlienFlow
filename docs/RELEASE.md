@@ -86,3 +86,9 @@ Install the signed APK delivered in the conversation, not the unsigned Actions i
 ## Signed 0.1.7 update — 2026-10-12
 
 Source `6db8c29dbf85386b9c6d6a3503a1e5838abe670b` / [CI run 38246391603](https://github.com/IssisX/AlienFlow/actions/runs/38246391603). 75 tests passed; lint 0 errors (28 warnings); package checks green. Artifact 11746196600 checked against 40 member hashes. VersionCode 8 / versionName 0.1.7. Privately signed APK 4,323,480 bytes, SHA-256 `9f6b97ffa414f36a195b705f65af70079d332cf64a76d719df3b5bc179a23ebe`, APK v3 verified with original cert. No unsandboxed signing material enters CI. Native WebRTC remains absent. Install over 0.1.6 without clearing data. Phone acceptance pending.
+
+## Signed 0.1.8 test update — 2026-10-12
+
+Compiled SHA `1f5fe9693e030e45155e1ec54de0c67baa8ee1f4`. [CI run 38252056770](https://github.com/IssisX/AlienFlow/actions/runs/38252056770) passed 85 tests, lint zero errors/31 warnings, assembly and packaging. The GitHub artifact 11748676724 (unsigned bundle) SHA-256 `014bfb7793fccd4bd24566e895fd22b123027131daee220b53d40d3d5dbbe84b` matched the downloaded file; all 46 member hashes matched.
+
+Final signed APK `AlienFlow-0.1.8.apk` versionCode 9, 4,339,864 bytes; SHA-256 `9dd65619bee26669c921efdfdd73d51794acfe8de586191c77545d275a181c2c`. APK v3 and existing certificate `d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f` verified. 25 unsigned payload entries unchanged. No native WebRTC; approved Gray drawable and key/data formats unchanged. The new key check exercises the actual transcription-intent WebSocket. Install signed APK in place, not the unsigned bundle. Actual Fold6 and provider operation remain unverified.

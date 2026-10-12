@@ -1,0 +1,35 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version_name": "0.1.8",
+  "version_code": 9,
+  "branch": "build/first-apk",
+  "compiled_source_sha": "1f5fe9693e030e45155e1ec54de0c67baa8ee1f4",
+  "workflow_run_url": "https://github.com/IssisX/AlienFlow/actions/runs/38252056770",
+  "artifact_id": 11748676724,
+  "unsigned_bundle_filename": "AlienFlow-0.1.8-unsigned-release-bundle.zip",
+  "unsigned_bundle_sha256": "014bfb7793fccd4bd24566e895fd22b123027131daee220b53d40d3d5dbbe84b",
+  "unsigned_bundle_member_hashes_verified": 46,
+  "tests": {
+    "executed": 85,
+    "total": 85,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "lint": {
+    "issues": 31,
+    "errors": 0
+  },
+  "apk_filename": "AlienFlow-0.1.8.apk",
+  "apk_size_bytes": 4339864,
+  "apk_sha256": "9dd65619bee26669c921efdfdd73d51794acfe8de586191c77545d275a181c2c",
+  "signing_certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+  "signing_scheme": "APK v3",
+  "unsigned_payload_entries_verified_unchanged": 25,
+  "signer_metadata_entries_added": 3,
+  "native_webrtc_packaged": false,
+  "approved_alien_sha256": "8850ac9bbd07c876ba00e5b4339d1b126a14d631194b07379dde0ac676888940",
+  "transcription_intent_string_in_apk": true,
+  "legacy_model_url_in_apk": false,
+  "provider_and_fold6_acceptance": "Not yet tested on real provider/account/device. Realtime acknowledgement, Android microphone capture and in-field typing are pending."
+}

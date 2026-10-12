@@ -20,7 +20,15 @@ Overlay failure notices measure their actual height and stay within the usable s
 
 ## Verification boundary
 
-At the initial source checkpoint, regression tests exercise actual OkHttp WebSocket upgrades/frames against local MockWebServer, the production transport's synchronous failure race, and error notice placement. The real provider and hardware are not mocked into a claimed acceptance pass. Complete CI compilation/tests, release lint and artifact verification are required before signing. Record outcomes against the exact compiled SHA.
+Regressions exercise actual OkHttp WebSocket upgrades/frames against local MockWebServer, the production transport's synchronous failure race, session acknowledgement/HTTP errors, and status notice positioning. The real provider and hardware are not mocked into a claimed acceptance pass.
+
+**Build verification complete.** Initial CI on commit `7b7573ca53594a5efd9f0193336d56493b011845` failed in the test harness because Robolectric's `RuntimeEnvironment.getApplication()` does not take a Kotlin type parameter; no APK was delivered from it. A one-line test-only correction was made; compiled revision is `1f5fe9693e030e45155e1ec54de0c67baa8ee1f4`.
+
+[Actions run 38252056770](https://github.com/IssisX/AlienFlow/actions/runs/38252056770): all **85 unit tests passed**, zero failed/errored/skipped; release lint zero errors, 31 warnings; assembled and verified package identity and absence of native WebRTC. Artifact `11748676724` (`AlienFlow-0.1.8-unsigned-release-bundle.zip`) matched GitHub SHA-256 `014bfb7793fccd4bd24566e895fd22b123027131daee220b53d40d3d5dbbe84b`; all 46 manifest-listed member SHA-256 hashes matched after download. The approved Gray drawable survived the build byte-for-byte.
+
+Signed APK `AlienFlow-0.1.8.apk`, 4,339,864 bytes, SHA-256 `9dd65619bee26669c921efdfdd73d51794acfe8de586191c77545d275a181c2c`. APK v3 signature verified with original certificate SHA-256 `d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f`. All 25 unsigned payload entries remained byte-identical after signing; only three signer metadata entries were added. The actual compiled classes contain the transcription intent URL and no legacy `?model=gpt-live-transcribe` URL. Permanent private signing material remained outside CI and the repository.
+
+[Machine-readable release record](RELEASE_VERIFICATION_0.1.8.json); [actual signer output](APK_SIGNATURE_0.1.8.txt). Phone/account/provider live acceptances remain pending.
 
 ## Fold6 acceptance still pending
 
