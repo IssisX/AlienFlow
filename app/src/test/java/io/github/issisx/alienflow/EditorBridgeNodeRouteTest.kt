@@ -142,7 +142,11 @@ class EditorBridgeNodeRouteTest {
         var result: EditorWriteResult? = null
         service.bridge.write(value) { result = it }
         val until = System.currentTimeMillis() + 10_000
-        while (result == null && System.currentTimeMillis() < until) { shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(5) }
+        while (result == null && System.currentTimeMillis() < until) {
+            // Advance the paused framework clock as well as waiting for IO. A
+            // rejected read must exercise the production retry/timeout boundary.
+            shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(5)); Thread.sleep(5)
+        }
         assertNotNull("Editor operation did not complete", result)
         return result
     }
