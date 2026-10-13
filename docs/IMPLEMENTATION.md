@@ -22,7 +22,7 @@ The owner explicitly deferred AAB work until final store preparation. Routine CI
 
 ## Verification
 
-Pending exact-source unit tests, release lint, APK assembly, identity/archive checks, original-certificate signing and saved-file verification. Actual ChatGPT/Fold6 and Termux/tmux/provider acceptance remain unverified for this revision. The screenshot alone cannot identify all causes sharing AF-E10.
+Final source 5e248ee3a9c4c91a0c78580f0917d641e7035b15 (tree c908fed9f50e4e360d4fd5fcb732c802804192cf) passed workflow 38403807428: all 201 tests, zero failures/errors/skips, release lint zero errors (38 non-error issues), and APK assembly. The actual framework default-window positive case and contradictory-callback negative case passed. All 140 package-member hashes and compiled source were verified. Original signing certificate matched and all 25 APK payload entries remained unchanged. The signed APK was saved and SHA-256 verified after saving. No AAB or bundletool was built/downloaded/delivered. Full evidence: RELEASE_VERIFICATION_0.1.21.json. The preliminary run failed compilation because a test helper directly referenced a host-JVM method outside Android’s compile API; resolving that test-only helper through reflection corrected compilation without changing the production patch. Actual ChatGPT/Fold6 and Termux/tmux/provider acceptance remain unverified for this revision. The screenshot alone cannot identify all causes sharing AF-E10.
 
 ## Primary references
 

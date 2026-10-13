@@ -1,0 +1,108 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version": "0.1.21",
+  "version_code": 22,
+  "branch": "AlienFlow2",
+  "compiled_source_sha": "5e248ee3a9c4c91a0c78580f0917d641e7035b15",
+  "compiled_tree_sha": "c908fed9f50e4e360d4fd5fcb732c802804192cf",
+  "workflow_run": "https://github.com/IssisX/AlienFlow/actions/runs/38403807428",
+  "workflow_conclusion": "success",
+  "artifact_id": 11816751287,
+  "unsigned_bundle_sha256": "79c935a03ad9b5221d647a3004edb530aba1347af6bc2b957bf53f57962bce65",
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.21.apk",
+    "size_bytes": 4552657,
+    "sha256": "d37f2960a2752872bc255696310c80ac1f5d8c74cb15fd709abd573541b2193f",
+    "signature_scheme": "APK v3",
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "payload_entries_unchanged": 25
+  },
+  "member_hashes_verified": 140,
+  "tests": {
+    "executed": 201,
+    "total": 201,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "not run"
+  },
+  "lint": {
+    "issues": 38,
+    "errors": 0
+  },
+  "changed_path_suites": [
+    {
+      "name": "io.github.issisx.alienflow.TerminalCoordinatorTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.StopDeliveryTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.EditorBridgeNodeRouteTest",
+      "tests": "25",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.EditorSynchronizationTest",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.EditorEvidenceTest",
+      "tests": "19",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.TerminalDictationTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "observed": "Owner screenshot shows selected ChatGPT composer and visible alien with AF-E10. It contains no offset/selection diagnostic; exact phone case remains unknown.",
+  "cause": "Android's default InputConnection.getSurroundingText returns a bounded window with offset=-1. The old guard required exact full field contents for any unknown offset, rejecting supported partial windows in longer drafts.",
+  "repair": "An immutable absolute selection from EditorInfo/onUpdateSelection is attached only if its identical observation survives the read. Unknown-offset partial windows require both absolute endpoints, selection width, exact shared characters and complete mutation coverage to agree. No substring search, normalization, timeout increase or resends.",
+  "verification": [
+    "Test invokes the actual framework default InputConnection method through a Java proxy forwarding native EditText operations, verifies offset=-1 and bounded contents, then exercises production bridge insertion, Unicode correction and intervening typing with preserved unrelated anchors.",
+    "A contradictory selection callback dispatches no selection or commit. Missing callbacks, changed text, width disagreement and insufficient mutation coverage are rejected.",
+    "All 198 prior tests plus three regressions passed; 201 total with zero failures/errors/skips. Release lint zero errors; 38 non-error issues.",
+    "All 140 package-member hashes and compiled source verified. Original certificate verified; all 25 APK payload entries unchanged. Saved file hash verified."
+  ],
+  "build_scope": {
+    "target_sdk": 36,
+    "aab_built": false,
+    "bundletool_downloaded": false,
+    "aab_delivery": false,
+    "reason": "Owner explicitly deferred AAB work until final store preparation."
+  },
+  "preliminary_run": {
+    "id": 38403352933,
+    "source_sha": "4f99c3a9498324bf97f1ccbffaecf3e5e3a00e73",
+    "conclusion": "failure",
+    "classification": "introduced test-helper compile error",
+    "reason": "Direct InvocationHandler.invokeDefault reference exists on host Java 17 but not Android's compile API. The test-only helper was resolved through reflection; production patch was unchanged. No tests executed in that failed compile run."
+  },
+  "independent_termux_evidence": {
+    "branch": "AlienFlow(chat)",
+    "checkpoint": "2ada0793ea4d0888a39c12eb3acc406e588a0be4",
+    "compiled_source_sha": "683ab2dcc5902d41ed5b283f08d6a8054def1b2d",
+    "scope": "Existing branch records installed official Termux v0.118.3 x86_64/API 36 overlay and accessibility IPC tests with recognition fixtures. This is not current Fold6/Gboard/tmux/provider proof; no writes to that branch."
+  },
+  "limitations": "Editor regressions use Robolectric SDK 35 with simulated accessibility broker/IPC and callback delivery. Android 16 primary source defines the same default method. Exact screenshot cause and installed 0.1.21 ChatGPT/Termux/Fold6/Gboard behavior remain unverified. No paid provider call or old-version execution with the new tests was performed.",
+  "delivery": "Signed APK saved successfully, file identity applied and SHA-256 verified after saving. No AAB generated or delivered."
+}
