@@ -48,6 +48,7 @@ android {
         targetSdk = 36
         versionCode = 22
         versionName = "0.1.21"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SOURCE_REVISION", "\"${System.getenv("GITHUB_SHA") ?: "local-unversioned"}\"")
     }
     buildFeatures { buildConfig = true }
@@ -87,6 +88,8 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.robolectric)
+    androidTestImplementation(libs.androidx.runner)
+    androidTestImplementation(libs.androidx.junit)
 }
 
 
