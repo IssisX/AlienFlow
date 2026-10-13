@@ -1,21 +1,31 @@
-# AlienFlow2 implementation checkpoint — 0.1.19
+# AlienFlow2 implementation checkpoint — 0.1.20
 
-Repository: IssisX/AlienFlow. Branch: AlienFlow2. Date: 2026-10-12. VersionCode: 20.
+Repository: IssisX/AlienFlow. Branch: AlienFlow2. Date: 2026-10-13. VersionCode: 21.
 
-## Report and diagnosis
+## Observation and unresolved failure
 
-The owner reports repeat failures in ChatGPT and Chrome on 0.1.18 (19), source 185665b2451e1ce3b9a78e2cb4ba4697bd70e581, Samsung SM-F956U / Android 16 / API 36. The supplied metadata shows successful microphone and live connection startup, transcript completion and saving, followed by a pre-write editor rejection. The last observation has node length 25, IME length 27, both cursors 25:25, explicit offset 0 and composing=false. The old 0.1.6 SocketException and PACKAGE_UPDATED exits do not establish a crash in these sessions.
+The owner reports 0.1.19 working in tested ordinary apps but still failing in Termux. A follow-up answer says the bubble is absent in ChatGPT while working in other apps. These are bounded observations, not universal compatibility. No fresh failure diagnostic or installed Termux version was supplied. The earlier 0.1.18 25/27-character report cannot establish the current Termux or missing-bubble cause.
 
-EditorEvidence rejected any keyboard window whose end exceeded the accessibility text length, even when the extra characters were beyond the selected mutation. This coverage check necessarily rejects the reported lengths. The diagnostic did not record character equality: whether the two representations share an exact prefix, and what the extra characters are, remain unknown. Do not infer that they are newlines. Chromium TextInputState supplies a separately represented IME window and explicit absolute offset; Android SurroundingText documents that offset and allows bounded windows.
+Inspected current upstream Termux TerminalView and Android 16 BaseInputConnection/RemoteInputConnectionImpl. The upstream terminal exposes a generic View, uses TYPE_NULL or class-zero visible-password/no-suggestions flags, and consumes/clears committed text; its contract matches the existing terminal adapter. Existing source already gates terminal commits until finalization. Plausible remaining boundaries include unavailable input connection, unresolved accessibility focus, or target invalidation; evidence does not uniquely select one. No new Termux insertion or focus-eligibility patch is justified, and no device fix is claimed.
 
-## Repair and acceptance
+## Implemented
 
-Corroboration now requires an explicit anchored offset, exact equality of every shared character, matching absolute selection, nonempty independent text evidence for nonempty input, and coverage of the entire mutation within both representations. IME-only characters past the node are outside the allowed edit. The existing keyboard range commit leaves them intact; no trimming, normalization, substring search or whole-field reconstruction is added. Unknown offsets still require exact full contents. Genuine shared-text/cursor conflicts remain rejected. Diagnostics retain a metadata-only evidence rejection code in addition to lengths, avoiding an ambiguous generic timeout report.
+Diagnostic capture now preserves one last unavailable external-input snapshot across opening AlienFlow's own diagnostic screen. It records sanitized package/class identifiers, input type, field ID, connection/start flags and resolver counts, never field text, credentials or audio. A bounded terminal-stage value records binding, dispatch, rejection or exception; dispatch is explicitly not receipt confirmation. This addresses a verified evidence-loss mechanism: the old latest-focus fields were overwritten by subsequent app focus, including the diagnostic screen.
 
-Regression tests exercise the production bridge and real framework EditText/InputConnection with a simulated accessibility representation omitting an arbitrary two-character suffix: initial 25/27 lengths and cursor 25, revisions, cancellation, bounded nonzero-offset windows, selected replacement, multiline Unicode, typed user text between speech updates, and a shared-text conflict that dispatches no commit or selection. Remote Android accessibility IPC and representation publication are explicit fixtures. Existing terminal final-only gating, typing/composition protections, focus ownership, background readiness, selected keyboard, cost reductions and approved artwork are retained. No provider request is added by this repair.
-
-Primary references: https://chromium.googlesource.com/chromium/src/+/refs/heads/main/content/public/android/java/src/org/chromium/content/browser/input/TextInputState.java and https://developer.android.com/reference/android/view/inputmethod/SurroundingText .
+The project already compiled and targeted API 36. Release CI now builds both APK and AAB. Pinned bundletool 1.18.3 is SHA-256 checked against the upstream release digest, validates the bundle, and dumps its manifest. Packaging checks matching package/version/minimum/target SDK, non-debuggable state, source SHA in DEX, unsigned state and no native libraries; it retains the AAB and reports in the existing delivery ZIP. Direct APK signing and delivery use the original certificate. Play App Signing enrollment/upload-key setup are future Console actions and have not been performed. Preserve the existing app-signing identity when enrolling if APK-to-Play update continuity is required; do not export private keys into this repository or CI artifacts.
 
 ## Verification
 
-Final source cad03c3aa1573944e7dbae8def245d2c97600680 (tree cfb2289545cb5b5d8b5a793c19ba46fd4600cea2) passed workflow 38313624028: 197 tests, zero failures/errors/skips, release lint zero errors (38 non-error issues), and release assembly. All 138 bundle-member hashes and compiled source were verified. Signed with the original update certificate; all 25 APK payload entries were unchanged. AlienFlow-0.1.19.apk was saved successfully and its SHA-256 verified after saving. Full provenance and limitations are in RELEASE_VERIFICATION_0.1.19.json. Two preliminary candidates had the same negative-test harness failure: the test helper did not advance Robolectric’s paused Android clock. The other 196 tests passed; the final helper advances that clock and the conflict assertion passes without changing the production repair. Tests simulate the representation boundary on SDK 35, not the installed Fold6 / Android 16. Successful compilation and simulated editor tests cannot certify ChatGPT, Chrome or Termux phone behavior. This release addresses the proven overlong-window rejection; shared-text disagreement would still correctly reject. Historical evidence: RELEASE_VERIFICATION_0.1.18.json and history/IMPLEMENTATION_0.1.18.md. Standing release authorization is in AGENTS.md.
+Pending exact-source CI, APK signing and delivered artifact checks. The added service test drives a missing external input, then switches to AlienFlow and verifies that the failure metadata survives without the private editor text. Existing terminal/document regressions remain required. SDK 35 framework fixtures do not certify installed Termux, ChatGPT, Android 16 or provider behavior. Termux insertion and intermittent ChatGPT bubble availability remain unresolved requirements; request a fresh diagnostic immediately after each failure using this diagnostic build.
+
+## Primary sources
+
+- https://github.com/termux/termux-app/blob/master/terminal-view/src/main/java/com/termux/view/TerminalView.java
+- https://github.com/aosp-mirror/platform_frameworks_base/blob/android16-release/core/java/android/view/inputmethod/BaseInputConnection.java
+- https://github.com/aosp-mirror/platform_frameworks_base/blob/android16-release/core/java/android/view/inputmethod/RemoteInputConnectionImpl.java
+- https://support.google.com/googleplay/android-developer/answer/11926878
+- https://developer.android.com/guide/app-bundle
+- https://developer.android.com/studio/publish/app-signing
+- https://github.com/google/bundletool/releases/tag/1.18.3
+
+Historical proof: RELEASE_VERIFICATION_0.1.19.json. Standing authority: AGENTS.md. Preserve the concurrent build/first-apk branch.

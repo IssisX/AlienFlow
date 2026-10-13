@@ -67,7 +67,7 @@ class CrashJournal(private val application: Application) {
         if (stage != "tap.received" && stage == lastStage()) return
         val session = if (stage == "tap.received") System.currentTimeMillis() else currentSession
         if (stage == "tap.received") prefs.edit().remove("live_problem").remove("editor_code")
-            .remove("editor_observation").remove("audio_commit").remove("startup_timing").apply()
+            .remove("editor_observation").remove("audio_commit").remove("startup_timing").remove("terminal_stage").apply()
         val entry = "${Instant.now()} $stage"
         val trace = (currentTrace.lines().filter { it.isNotBlank() } + entry).takeLast(80).joinToString("\n")
         currentStage = stage; currentSession = session; currentTrace = trace
@@ -106,6 +106,30 @@ class CrashJournal(private val application: Application) {
         val metadata = "direct=${result.direct}; input_window=${result.focusedWindow}; " +
             "visited=${result.visited}; candidates=${result.candidates}; exhausted=${result.exhausted}; resolved=${result.node != null}"
         if (prefs.getString("editor_focus", "") != metadata) prefs.edit().putString("editor_focus", metadata).apply()
+    }
+    /** Keep one foreign-input failure snapshot: opening our diagnostic screen must
+     * not replace the evidence with AlienFlow's own focus state. No editor text. */
+    internal fun inputAvailability(result: EditorFocusDiscovery.Result,
+                                   direct: android.view.accessibility.AccessibilityNodeInfo?,
+                                   info: android.view.inputmethod.EditorInfo?, started: Boolean, connected: Boolean) {
+        fun identifier(value: CharSequence?): String = value?.toString()?.takeIf {
+            it.length <= 180 && it.matches(Regex("[A-Za-z_][A-Za-z0-9_.$]*"))
+        } ?: "unknown"
+        val inputPackage = identifier(info?.packageName)
+        val nodePackage = identifier(direct?.packageName)
+        val foreign = if (started) inputPackage else nodePackage
+        if (result.node != null || foreign == "unknown" || foreign == application.packageName) return
+        val metadata = "input_package=$inputPackage; node_package=$nodePackage; node_class=${identifier(direct?.className)}; " +
+            "input_type=${info?.inputType}; field_id=${info?.fieldId}; input_started=$started; connected=$connected; " +
+            "direct_present=${direct != null}; editable=${direct?.isEditable}; password=${direct?.isPassword}; " +
+            "input_window=${result.focusedWindow}; visited=${result.visited}; candidates=${result.candidates}; exhausted=${result.exhausted}"
+        if (prefs.getString("unavailable_input_metadata", "") != metadata) prefs.edit()
+            .putString("unavailable_input_metadata", metadata)
+            .putString("unavailable_input", "${Instant.now()} source=${BuildConfig.SOURCE_REVISION}; $metadata").apply()
+    }
+    fun terminalStage(stage: String) {
+        if (stage in setOf("bound", "dispatched", "rejected", "exception"))
+            prefs.edit().putString("terminal_stage", "${Instant.now()} source=${BuildConfig.SOURCE_REVISION}; $stage").apply()
     }
     fun editorBinding(snapshot: EditorSnapshot, hintLength: Int, hintEqualsText: Boolean,
                       showingHint: Boolean, whollyOwnedNode: Boolean, keyboardAttached: Boolean) {
@@ -167,6 +191,8 @@ class CrashJournal(private val application: Application) {
         appendLine("Latest editor rejection code: " + prefs.getString("editor_code", "none"))
         appendLine("Latest editor observation: " + prefs.getString("editor_observation", "none"))
         appendLine("Latest editor focus resolution (metadata only): " + prefs.getString("editor_focus", "none"))
+        appendLine("Last unavailable external input (metadata only; may predate this session): " + prefs.getString("unavailable_input", "none"))
+        appendLine("Latest terminal stage (dispatch is not receipt confirmation): " + prefs.getString("terminal_stage", "none"))
         appendLine("Latest editor binding (metadata only): " + prefs.getString("editor_binding", "none"))
         appendLine("Latest rejected audio commit: " + prefs.getString("audio_commit", "none"))
         appendLine("Latest bubble availability (metadata only): " + prefs.getString("bubble_availability", "not observed"))

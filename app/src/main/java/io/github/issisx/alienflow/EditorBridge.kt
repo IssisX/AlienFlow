@@ -40,9 +40,13 @@ class EditorBridge(private val service: AlienAccessibilityService) {
             (info?.packageName == node.packageName?.toString() && password(info?.inputType ?: 0))
     }
     fun focused(): AccessibilityNodeInfo? {
-        val found = EditorFocusDiscovery.resolve(service.findFocus(AccessibilityNodeInfo.FOCUS_INPUT),
+        val direct = service.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        val found = EditorFocusDiscovery.resolve(direct,
             { service.windows }, { (it.isEditable || supportsNodeActions(it) || terminalNode(it)) && !isProtected(it) }, ::isProtected)
         (service.application as? AlienApp)?.crashJournal?.editorFocus(found)
+        (service.application as? AlienApp)?.crashJournal?.inputAvailability(found, direct,
+            service.inputMethod?.currentInputEditorInfo, service.inputMethod?.currentInputStarted == true,
+            service.inputMethod?.currentInputConnection != null)
         return found.node
     }
 
@@ -84,6 +88,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
             terminalFieldId = service.inputMethod?.currentInputEditorInfo?.fieldId ?: 0
             terminalInsertion = TerminalInsertion()
             bound = true
+            app.crashJournal.terminalStage("bound")
             return true
         }
         // Capture without guessing contents. Existing drafts use range edits through
@@ -157,11 +162,13 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         try {
             val connection = service.inputMethod?.currentInputConnection
             val ok = terminalInsertion?.send(value, connection != null && terminalValid()) {
+                app.crashJournal.terminalStage("dispatched")
                 connection!!.commitText(it, 1, null)
             } == true
-            if (!ok) fail("[AF-T01] Termux focus changed; text is saved in AlienFlow")
+            if (!ok) { app.crashJournal.terminalStage("rejected"); fail("[AF-T01] Termux focus changed; text is saved in AlienFlow") }
             completion(if (ok) EditorWriteResult.APPLIED else EditorWriteResult.FAILED)
         } catch (_: Exception) {
+            app.crashJournal.terminalStage("exception")
             fail("[AF-T02] Termux input could not be confirmed; text is saved in AlienFlow")
             completion(EditorWriteResult.FAILED)
         }
