@@ -35,6 +35,8 @@ grep -Fx 'alienflow-chat-api36' "$PROOF/available-avds.txt"
 "$ANDROID_HOME/emulator/emulator" -avd alienflow-chat-api36 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > "$PROOF/emulator.log" 2>&1 &
 EMULATOR_PID=$!
 cleanup() {
+  # Preserve in-process geometry/session evidence even if an assertion fails.
+  timeout 10 "$ADB" pull /sdcard/Android/data/io.github.issisx.alienflow/files/termux-proof "$PROOF/" > "$PROOF/pull-on-exit.txt" 2>&1 || true
   timeout 5 "$ADB" logcat -d -t 3000 > "$PROOF/logcat.txt" 2>&1 || true
   timeout 5 "$ADB" exec-out screencap -p > "$PROOF/last-screen.png" 2>/dev/null || true
   timeout 5 "$ADB" shell dumpsys accessibility > "$PROOF/accessibility.txt" 2>&1 || true

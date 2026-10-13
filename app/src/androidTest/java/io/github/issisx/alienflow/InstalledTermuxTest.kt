@@ -11,6 +11,7 @@ import android.os.SystemClock
 import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
+import android.view.accessibility.AccessibilityWindowInfo
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -52,17 +53,49 @@ class InstalledTermuxTest {
     private fun terminalText(): String = automation.windows
         .filter { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION }
         .joinToString("\n") { text(it.root) }
+    private var tapNumber = 0
+    private val evidenceDirectory get() = File(app.getExternalFilesDir(null), "termux-proof").apply { mkdirs() }
     private fun tapAlien(service: AlienAccessibilityService) {
-        val point = main {
-            val field = service.javaClass.getDeclaredField("bubble").apply { isAccessible = true }
-            val view = field.get(service) as View
-            check(view.isShown) { "Alien is not shown in the installed Termux" }
-            val xy = IntArray(2); view.getLocationOnScreen(xy)
-            floatArrayOf(xy[0] + view.width / 2f, xy[1] + view.height / 2f)
+        val trace = StringBuilder()
+        var prior: Rect? = null
+        var stable = 0
+        var target: Rect? = null
+        // Window/input focus can become ready before the IME and overlay finish moving.
+        // Select the actual topmost touch target, not merely View.isShown at stale coordinates.
+        await("stable, topmost alien touch target", 10_000) {
+            val bounds = main {
+                val field = service.javaClass.getDeclaredField("bubble").apply { isAccessible = true }
+                val view = field.get(service) as View
+                if (!view.isShown || !view.isAttachedToWindow) return@main null
+                val xy = IntArray(2); view.getLocationOnScreen(xy)
+                Rect(xy[0], xy[1], xy[0] + view.width, xy[1] + view.height)
+            }
+            val windows = automation.windows.sortedByDescending { it.layer }
+            val hit = bounds?.let { area -> windows.firstOrNull { window ->
+                val region = android.graphics.Region(); window.getRegionInScreen(region)
+                region.contains(area.centerX(), area.centerY())
+            } }
+            val canTap = bounds != null && hit?.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
+            if (bounds != prior || !canTap) {
+                trace.appendLine("time=${SystemClock.uptimeMillis()} view=$bounds hitType=${hit?.type}")
+                windows.forEach { window ->
+                    val area = Rect(); window.getBoundsInScreen(area)
+                    trace.appendLine("window=${window.id} type=${window.type} layer=${window.layer} bounds=$area")
+                }
+            }
+            stable = if (canTap && bounds == prior) stable + 1 else 0
+            prior = bounds; target = bounds
+            File(evidenceDirectory, "tap-${tapNumber + 1}-geometry.txt").writeText(trace.toString())
+            stable >= 3
+        }
+        val point = checkNotNull(target)
+        tapNumber++
+        File(evidenceDirectory, "before-tap-$tapNumber.png").outputStream().use {
+            automation.takeScreenshot().compress(Bitmap.CompressFormat.PNG, 100, it)
         }
         val now = SystemClock.uptimeMillis()
         fun inject(action: Int, time: Long) {
-            val event = MotionEvent.obtain(now, time, action, point[0], point[1], 0)
+            val event = MotionEvent.obtain(now, time, action, point.exactCenterX(), point.exactCenterY(), 0)
             event.source = InputDevice.SOURCE_TOUCHSCREEN
             try { assertTrue(automation.injectInputEvent(event, true)) } finally { event.recycle() }
         }
@@ -213,6 +246,10 @@ class InstalledTermuxTest {
                 .put("termux_visible_after_switch", true).put("premature_text", false).put("microphone_and_provider", "not exercised; transcript fixtures")
                 .toString(2))
         } finally {
+            File(evidenceDirectory, "session-diagnostic.txt").writeText(DiagnosticReport.collect(app))
+            File(evidenceDirectory, "before-instrumentation-exit.png").outputStream().use {
+                automation.takeScreenshot().compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
             main { coordinator.cancel(); idleTransport.close() }
             audio.close()
         }
