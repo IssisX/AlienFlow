@@ -242,11 +242,13 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 val requested = maxOf(before.end - initialReplacement.range.first, initialReplacement.text.length) + 64
                 var rawObservation: EditorSnapshot? = null
                 suspend fun read(): EditorSynchronization.Reading {
+                    val selectionBefore = service.imeSelection
                     val surrounding = withContext(Dispatchers.IO) {
                         connection.getSurroundingText(requested, requested, InputConnection.GET_TEXT_WITH_STYLES)
                     }
                     val keyboard = surrounding?.let { EditorEvidence.KeyboardText(
-                        it.text.toString(), it.selectionStart, it.selectionEnd, it.offset) }
+                        it.text.toString(), it.selectionStart, it.selectionEnd, it.offset,
+                        selectionBefore.takeIf { selectionBefore === service.imeSelection }) }
                     val snapshot = snapshotNode()
                     rawObservation = snapshot
                     val composed = service.composing || hasComposition(surrounding?.text)

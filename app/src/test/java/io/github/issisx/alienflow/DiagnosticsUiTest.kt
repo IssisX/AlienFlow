@@ -41,11 +41,11 @@ class DiagnosticsUiTest {
         Robolectric.buildActivity(MainActivity::class.java).setup().use { controller ->
             val activity = controller.get(); val root = activity.window.decorView
             shadowOf(Looper.getMainLooper()).idle()
-            screenshot(root, "main-0.1.20.png")
+            screenshot(root, "main-0.1.21.png")
             assertFalse(descendants(root).filterIsInstance<TextView>().any { it.text.toString() == "Diagnostics / share report" })
             button(root, "Settings").performClick()
             descendants(root).single { it.contentDescription?.toString()?.startsWith("Help & about.") == true }.performClick()
-            assertTrue(descendants(root).filterIsInstance<TextView>().any { it.text.toString() == "Version 0.1.20 (21)" })
+            assertTrue(descendants(root).filterIsInstance<TextView>().any { it.text.toString() == "Version 0.1.21 (22)" })
             val entry = button(root, "Diagnostics / share report")
             assertTrue(entry.isShown)
             assertTrue(entry.performClick())
@@ -60,11 +60,11 @@ class DiagnosticsUiTest {
             while (!copy.isEnabled && System.currentTimeMillis() < deadline) { shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(11) }
             shadowOf(Looper.getMainLooper()).idle()
             assertTrue("Report did not finish loading", copy.isEnabled)
-            screenshot(root, "diagnostics-0.1.20.png")
+            screenshot(root, "diagnostics-0.1.21.png")
             assertTrue(copy.performClick())
             val copied = activity.getSystemService(ClipboardManager::class.java).primaryClip!!.getItemAt(0).text.toString()
             assertTrue(copied.contains("ALIENFLOW DIAGNOSTIC REPORT"))
-            assertTrue(copied.contains("Version: 0.1.20 (21)"))
+            assertTrue(copied.contains("Version: 0.1.21 (22)"))
             assertTrue(copied.contains("Transport: Android AudioRecord + OpenAI Realtime WebSocket"))
             assertTrue(copied.contains("Native WebRTC packaged: false"))
             assertTrue(copied.contains("ANDROID RECORDED PROCESS EXITS"))

@@ -1,6 +1,6 @@
 # AlienFlow — Product Design and Implementation Plan
 
-**Version:** 0.1.20 contract · **Updated:** 13 October 2026 · **Stage:** Implemented Android client; exact verification and remaining device limits are in IMPLEMENTATION.md.
+**Version:** 0.1.21 contract · **Updated:** 13 October 2026 · **Stage:** Implemented Android client; exact verification and remaining device limits are in IMPLEMENTATION.md.
 
 **Working product name:** AlienFlow. This is an Android dictation application inspired by the interaction of Wispr Flow, with a personal-key development client and a planned paid Google Play release. The name is provisional and has not been checked for publication or trademark use.
 
@@ -602,6 +602,11 @@ The supplied 0.1.18 Fold6 diagnostic overrides any implication that ChatGPT and 
 
 ## Store preparation and current compatibility — 2026-10-13
 
-Target API 36 remains mandatory. Build and validate an Android App Bundle alongside every release APK; continue signed APK delivery for phone testing. The unsigned AAB is a build artifact, not a Play-upload-ready or published release. Configure Play App Signing and upload-key handling in Play Console before release, preserving the existing app-signing identity for update continuity. No enrollment or public publishing is authorized by this build step alone.
+Target API 36 remains mandatory. AAB generation was introduced in 0.1.20 and explicitly deferred by the owner afterward. Routine development builds produce APKs only; build and validate an AAB at final store preparation. The unsigned AAB is a build artifact, not a Play-upload-ready or published release. Configure Play App Signing and upload-key handling in Play Console before release, preserving the existing app-signing identity for update continuity. No enrollment or public publishing is authorized by this build step alone.
 
 The owner observes ordinary-app improvement on 0.1.19, continued Termux failure, and intermittent missing bubble in ChatGPT. These remain unresolved acceptance requirements. Preserve failure metadata across opening Diagnostics so subsequent investigation uses the actual failing input rather than the diagnostic screen's focus. Never infer universal compatibility from simulated tests.
+
+
+## Owner correction and default input contract — 2026-10-13 / 0.1.21
+
+Keep target API 36 and defer all AAB build/download/validation work until final store preparation. The current ChatGPT screenshot shows a visible bubble with AF-E10, so do not call that screenshot a missing-bubble failure. Support Android’s default unknown-offset partial surrounding-text windows using a stable absolute IME selection and exact node/text/mutation coverage. Reject missing, stale or contradictory evidence; never search for a matching substring or relax unrelated-text protection. A successful framework regression is not physical-device acceptance.

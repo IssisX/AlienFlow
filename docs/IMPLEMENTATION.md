@@ -1,31 +1,35 @@
-# AlienFlow2 implementation checkpoint — 0.1.20
+# AlienFlow2 implementation checkpoint — 0.1.21
 
-Repository: IssisX/AlienFlow. Branch: AlienFlow2. Date: 2026-10-13. VersionCode: 21.
+Repository: IssisX/AlienFlow. Branch: AlienFlow2. Date: 2026-10-13. VersionCode: 22.
 
-## Observation and unresolved failure
+## Observed failure and research
 
-The owner reports 0.1.19 working in tested ordinary apps but still failing in Termux. A follow-up answer says the bubble is absent in ChatGPT while working in other apps. These are bounded observations, not universal compatibility. No fresh failure diagnostic or installed Termux version was supplied. The earlier 0.1.18 25/27-character report cannot establish the current Termux or missing-bubble cause.
+The latest owner screenshot shows ChatGPT's selected composer, visible alien and [AF-E10] Editor sync timed out. This is an insertion/synchronization rejection, not evidence of a missing bubble in that screenshot. It does not include surrounding-text offset or failure metadata, so its exact producing case remains unknown. The screenshot is directly visible in the conversation; its supplied scratch attachment path did not exist and was not substituted with a Library screenshot read.
 
-Inspected current upstream Termux TerminalView and Android 16 BaseInputConnection/RemoteInputConnectionImpl. The upstream terminal exposes a generic View, uses TYPE_NULL or class-zero visible-password/no-suggestions flags, and consumes/clears committed text; its contract matches the existing terminal adapter. Existing source already gates terminal commits until finalization. Plausible remaining boundaries include unavailable input connection, unresolved accessibility focus, or target invalidation; evidence does not uniquely select one. No new Termux insertion or focus-eligibility patch is justified, and no device fix is claimed.
+Primary Android 16 InputConnection source establishes a supported case the app rejected: the default getSurroundingText concatenates bounded before/selected/after text and returns offset=-1. AndroidX RecordingInputConnection does not override that method. AlienFlow requested bounded text but accepted unknown-offset windows only when they equaled the full accessibility field. A long draft using this default method necessarily fails the old guard, independently of increasing the timeout. This is a source-confirmed compatibility defect; without a fresh runtime report it is not established as the exact screenshot cause.
 
-## Implemented
+Also read the current independent AlienFlow(chat) checkpoint and its Library verification JSON. That branch exercised official Termux 0.118.3 on an API 36 emulator through actual overlay touches and accessibility IPC, with recognition fixtures. Its production coordinator/editor matched 0.1.19; its only terminal delta rejects control-only converted text before consuming delivery. This is bounded integration evidence, not Fold6/Gboard/tmux/provider acceptance. No writes were made to AlienFlow(chat), main or build/first-apk, and no generic Termux rewrite is warranted by that evidence.
 
-Diagnostic capture now preserves one last unavailable external-input snapshot across opening AlienFlow's own diagnostic screen. It records sanitized package/class identifiers, input type, field ID, connection/start flags and resolver counts, never field text, credentials or audio. A bounded terminal-stage value records binding, dispatch, rejection or exception; dispatch is explicitly not receipt confirmation. This addresses a verified evidence-loss mechanism: the old latest-focus fields were overwritten by subsequent app focus, including the diagnostic screen.
+## Repair
 
-The project already compiled and targeted API 36. Release CI now builds both APK and AAB. Pinned bundletool 1.18.3 is SHA-256 checked against the upstream release digest, validates the bundle, and dumps its manifest. Packaging checks matching package/version/minimum/target SDK, non-debuggable state, source SHA in DEX, unsigned state and no native libraries; it retains the AAB and reports in the existing delivery ZIP. Direct APK signing and delivery use the original certificate. Play App Signing enrollment/upload-key setup are future Console actions and have not been performed. Preserve the existing app-signing identity when enrolling if APK-to-Play update continuity is required; do not export private keys into this repository or CI artifacts.
+The service retains absolute selection supplied by onStartInput EditorInfo.initialSelStart/End and onUpdateSelection, clearing it when input ends. A read receives that immutable selection only if the identical observation survives across the keyboard IPC. Unknown-offset partial windows can then anchor at absolute selection minus local selection. Both absolute endpoints must match the focused node, selection widths must agree, every shared character must match and the complete mutation must be covered. No substring search, normalization, timeout increase or resending is added. Explicit-offset and full-text paths retain their existing guards. Missing or contradictory callbacks cannot authorize a partial-window edit. Diagnostics include numeric absolute selection metadata.
+
+The changed-path test invokes Android's actual default InputConnection method through a Java proxy delegating native EditText operations, not a fabricated offset window. It verifies offset=-1 and a bounded result in a long draft, selected replacement, Unicode corrections, preservation of prefix/suffix, typing between speech updates and a contradictory callback dispatching no selection/commit. Accessibility broker/IPC and selection callback delivery remain explicit fixtures. No physical-device claim is inferred.
+
+## Build scope correction
+
+The owner explicitly deferred AAB work until final store preparation. Routine CI no longer downloads bundletool, builds bundleRelease, validates or packages AABs. API 36 remains targeted. Existing delivered .20 AAB and historical records are retained, not treated as a current deliverable. Direct signed APK delivery uses the existing certificate. Recognition requests, prompts and model choices are unchanged.
 
 ## Verification
 
-Exact source 658c9186056e84f91d12f34addf823e645200dd4 (tree 1a26d7cc616590239e3b80c200b9fefb1884073e) passed the single workflow 38399312969: 198 tests, zero failures/errors/skips, release lint zero errors (38 non-error issues), APK assembly and AAB assembly/validation. All 141 bundle-member hashes were verified. The APK uses the original certificate with all 25 payload entries unchanged. The signed APK and unsigned AAB were saved and their hashes verified afterward. Exact evidence: RELEASE_VERIFICATION_0.1.20.json. The added service test drives a missing external input, then switches to AlienFlow and verifies that the failure metadata survives without the private editor text. Existing terminal/document regressions remain required. SDK 35 framework fixtures do not certify installed Termux, ChatGPT, Android 16 or provider behavior. Termux insertion and intermittent ChatGPT bubble availability remain unresolved requirements; request a fresh diagnostic immediately after each failure using this diagnostic build.
+Pending exact-source unit tests, release lint, APK assembly, identity/archive checks, original-certificate signing and saved-file verification. Actual ChatGPT/Fold6 and Termux/tmux/provider acceptance remain unverified for this revision. The screenshot alone cannot identify all causes sharing AF-E10.
 
-## Primary sources
+## Primary references
 
-- https://github.com/termux/termux-app/blob/master/terminal-view/src/main/java/com/termux/view/TerminalView.java
-- https://github.com/aosp-mirror/platform_frameworks_base/blob/android16-release/core/java/android/view/inputmethod/BaseInputConnection.java
-- https://github.com/aosp-mirror/platform_frameworks_base/blob/android16-release/core/java/android/view/inputmethod/RemoteInputConnectionImpl.java
-- https://support.google.com/googleplay/android-developer/answer/11926878
-- https://developer.android.com/guide/app-bundle
-- https://developer.android.com/studio/publish/app-signing
-- https://github.com/google/bundletool/releases/tag/1.18.3
+- https://github.com/aosp-mirror/platform_frameworks_base/blob/android16-release/core/java/android/view/inputmethod/InputConnection.java
+- https://github.com/androidx/androidx/blob/androidx-main/compose/ui/ui/src/androidMain/kotlin/androidx/compose/ui/text/input/RecordingInputConnection.android.kt
+- https://developer.android.com/reference/android/accessibilityservice/InputMethod
+- https://developer.android.com/reference/android/view/inputmethod/SurroundingText
+- Independent branch verification: RELEASE_VERIFICATION_0.1.20-chat.1.json at AlienFlow(chat) 2ada0793ea4d0888a39c12eb3acc406e588a0be4, compiled source 683ab2dcc5902d41ed5b283f08d6a8054def1b2d.
 
-Historical proof: RELEASE_VERIFICATION_0.1.19.json. Standing authority: AGENTS.md. Preserve the concurrent build/first-apk branch.
+Standing authority: AGENTS.md. Historical delivery: RELEASE_VERIFICATION_0.1.20.json.

@@ -51,26 +51,19 @@ jobs:
         run: |
           set -euo pipefail
           "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --channel=0 "platforms;android-${COMPILE_SDK}" "build-tools;${BUILD_TOOLS_VERSION}"
-      - name: Verify pinned bundletool
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p build/ci
-          curl --fail --location --silent --show-error --retry 2 -o build/ci/bundletool.jar https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar
-          echo 'a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29  build/ci/bundletool.jar' | sha256sum --check --strict
-      - name: Unit tests, release lint, APK and AAB
+      - name: Unit tests, release lint, and APK
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p build/ci
           bash gradlew --no-daemon --no-configuration-cache --console=plain --stacktrace \
-            :app:testDebugUnitTest :app:lintRelease :app:assembleRelease :app:bundleRelease 2>&1 | tee build/ci/gradle.log
+            :app:testDebugUnitTest :app:lintRelease :app:assembleRelease 2>&1 | tee build/ci/gradle.log
       - name: Verify release and prepare delivery bundle
         run: python3 scripts/package_release.py
       - name: Upload single delivery ZIP
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          path: build/delivery/AlienFlow-0.1.20-unsigned-release-bundle.zip
+          path: build/delivery/AlienFlow-0.1.21-unsigned-release-bundle.zip
           archive: false
           if-no-files-found: error
           retention-days: 14

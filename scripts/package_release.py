@@ -15,8 +15,8 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = "io.github.issisx.alienflow"
-VERSION_CODE = 21
-VERSION_NAME = "0.1.20"
+VERSION_CODE = 22
+VERSION_NAME = "0.1.21"
 MIN_SDK = 33
 TARGET_SDK = 36
 BUILD_TOOLS = "36.0.0"
@@ -67,7 +67,7 @@ def main() -> None:
     if bundle.exists():
         shutil.rmtree(bundle)
     (bundle / "reports").mkdir(parents=True)
-    apk = bundle / "AlienFlow-0.1.20-unsigned.apk"
+    apk = bundle / "AlienFlow-0.1.21-unsigned.apk"
     run(str(tools / "zipalign"), "-P", "16", "-f", "4", str(raw_apk), str(apk))
     run(str(tools / "zipalign"), "-c", "-P", "16", "4", str(apk))
 
@@ -119,36 +119,6 @@ def main() -> None:
         "apksigner did not confirm the expected completely unsigned APK",
     )
 
-    # Play uses a bundle; direct phone testing continues to use the signed APK.
-    raw_aab = ROOT / "app/build/outputs/bundle/release/app-release.aab"
-    require(raw_aab.is_file(), "Expected release AAB is missing")
-    aab = bundle / f"AlienFlow-{VERSION_NAME}-unsigned.aab"
-    shutil.copy2(raw_aab, aab)
-    bundletool = ROOT / "build/ci/bundletool.jar"
-    require(sha256(bundletool) == "a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29", "Unexpected bundletool")
-    validation = run("java", "-jar", str(bundletool), "validate", f"--bundle={aab}")
-    manifest_result = subprocess.run(
-        ["java", "-jar", str(bundletool), "dump", "manifest", f"--bundle={aab}", "--module=base"],
-        check=True, text=True, capture_output=True,
-    )
-    bundle_manifest = ET.fromstring(manifest_result.stdout)
-    android = "{http://schemas.android.com/apk/res/android}"
-    require(bundle_manifest.get("package") == PACKAGE, "Unexpected AAB package")
-    require(bundle_manifest.get(android + "versionCode") == str(VERSION_CODE), "Unexpected AAB version code")
-    require(bundle_manifest.get(android + "versionName") == VERSION_NAME, "Unexpected AAB version name")
-    uses_sdk = bundle_manifest.find("uses-sdk")
-    require(uses_sdk is not None and uses_sdk.get(android + "targetSdkVersion") == str(TARGET_SDK), "Unexpected AAB target SDK")
-    require(uses_sdk.get(android + "minSdkVersion") == str(MIN_SDK), "Unexpected AAB minimum SDK")
-    application = bundle_manifest.find("application")
-    require(application is not None and application.get(android + "debuggable", "false") == "false", "AAB is debuggable")
-    with zipfile.ZipFile(aab) as archive:
-        names = archive.namelist()
-        require(not any(re.match(r"META-INF/.*\.(SF|RSA|DSA|EC)$", n, re.I) for n in names), "AAB unexpectedly signed")
-        require(not any(n.startswith("base/lib/") and n.endswith(".so") for n in names), "AAB contains native libraries")
-        require(any(source_sha.encode() in archive.read(n) for n in names if n.startswith("base/dex/") and n.endswith(".dex")), "AAB source identity missing")
-    (bundle / "reports/aab-manifest.xml").write_text(manifest_result.stdout)
-    (bundle / "reports/aab-validation.txt").write_text(validation)
-
     test_files = sorted((ROOT / "app/build/test-results/testDebugUnitTest").glob("TEST-*.xml"))
     require(bool(test_files), "Required unit-test XML reports are missing")
     tests = failures = errors = skipped = 0
@@ -174,10 +144,10 @@ def main() -> None:
     shutil.copytree(ROOT / "app/build/reports/tests/testDebugUnitTest", reports / "unit-tests")
     ui_proof = ROOT / "app/build/reports/ui-proof"
     require(
-        (ui_proof / "main-0.1.20.png").is_file()
-        and (ui_proof / "diagnostics-0.1.20.png").is_file()
-        and (ui_proof / "indicator-light-0.1.20.png").is_file()
-        and (ui_proof / "indicator-dark-0.1.20.png").is_file(),
+        (ui_proof / "main-0.1.21.png").is_file()
+        and (ui_proof / "diagnostics-0.1.21.png").is_file()
+        and (ui_proof / "indicator-light-0.1.21.png").is_file()
+        and (ui_proof / "indicator-dark-0.1.21.png").is_file(),
         "Actual activity render evidence is missing",
     )
     for screen in ("settings", "bubble-settings", "dictation-settings", "privacy-settings", "history", "settings-small-large-text", "language-small-large-text", "bubble-small-large-text", "settings-unfolded"):
@@ -197,7 +167,7 @@ def main() -> None:
     (reports / "test-lint-summary.txt").write_text(
         f"Unit tests: {tests}; failures: {failures}; errors: {errors}; skipped: {skipped}\n"
         f"Release lint: {len(issues)} issues; errors/fatal: {lint_errors}\n"
-        "Gradle gates: :app:testDebugUnitTest :app:lintRelease :app:assembleRelease :app:bundleRelease succeeded.\n"
+        "Gradle gates: :app:testDebugUnitTest :app:lintRelease :app:assembleRelease succeeded.\n"
         "Device, microphone, provider account, and editor behavior have not been validated by CI.\n"
     )
 
@@ -216,9 +186,9 @@ def main() -> None:
         "The APK is deliberately unsigned. Never generate or store a private key in this bundle or repository.\n"
         "With Java 17, sign a COPY using an existing private keystore stored outside the repository:\n"
         "java -jar tooling/apksigner.jar sign --ks /private/path/release.jks --ks-key-alias alienflow "
-        "--out AlienFlow-0.1.20.apk AlienFlow-0.1.20-unsigned.apk\n"
+        "--out AlienFlow-0.1.21.apk AlienFlow-0.1.21-unsigned.apk\n"
         "Omit password options to use the private interactive password prompt.\n"
-        "java -jar tooling/apksigner.jar verify --verbose --print-certs AlienFlow-0.1.20.apk\n"
+        "java -jar tooling/apksigner.jar verify --verbose --print-certs AlienFlow-0.1.21.apk\n"
     )
 
     versions = tomllib.loads((ROOT / "gradle/libs.versions.toml").read_text())["versions"]
@@ -236,7 +206,6 @@ def main() -> None:
         "compile_sdk": 36,
         "debuggable": False,
         "signing": "unsigned; private release signing required before installation",
-        "aab": {"filename": aab.name, "sha256": sha256(aab), "validated_with": "bundletool 1.18.3", "signing": "unsigned; upload signing and Play App Signing enrollment pending"},
         "transport": TRANSPORT,
         "native_libraries": native_libraries,
         "approved_artwork_entry": artwork_entries[0],
@@ -267,7 +236,7 @@ def main() -> None:
     }
     (bundle / "build-info.json").write_text(json.dumps(info, indent=2) + "\n")
 
-    zip_path = delivery / "AlienFlow-0.1.20-unsigned-release-bundle.zip"
+    zip_path = delivery / "AlienFlow-0.1.21-unsigned-release-bundle.zip"
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
         for path in sorted(bundle.rglob("*")):
             if path.is_file():

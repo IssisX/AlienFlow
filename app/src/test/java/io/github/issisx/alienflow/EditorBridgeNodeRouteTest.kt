@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.os.Looper
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.SurroundingText
 import android.view.inputmethod.TextAttribute
@@ -42,6 +43,11 @@ class EditorBridgeNodeRouteTest {
         var unexposedSuffix = ""
         var conflictingKeyboard = false
         val committedTexts = mutableListOf<String>()
+        fun publishSelection() {
+            val current = field ?: return
+            inputMethod?.onUpdateSelection(-1, -1, current.selectionStart, current.selectionEnd,
+                BaseInputConnection.getComposingSpanStart(current.text), BaseInputConnection.getComposingSpanEnd(current.text))
+        }
     }
     @Implements(AccessibilityService::class)
     class Broker : ShadowAccessibilityService() {
@@ -61,7 +67,9 @@ class EditorBridgeNodeRouteTest {
             return if (conflictingKeyboard && read.text.isNotEmpty()) SurroundingText(
                 "!" + read.text.toString().drop(1), read.selectionStart, read.selectionEnd, read.offset) else read
         }
-        @Implementation fun setSelection(start: Int, end: Int) { selections.add(start to end); nativeKeyboard!!.setSelection(start, end) }
+        @Implementation fun setSelection(start: Int, end: Int) {
+            selections.add(start to end); nativeKeyboard!!.setSelection(start, end); publishSelection()
+        }
         @Implementation fun commitText(text: CharSequence, cursor: Int, attributes: TextAttribute?) {
             committedTexts.add(text.toString())
             // AOSP accessibility IPC batches finishComposingText before commitText.
@@ -71,7 +79,19 @@ class EditorBridgeNodeRouteTest {
             nativeKeyboard!!.commitText(text, cursor)
             nativeKeyboard!!.endBatchEdit()
             serviceForCallbacks?.confirmEmptyComposition() // Simulated OS selection callback.
+            publishSelection()
         }
+    }
+    private fun useAndroidDefaultSurroundingText() {
+        val delegate = nativeKeyboard!!
+        nativeKeyboard = java.lang.reflect.Proxy.newProxyInstance(InputConnection::class.java.classLoader,
+            arrayOf(InputConnection::class.java)) { proxy, method, args ->
+            if (method.name == "getSurroundingText") {
+                check(method.isDefault)
+                // Execute Android's actual default method, not a fabricated window.
+                java.lang.reflect.InvocationHandler.invokeDefault(proxy, method, *(args ?: emptyArray()))
+            } else method.invoke(delegate, *(args ?: emptyArray()))
+        } as InputConnection
     }
     @Implements(AccessibilityNodeInfo::class)
     class NodeIpc : ShadowAccessibilityNodeInfo() {
@@ -119,21 +139,52 @@ class EditorBridgeNodeRouteTest {
             val service = controller.get()
             serviceForCallbacks = service
             if (keyboard) {
-                info = EditorInfo().apply { packageName = focused!!.packageName.toString(); inputType = field!!.inputType; fieldId = 42 }
+                info = EditorInfo().apply {
+                    packageName = focused!!.packageName.toString(); inputType = field!!.inputType; fieldId = 42
+                    initialSelStart = field!!.selectionStart; initialSelEnd = field!!.selectionEnd
+                }
                 nativeKeyboard = field!!.onCreateInputConnection(EditorInfo())!!
-                inputMethod = InputMethod(service)
+                inputMethod = service.onCreateInputMethod()
                 @Suppress("UNCHECKED_CAST")
                 val remoteClass = Class.forName("com.android.internal.inputmethod.RemoteAccessibilityInputConnection") as Class<Any>
                 connection = ReflectionHelpers.callConstructor(InputMethod.AccessibilityInputConnection::class.java,
                     ClassParameter.from(InputMethod::class.java, inputMethod), ClassParameter.from(remoteClass, null))
             }
             service.javaClass.getDeclaredMethod("onServiceConnected").apply { isAccessible = true }.invoke(service)
+            if (keyboard) inputMethod!!.onStartInput(info!!, false)
             try { block(service) } finally {
                 (service.application as AlienApp).coordinator.javaClass.getDeclaredField("active").apply { isAccessible = true }.setBoolean((service.application as AlienApp).coordinator, false)
                 controller.destroy()
             }
         }
     }
+    @Test fun androidDefaultImeWindowInALongDraftPreservesSelectionAndLiveCorrections() =
+        withField("older 🛸 line\n".repeat(20) + "left selected right", keyboard = true) { service ->
+            useAndroidDefaultSurroundingText(); keyboardWindow = 24
+            val initial = field!!.text.toString(); val cursor = initial.indexOf("selected")
+            field!!.setSelection(cursor, cursor + 8); publishSelection()
+            val actual = nativeKeyboard!!.getSurroundingText(24, 24, 0)!!
+            assertEquals(-1, actual.offset); assertTrue(actual.text.length < initial.length)
+            assertTrue(service.bridge.begin()); activate(service)
+            assertEquals(EditorWriteResult.APPLIED, write(service, "hello 🛸"))
+            assertEquals(EditorWriteResult.APPLIED, write(service, "Hello 🚀."))
+            assertEquals(initial.take(cursor) + "Hello 🚀." + initial.drop(cursor + 8), field!!.text.toString())
+            val typedCursor = field!!.selectionStart
+            field!!.text.insert(typedCursor, " typed"); field!!.setSelection(typedCursor + 6); publishSelection()
+            assertEquals(EditorWriteResult.APPLIED, write(service, "Hello 🚀. again"))
+            assertEquals(initial.take(cursor) + "Hello 🚀. typed again" + initial.drop(cursor + 8), field!!.text.toString())
+            assertTrue(service.bridge.hasUserInteraction)
+            assertEquals(0, mutations)
+        }
+    @Test fun defaultImeWindowCannotWriteWithAContradictorySelectionCallback() =
+        withField("older draft\n".repeat(20) + "existing words", keyboard = true) { service ->
+            useAndroidDefaultSurroundingText(); keyboardWindow = 24
+            assertTrue(service.bridge.begin()); activate(service)
+            val initial = field!!.text.toString(); val cursor = field!!.selectionStart
+            inputMethod!!.onUpdateSelection(-1, -1, cursor - 1, cursor - 1, -1, -1)
+            assertEquals(EditorWriteResult.FAILED, write(service, "spoken"))
+            assertEquals(initial, field!!.text.toString()); assertTrue(committedTexts.isEmpty()); assertTrue(selections.isEmpty())
+        }
     private fun activate(service: AlienAccessibilityService) {
         val app = service.application as AlienApp
         app.coordinator.javaClass.getDeclaredField("active").apply { isAccessible = true }.setBoolean(app.coordinator, true)
