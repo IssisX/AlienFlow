@@ -67,7 +67,7 @@ class CrashJournal(private val application: Application) {
         if (stage != "tap.received" && stage == lastStage()) return
         val session = if (stage == "tap.received") System.currentTimeMillis() else currentSession
         if (stage == "tap.received") prefs.edit().remove("live_problem").remove("editor_code")
-            .remove("editor_observation").remove("audio_commit").remove("startup_timing").apply()
+            .remove("editor_observation").remove("audio_commit").remove("startup_timing").remove("terminal_stage").apply()
         val entry = "${Instant.now()} $stage"
         val trace = (currentTrace.lines().filter { it.isNotBlank() } + entry).takeLast(80).joinToString("\n")
         currentStage = stage; currentSession = session; currentTrace = trace
@@ -107,6 +107,30 @@ class CrashJournal(private val application: Application) {
             "visited=${result.visited}; candidates=${result.candidates}; exhausted=${result.exhausted}; resolved=${result.node != null}"
         if (prefs.getString("editor_focus", "") != metadata) prefs.edit().putString("editor_focus", metadata).apply()
     }
+    /** Keep one foreign-input failure snapshot: opening our diagnostic screen must
+     * not replace the evidence with AlienFlow's own focus state. No editor text. */
+    internal fun inputAvailability(result: EditorFocusDiscovery.Result,
+                                   direct: android.view.accessibility.AccessibilityNodeInfo?,
+                                   info: android.view.inputmethod.EditorInfo?, started: Boolean, connected: Boolean) {
+        fun identifier(value: CharSequence?): String = value?.toString()?.takeIf {
+            it.length <= 180 && it.matches(Regex("[A-Za-z_][A-Za-z0-9_.$]*"))
+        } ?: "unknown"
+        val inputPackage = identifier(info?.packageName)
+        val nodePackage = identifier(direct?.packageName)
+        val foreign = if (started) inputPackage else nodePackage
+        if (result.node != null || foreign == "unknown" || foreign == application.packageName) return
+        val metadata = "input_package=$inputPackage; node_package=$nodePackage; node_class=${identifier(direct?.className)}; " +
+            "input_type=${info?.inputType}; field_id=${info?.fieldId}; input_started=$started; connected=$connected; " +
+            "direct_present=${direct != null}; editable=${direct?.isEditable}; password=${direct?.isPassword}; " +
+            "input_window=${result.focusedWindow}; visited=${result.visited}; candidates=${result.candidates}; exhausted=${result.exhausted}"
+        if (prefs.getString("unavailable_input_metadata", "") != metadata) prefs.edit()
+            .putString("unavailable_input_metadata", metadata)
+            .putString("unavailable_input", "${Instant.now()} source=${BuildConfig.SOURCE_REVISION}; $metadata").apply()
+    }
+    fun terminalStage(stage: String) {
+        if (stage in setOf("bound", "dispatched", "rejected", "exception"))
+            prefs.edit().putString("terminal_stage", "${Instant.now()} source=${BuildConfig.SOURCE_REVISION}; $stage").apply()
+    }
     fun editorBinding(snapshot: EditorSnapshot, hintLength: Int, hintEqualsText: Boolean,
                       showingHint: Boolean, whollyOwnedNode: Boolean, keyboardAttached: Boolean) {
         prefs.edit().putString("editor_binding", "length=${snapshot.text.length}; cursor=${snapshot.start}:${snapshot.end}; " +
@@ -118,11 +142,20 @@ class CrashJournal(private val application: Application) {
         val metadata = "phase=${if (phase in setOf("before", "after", "node")) phase else "after"}; " +
             "node_length=${n?.text?.length}; node_cursor=${n?.start}:${n?.end}; " +
             "ime_length=${k?.text?.length}; ime_cursor=${k?.start}:${k?.end}; " +
-            "offset=${k?.offset}; composing=${observation.composing}; " +
+            "offset=${k?.offset}; ime_absolute_cursor=${k?.selection?.start}:${k?.selection?.end}; composing=${observation.composing}; " +
             "evidence_code=" + (if (n != null && k != null) {
                 val error = EditorEvidence.corroborate(n, k, observation.requiredRange ?: (n.start until n.end)).error
                 Regex("^\\[AF-E([0-9]{2})\\]").find(error.orEmpty())?.groupValues?.get(1) ?: "none"
             } else "unavailable")
+        try { prefs.edit().putString("editor_observation", metadata).commit() }
+        catch (_: Exception) { persistFailed = true }
+    }
+    @Synchronized fun keyboardObservation(phase: String, node: EditorEvidence.NodeText?,
+                                           keyboard: EditorEvidence.KeyboardText?, code: String) {
+        val metadata = "route=keyboard; phase=$phase; node_length=${node?.text?.length}; " +
+            "node_cursor=${node?.start}:${node?.end}; ime_length=${keyboard?.text?.length}; " +
+            "ime_cursor=${keyboard?.start}:${keyboard?.end}; offset=${keyboard?.offset}; " +
+            "ime_absolute_cursor=${keyboard?.selection?.start}:${keyboard?.selection?.end}; evidence_code=$code"
         try { prefs.edit().putString("editor_observation", metadata).commit() }
         catch (_: Exception) { persistFailed = true }
     }
@@ -167,6 +200,8 @@ class CrashJournal(private val application: Application) {
         appendLine("Latest editor rejection code: " + prefs.getString("editor_code", "none"))
         appendLine("Latest editor observation: " + prefs.getString("editor_observation", "none"))
         appendLine("Latest editor focus resolution (metadata only): " + prefs.getString("editor_focus", "none"))
+        appendLine("Last unavailable external input (metadata only; may predate this session): " + prefs.getString("unavailable_input", "none"))
+        appendLine("Latest terminal stage (dispatch is not receipt confirmation): " + prefs.getString("terminal_stage", "none"))
         appendLine("Latest editor binding (metadata only): " + prefs.getString("editor_binding", "none"))
         appendLine("Latest rejected audio commit: " + prefs.getString("audio_commit", "none"))
         appendLine("Latest bubble availability (metadata only): " + prefs.getString("bubble_availability", "not observed"))

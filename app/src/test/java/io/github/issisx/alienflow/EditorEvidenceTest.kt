@@ -58,6 +58,19 @@ class EditorEvidenceTest {
         assertNull(EditorEvidence.corroborate(snapshot,
             EditorEvidence.KeyboardText("prefix text", 8, 8, -1)).snapshot)
     }
+    @Test fun defaultImePartialWindowNeedsStableAbsoluteSelectionAndExactAnchors() {
+        val text = "earlier draft\n".repeat(20) + "left selected right"
+        val start = text.indexOf("selected"); val end = start + 8
+        val snapshot = node(text, start = start, end = end).snapshot!!
+        val window = EditorEvidence.KeyboardText(text.substring(start - 8, end + 6), 8, 16, -1,
+            EditorEvidence.Selection(start, end))
+        assertEquals(snapshot, EditorEvidence.corroborate(snapshot, window, start until end).snapshot)
+        assertNull(EditorEvidence.corroborate(snapshot, window.copy(selection = null)).snapshot)
+        assertNull(EditorEvidence.corroborate(snapshot, window.copy(selection = EditorEvidence.Selection(start + 1, end + 1))).snapshot)
+        assertNull(EditorEvidence.corroborate(snapshot, window.copy(end = 15)).snapshot)
+        assertNull(EditorEvidence.corroborate(snapshot, window.copy(text = "X" + window.text.drop(1))).snapshot)
+        assertNull(EditorEvidence.corroborate(snapshot, window, (start - 9) until end).snapshot)
+    }
     @Test fun nonzeroAndInvalidOffsetsAreNotGuessed() {
         val snapshot = node("text", start = 4).snapshot!!
         for (offset in listOf(-2, 1, 200)) {

@@ -15,6 +15,10 @@ class EditorBridge(private val service: AlienAccessibilityService) {
     private var generation = 0L
     private var writeSequence = 0L
     private var ownership: EditorOwnership? = null
+    private var keyboardOwnership: KeyboardEditorOwnership? = null
+    private var keyboardFieldId = 0
+    private var bindingSelection: EditorEvidence.Selection? = null
+    private var bindingPresentation: EditorEvidence.NodeText? = null
     private var first = true
     private var detachedSnapshot: EditorSnapshot? = null
     var isTerminal = false; private set
@@ -40,9 +44,13 @@ class EditorBridge(private val service: AlienAccessibilityService) {
             (info?.packageName == node.packageName?.toString() && password(info?.inputType ?: 0))
     }
     fun focused(): AccessibilityNodeInfo? {
-        val found = EditorFocusDiscovery.resolve(service.findFocus(AccessibilityNodeInfo.FOCUS_INPUT),
+        val direct = service.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        val found = EditorFocusDiscovery.resolve(direct,
             { service.windows }, { (it.isEditable || supportsNodeActions(it) || terminalNode(it)) && !isProtected(it) }, ::isProtected)
         (service.application as? AlienApp)?.crashJournal?.editorFocus(found)
+        (service.application as? AlienApp)?.crashJournal?.inputAvailability(found, direct,
+            service.inputMethod?.currentInputEditorInfo, service.inputMethod?.currentInputStarted == true,
+            service.inputMethod?.currentInputConnection != null)
         return found.node
     }
 
@@ -73,10 +81,11 @@ class EditorBridge(private val service: AlienAccessibilityService) {
 
     fun begin(): Boolean {
         generation++; writeSequence++; ownership = null; first = true; lastError = ""
-        bound = false
+        bound = false; keyboardOwnership = null
         isTerminal = false; terminalInsertion = null; nodeActions = false
         continuation.reset(); userInteracted = false
         node = focused() ?: return fail("[AF-E01] Tap inside a text box first. Password fields are excluded")
+        if (!node!!.refresh()) return fail("[AF-E03] The original text box is no longer available")
         if (terminalNode(node!!)) {
             if (service.inputMethod?.currentInputConnection == null)
                 return fail("[AF-E04] Tap the Termux terminal to attach its keyboard")
@@ -84,11 +93,22 @@ class EditorBridge(private val service: AlienAccessibilityService) {
             terminalFieldId = service.inputMethod?.currentInputEditorInfo?.fieldId ?: 0
             terminalInsertion = TerminalInsertion()
             bound = true
+            app.crashJournal.terminalStage("bound")
             return true
         }
-        // Capture without guessing contents. Existing drafts use range edits through
-        // the keyboard connection; node SET_TEXT is allowed only for an empty field
-        // whose entire contents will be our owned dictation.
+        val connection = service.inputMethod?.currentInputConnection
+        // Accessibility identifies the field. Its visible text/selection can include
+        // CSS placeholder content and are never coordinates for keyboard mutations.
+        if (connection != null) {
+            if (service.inputMethod?.currentInputEditorInfo?.packageName != node!!.packageName?.toString())
+                return fail("[AF-E05] The keyboard is attached to another app; tap this text box again")
+            keyboardFieldId = service.inputMethod?.currentInputEditorInfo?.fieldId ?: 0
+            bindingSelection = service.imeSelection
+            bindingPresentation = presentation()
+            nodeActions = false
+            bound = true
+            return true
+        }
         nodeActions = supportsNodeActions(node!!)
         val snapshot = snapshotNode() ?: return false
         val ambiguousHint = !node!!.isShowingHintText && !node!!.hintText.isNullOrEmpty() && node!!.text?.toString() == node!!.hintText.toString()
@@ -97,11 +117,10 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         nodeActions = nodeActions && snapshot.text.isEmpty() && emptyEvidence && !ambiguousHint
         app.crashJournal.editorBinding(snapshot, node!!.hintText?.length ?: 0,
             !node!!.hintText.isNullOrEmpty() && node!!.text?.toString() == node!!.hintText.toString(), node!!.isShowingHintText,
-            nodeActions, service.inputMethod?.currentInputConnection != null)
-        if (!nodeActions && service.inputMethod?.currentInputConnection == null) {
-            return fail(if (ambiguousHint) "[AF-E16] This field’s placeholder cannot be separated from its text; no text was changed"
-                else "[AF-E04] Can't safely edit the existing text; select the field again or start in an empty field")
-        }
+            nodeActions, false)
+        if (!nodeActions) return fail(if (ambiguousHint)
+            "[AF-E16] This field’s placeholder cannot be separated from its text; no text was changed"
+            else "[AF-E04] Can't safely edit the existing text; select the field again or start in an empty field")
         // Binding permits microphone startup during typing; writes use fresh
         // matching text/cursor evidence and finish composition before insertion.
         ownership = EditorOwnership(snapshot.copy(composing = false))
@@ -137,6 +156,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
     } == true
 
     fun valid(): Boolean {
+        if (!nodeActions && !isTerminal) return sameTarget()
         if (isTerminal) return terminalInsertion != null && terminalValid()
         val owner = ownership ?: return false
         val snapshot = snapshotNode() ?: return false
@@ -148,22 +168,141 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         if (!bound) return false
         if (isTerminal) return terminalValid()
         val target = node ?: return false
-        return ownership != null && app.screenReady() && target.refresh() && focused() == target && !isProtected(target)
+        return app.screenReady() && target.refresh() && focused() == target && !isProtected(target) &&
+            (nodeActions || (service.inputMethod?.currentInputConnection != null &&
+                service.inputMethod?.currentInputEditorInfo?.packageName == target.packageName?.toString() &&
+                service.inputMethod?.currentInputEditorInfo?.fieldId == keyboardFieldId))
     }
 
     fun write(value: String, completion: (EditorWriteResult) -> Unit) {
-        if (!isTerminal) { writeOwned(value, false, completion); return }
+        if (!isTerminal) {
+            if (nodeActions) writeOwned(value, false, completion) else writeKeyboard(value, false, completion)
+            return
+        }
         if (!app.coordinator.finishing || app.coordinator.active) { completion(EditorWriteResult.FAILED); return }
         try {
             val connection = service.inputMethod?.currentInputConnection
             val ok = terminalInsertion?.send(value, connection != null && terminalValid()) {
+                app.crashJournal.terminalStage("dispatched")
                 connection!!.commitText(it, 1, null)
             } == true
-            if (!ok) fail("[AF-T01] Termux focus changed; text is saved in AlienFlow")
+            if (!ok) { app.crashJournal.terminalStage("rejected"); fail("[AF-T01] Termux focus changed; text is saved in AlienFlow") }
             completion(if (ok) EditorWriteResult.APPLIED else EditorWriteResult.FAILED)
         } catch (_: Exception) {
+            app.crashJournal.terminalStage("exception")
             fail("[AF-T02] Termux input could not be confirmed; text is saved in AlienFlow")
             completion(EditorWriteResult.FAILED)
+        }
+    }
+
+    private fun presentation(): EditorEvidence.NodeText? = node?.let {
+        EditorEvidence.NodeText(it.text?.toString(), it.isShowingHintText, it.textSelectionStart, it.textSelectionEnd)
+    }
+
+    private fun writeKeyboard(value: String, restoring: Boolean, completion: (EditorWriteResult) -> Unit) {
+        lastError = ""
+        val writeGeneration = generation
+        val sequence = ++writeSequence
+        fun current() = generation == writeGeneration && sequence == writeSequence && bound &&
+            app.coordinator.service === service && (restoring || app.coordinator.active || app.coordinator.finishing) && sameTarget()
+        scope.launch {
+            var outcome = EditorWriteResult.USER_EDIT
+            var phase = "before"
+            var evidence: EditorEvidence.KeyboardText? = null
+            var evidenceCode = "unavailable"
+            try {
+                if (!current()) return@launch
+                val connection = service.inputMethod?.currentInputConnection ?: return@launch
+                var owner = keyboardOwnership
+                val preview = if (restoring) value else continuation.tail(value)
+                val requested = owner?.replacement(preview)?.let {
+                    maxOf(it.range.last.toLong() + 1 - it.range.first, it.text.length.toLong()) + 64
+                }?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt()
+                    ?: maxOf(128L, preview.length.toLong() + 64).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                suspend fun read(): KeyboardWindow? {
+                    val selection = service.imeSelection
+                    val surrounding = withContext(Dispatchers.IO) {
+                        connection.getSurroundingText(requested, requested, InputConnection.GET_TEXT_WITH_STYLES)
+                    }
+                    evidence = surrounding?.let { EditorEvidence.KeyboardText(it.text.toString(),
+                        it.selectionStart, it.selectionEnd, it.offset,
+                        selection.takeIf { selection === service.imeSelection }) }
+                    return evidence?.let { KeyboardWindow.read(it, service.composing || hasComposition(surrounding?.text)) }
+                        .also { evidenceCode = if (it != null) "none" else if (evidence == null) "04" else "11" }
+                }
+                val initial = withTimeoutOrNull(3_000L) { read() } ?: run {
+                    fail("[AF-E09] Keyboard text or cursor unavailable; words are saved in AlienFlow")
+                    outcome = EditorWriteResult.FAILED; return@launch
+                }
+                val changedBeforeFirstRead = owner == null && (bindingPresentation != presentation() ||
+                    (evidence?.offset == -1 && bindingSelection?.let { minOf(it.start, it.end) != initial.absoluteStart ||
+                        maxOf(it.start, it.end) != initial.absoluteEnd } == true))
+                if (owner == null || initial.composing || !owner.matches(initial)) {
+                    if (restoring) return@launch
+                    if (owner != null || initial.composing || changedBeforeFirstRead) {
+                        userInteracted = true; continuation.protectDispatched()
+                    }
+                    owner = KeyboardEditorOwnership(initial, writeGeneration, replaceSelection = !userInteracted)
+                    keyboardOwnership = owner
+                }
+                val writer = owner
+                val tail = if (restoring) value else continuation.tail(value)
+                val inserted = if (!restoring && userInteracted) writer.separateFromTypedWord(tail) else tail
+                if (!restoring && writer.first && inserted.isEmpty()) {
+                    continuation.dispatched(value); outcome = EditorWriteResult.APPLIED; return@launch
+                }
+                val replacement = writer.replacement(inserted)
+                // A fresh read authorizes exactly the characters about to be replaced.
+                // A short window cannot authorize rewriting unseen earlier speech.
+                val fresh = withTimeoutOrNull(3_000L) { read() }
+                if (!current()) return@launch
+                if (fresh == null || !writer.covers(fresh, replacement.range)) {
+                    evidenceCode = "09"; outcome = EditorWriteResult.FAILED; return@launch
+                }
+                if (!writer.matches(fresh)) { outcome = EditorWriteResult.RETRY; return@launch }
+                val selectionAtDispatch = evidence?.selection
+                val range = replacement.range
+                if (writer.first || range.first != fresh.absoluteStart || range.last + 1 != fresh.absoluteEnd)
+                    connection.setSelection(range.first, range.last + 1)
+                connection.commitText(replacement.text, 1, null)
+                if (!restoring) continuation.dispatched(value)
+                phase = "after"
+                // Confirm through the same API/coordinate system that performed the edit.
+                // No whole-field SET_TEXT, clipboard paste, or resend after a timeout.
+                outcome = withTimeoutOrNull(3_000L) {
+                    repeat(16) {
+                        if (!current()) return@withTimeoutOrNull EditorWriteResult.USER_EDIT
+                        val observed = read()
+                        if (!current()) return@withTimeoutOrNull EditorWriteResult.USER_EDIT
+                        if (observed != null) {
+                            if (writer.confirm(observed, inserted)) return@withTimeoutOrNull EditorWriteResult.APPLIED
+                            val staleSelection = evidence?.offset == -1 && evidence?.selection == selectionAtDispatch &&
+                                observed.absoluteEnd != writer.proposedCursor(inserted)
+                            if (!staleSelection && !writer.matches(observed))
+                                return@withTimeoutOrNull EditorWriteResult.RETRY
+                        }
+                        if (it < 15) delay(50)
+                    }
+                    EditorWriteResult.FAILED
+                } ?: EditorWriteResult.FAILED
+            } catch (_: CancellationException) {
+                outcome = EditorWriteResult.USER_EDIT
+            } catch (_: Exception) {
+                fail("[AF-E15] Android rejected the editor operation; words are saved in AlienFlow")
+                outcome = EditorWriteResult.FAILED
+            } finally {
+                if (outcome == EditorWriteResult.USER_EDIT && current()) outcome = EditorWriteResult.RETRY
+                if (outcome == EditorWriteResult.RETRY) {
+                    continuation.protectDispatched(); userInteracted = true; keyboardOwnership = null
+                }
+                if (outcome == EditorWriteResult.FAILED && current()) {
+                    app.crashJournal.keyboardObservation(phase, presentation(), evidence, evidenceCode)
+                    if (!lastError.startsWith("[AF-E15]")) fail(if (phase == "before")
+                        "[AF-E09] Keyboard read did not cover this edit; see Diagnostics"
+                        else "[AF-E14] Keyboard insertion unconfirmed; see Diagnostics")
+                }
+                completion(outcome)
+            }
         }
     }
 
@@ -226,78 +365,6 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                     }
                     return@launch
                 }
-                val connection = service.inputMethod?.currentInputConnection
-                    ?: run { fail("[AF-E04] Android detached the keyboard connection"); outcome = EditorWriteResult.FAILED; return@launch }
-                val initialEvidence = before
-                // Read the owned mutation plus context, not an entire growing draft.
-                // An editor may return less; coverage is checked before dispatch.
-                val initialReplacement = owner.replacement(inserted, first)
-                val requested = maxOf(before.end - initialReplacement.range.first, initialReplacement.text.length) + 64
-                var rawObservation: EditorSnapshot? = null
-                suspend fun read(): EditorSynchronization.Reading {
-                    val surrounding = withContext(Dispatchers.IO) {
-                        connection.getSurroundingText(requested, requested, InputConnection.GET_TEXT_WITH_STYLES)
-                    }
-                    val keyboard = surrounding?.let { EditorEvidence.KeyboardText(
-                        it.text.toString(), it.selectionStart, it.selectionEnd, it.offset) }
-                    val snapshot = snapshotNode()
-                    rawObservation = snapshot
-                    val composed = service.composing || hasComposition(surrounding?.text)
-                    val agreed = if (snapshot != null && keyboard != null)
-                        EditorEvidence.corroborateWithHint(snapshot, node?.hintText?.toString(), keyboard).snapshot else null
-                    val range = owner.replacement(inserted, first).range
-                    val required = if (phase == "after") range.first until owner.proposedSnapshot(inserted).end else range
-                    observation = EditorSynchronization.Reading(agreed ?: snapshot, keyboard, composed, required)
-                    return observation
-                }
-                val initialReading = withTimeoutOrNull(3_000L) { read() }
-                    ?: run { fail("[AF-E10] Keyboard read timed out; words are saved in AlienFlow"); outcome = EditorWriteResult.FAILED; return@launch }
-                // Some nodes omit composing spans while the native keyboard supplies
-                // them. That independently observed typed word is also user-owned.
-                if (!restoring && initialReading.composing && !initialNode.composing &&
-                    initialReading.node?.copy(composing = false) == before) {
-                    continuation.protectDispatched(); userInteracted = true; owner.invalidate()
-                    owner = EditorOwnership(before, replaceSelection = false); ownership = owner; first = true
-                    inserted = owner.separateFromTypedWord(continuation.tail(value))
-                }
-                // Only independent empty keyboard contents plus matching hint metadata
-                // may disambiguate a misreported placeholder. Never strip matching words
-                // merely because they look like a prompt.
-                val resolvedInitial = initialReading.node
-                if (first && resolvedInitial != null && resolvedInitial.text.isEmpty() && initialEvidence.text.isNotEmpty() &&
-                    node?.hintText?.toString() == initialEvidence.text && initialReading.keyboard?.text == "" &&
-                    !initialReading.composing && !resolvedInitial.composing && snapshotNode() == initialEvidence) {
-                    before = resolvedInitial
-                    owner = EditorOwnership(before); ownership = owner
-                }
-                var initialPending = true
-                suspend fun initialRead(): EditorSynchronization.Reading {
-                    if (initialPending) {
-                        initialPending = false
-                        // Placeholder/composition resolution may have replaced the owner.
-                        // Evidence must cover that owner's current mutation range.
-                        return initialReading.copy(requiredRange = owner.replacement(inserted, first).range)
-                    }
-                    return read()
-                }
-                outcome = EditorSynchronization.await(before, before, ::current, ::initialRead, allowComposition = true)
-                if (outcome != EditorWriteResult.APPLIED) return@launch
-                if (!current() || snapshotNode() != rawObservation) { outcome = EditorWriteResult.USER_EDIT; return@launch }
-                val replacement = owner.replacement(inserted, first)
-                val range = replacement.range
-                if (first || range.first != before.start || range.last + 1 != before.end)
-                    connection.setSelection(range.first, range.last + 1)
-                connection.commitText(replacement.text, 1, null)
-                if (!restoring) continuation.dispatched(value)
-                phase = "after"
-                // A single 100ms sample can read a new IME buffer and an old browser node.
-                // Exact full node text/cursor plus its anchored keyboard window authorize another write.
-                outcome = EditorSynchronization.await(before, owner.proposedSnapshot(inserted), ::current, ::read)
-                if (outcome == EditorWriteResult.APPLIED) {
-                    val confirmed = observation.node
-                    if (confirmed == null || !owner.confirm(confirmed, inserted)) outcome = EditorWriteResult.FAILED
-                    else first = false
-                }
             } catch (_: CancellationException) {
                 outcome = EditorWriteResult.USER_EDIT
             } catch (_: Exception) {
@@ -327,6 +394,12 @@ class EditorBridge(private val service: AlienAccessibilityService) {
     fun cancel(completion: (Boolean) -> Unit) {
         if (isTerminal) { completion(terminalInsertion?.sent != true); return }
         if (userInteracted) { completion(false); return }
+        if (!nodeActions) {
+            val owner = keyboardOwnership ?: return completion(true)
+            if (owner.first) { completion(true); return }
+            writeKeyboard(owner.originalSelection(), true) { completion(it == EditorWriteResult.APPLIED) }
+            return
+        }
         val owner = ownership ?: return completion(false)
         if (first) { completion(true); return }
         if (!valid()) { owner.invalidate(); completion(false); return }
@@ -334,7 +407,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
     }
     fun detachForCapture() { invalidate(); detachedSnapshot = snapshotNode() }
     fun detachedTargetUnchanged() = detachedSnapshot?.let { it == snapshotNode() } == true
-    fun invalidate() { bound = false; generation++; writeSequence++; ownership?.invalidate(); terminalInsertion = null; isTerminal = false }
+    fun invalidate() { bound = false; generation++; writeSequence++; ownership?.invalidate(); keyboardOwnership = null; terminalInsertion = null; isTerminal = false }
     private fun rejected(reason: String): EditorSnapshot? { fail(reason); return null }
     private fun fail(reason: String): Boolean {
         lastError = reason

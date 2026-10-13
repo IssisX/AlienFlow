@@ -15,3 +15,5 @@ Read docs/PRODUCT_SPEC.md for the product requirements and docs/IMPLEMENTATION.m
 - A successful build proves compilation, not microphone access or compatibility with every editor. Report untested device behavior explicitly.
 - Agents edit only assigned paths. The lead owns commits, remote writes, workflow runs, signing, and delivery.
 - Keep exact dependency versions in the build configuration. Tests must exercise actual state/ordering/ownership logic.
+
+- Current repair imports the reviewed 0.1.22 keyboard-coordinate fix from AlienFlow2 into this branch only. Preserve the chat terminal guard, all prior history and the source branch. Current phone baseline is 0.1.21 (22), source 5e248ee3a9c4c91a0c78580f0917d641e7035b15. API 36 and APK-only development remain required; no AAB work until final store preparation.

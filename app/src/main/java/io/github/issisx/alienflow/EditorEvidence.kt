@@ -8,7 +8,9 @@ object EditorEvidence {
         val start: Int,
         val end: Int,
     )
-    data class KeyboardText(val text: String, val start: Int, val end: Int, val offset: Int)
+    data class Selection(val start: Int, val end: Int)
+    data class KeyboardText(val text: String, val start: Int, val end: Int, val offset: Int,
+                            val selection: Selection? = null)
     data class Read(val snapshot: EditorSnapshot? = null, val error: String? = null)
 
     /** Candidate ranges are half-open. A zero-length 0..0 range is not composition. */
@@ -36,13 +38,23 @@ object EditorEvidence {
     /** An explicit Android offset anchors a window, including the entire mutation range.
      * Compare all shared characters. IME-only text beyond the node is outside the
      * permitted edit and remains untouched by ranged commits. Never trim it or
-     * infer its contents. Unknown offsets still require exact full text.
+     * infer its contents. Android's default InputConnection returns offset=-1.
+     * Its partial window needs a stable IME selection callback as an absolute anchor.
      */
     fun corroborate(node: EditorSnapshot, keyboard: KeyboardText,
                     required: IntRange = node.start until node.end): Read {
         val start = minOf(keyboard.start, keyboard.end)
         val end = maxOf(keyboard.start, keyboard.end)
-        val offset = if (keyboard.offset == -1 && keyboard.text == node.text) 0 else keyboard.offset
+        val offset = if (keyboard.offset == -1 && keyboard.text == node.text) 0
+            else if (keyboard.offset == -1 && keyboard.selection != null) {
+                val selection = keyboard.selection
+                val absoluteStart = minOf(selection.start, selection.end)
+                val absoluteEnd = maxOf(selection.start, selection.end)
+                if (absoluteStart != node.start || absoluteEnd != node.end ||
+                    absoluteStart.toLong() - start != absoluteEnd.toLong() - end)
+                    return Read(error = "[AF-E11] Keyboard and text-box cursor positions disagree; tap the field again")
+                absoluteStart - start
+            } else keyboard.offset
         val windowEnd = offset.toLong() + keyboard.text.length
         val sharedEnd = minOf(windowEnd, node.text.length.toLong())
         if (offset < 0 || offset > node.text.length ||

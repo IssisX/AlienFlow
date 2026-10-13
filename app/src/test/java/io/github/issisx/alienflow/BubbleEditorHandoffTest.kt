@@ -154,4 +154,21 @@ class BubbleEditorHandoffTest {
         val destroyed = Broker.queries
         ui().idleFor(Duration.ofSeconds(10)); assertEquals(destroyed, Broker.queries)
     }
+    @Test fun openingDiagnosticsPreservesTheUnavailableExternalInputWithoutItsText() {
+        Connected().use { c ->
+            Broker.live = node("com.openai.chatgpt").apply {
+                isEditable = false; className = "android.view.View"; text = "private draft never logged"
+            }
+            c.start("com.openai.chatgpt"); ui().idle()
+            assertEquals(View.GONE, c.bubble.visibility)
+            val journal = (c.service.application as AlienApp).crashJournal
+            val before = journal.diagnostic().lineSequence().single { it.startsWith("Last unavailable external input") }
+            assertTrue(before, before.contains("input_package=com.openai.chatgpt"))
+            assertTrue(before, before.contains("node_class=android.view.View"))
+            assertFalse(before.contains("private draft"))
+            Broker.live = node("io.github.issisx.alienflow")
+            c.start("io.github.issisx.alienflow"); ui().idle()
+            assertEquals(before, journal.diagnostic().lineSequence().single { it.startsWith("Last unavailable external input") })
+        }
+    }
 }

@@ -43,7 +43,7 @@ class DictationIndicatorRenderTest {
                 }
                 canvas.drawText(labels[index], cx, cy + 72f, label)
             }
-            val output = File("build/reports/ui-proof/indicator-$name-0.1.20-chat.1.png")
+            val output = File("build/reports/ui-proof/indicator-$name-0.1.23-chat.1.png")
             output.parentFile!!.mkdirs(); output.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
             bitmap.recycle()
         }
