@@ -19,15 +19,17 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 0
-      - name: Export tracked source and pinned upstream revision
+      - name: Export tracked source and pinned installed revision
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git diff --exit-code
-          git cat-file -e 3be1cd2b5bac1206ad3f9025b64d1b55e5c2eac1^{commit}
-          git update-ref refs/heads/source-0.1.19-copy 3be1cd2b5bac1206ad3f9025b64d1b55e5c2eac1
-          git bundle create "${RUNNER_TEMP}/AlienFlow-chat-source.bundle" HEAD refs/heads/source-0.1.19-copy
+          git cat-file -e 5e248ee3a9c4c91a0c78580f0917d641e7035b15^{commit}
+          git cat-file -e 2c3f36d8cebfb5aff124191f1b00ee21892b9fae^{commit}
+          git update-ref refs/heads/source-installed-0.1.21 5e248ee3a9c4c91a0c78580f0917d641e7035b15
+          git update-ref refs/heads/source-upstream-readonly 2c3f36d8cebfb5aff124191f1b00ee21892b9fae
+          git bundle create "${RUNNER_TEMP}/AlienFlow-chat-source.bundle" HEAD refs/heads/source-installed-0.1.21 refs/heads/source-upstream-readonly
           git bundle verify "${RUNNER_TEMP}/AlienFlow-chat-source.bundle"
           git bundle list-heads "${RUNNER_TEMP}/AlienFlow-chat-source.bundle"
           sha256sum "${RUNNER_TEMP}/AlienFlow-chat-source.bundle"
