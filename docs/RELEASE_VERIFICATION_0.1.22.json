@@ -1,0 +1,79 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version": "0.1.22",
+  "version_code": 23,
+  "branch": "AlienFlow2",
+  "compiled_source_sha": "dc87d202161bffe31cd13edb6a1cb3c8ded79bb6",
+  "compiled_tree_sha": "c9f45a62f78ee36b5c97117aa4658bea14924ef7",
+  "workflow_run": "https://github.com/IssisX/AlienFlow/actions/runs/38422683700",
+  "workflow_conclusion": "success",
+  "artifact_id": 11827092984,
+  "unsigned_bundle_sha256": "3b06924ea2510a450e91cda903b7c56ade931916d6238cf29574c05d4cc35ef8",
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.22.apk",
+    "size_bytes": 4564945,
+    "sha256": "9059136fe1ea4b02992dbcf76e682583f6410f1e0106c58c37b612a81f9c31b9",
+    "payload_entries_unchanged": 25,
+    "signature_scheme": "APK v3",
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f"
+  },
+  "member_hashes_verified": 144,
+  "tests": {
+    "executed": 208,
+    "total": 208,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "instrumentation_tests": 2
+  },
+  "lint": {
+    "issues": 39,
+    "errors": 0
+  },
+  "baseline": {
+    "source_sha": "5e8fd1532ba7f9575585b150c4dc59bcb91f7e42",
+    "workflow_run": 38417316318,
+    "artifact_id": 11824819007,
+    "artifact_sha256": "2599f3f75fb874ed283ee0d20de9436dc1bdf040e9e05859de7187ca8ecb88f3",
+    "result": "Real Android 16 WebView reproduced AF-E10 before any commit: accessibility text Ask ChatGPT\\n, selection 1:1, empty hint metadata; IME text \\n, selection 0:0, offset=-1, absolute selection 0:0. Actual alien tap and focus binding succeeded; delivered=false."
+  },
+  "cause": "Accessibility presentation includes CSS-generated placeholder content and can use different text/cursor coordinates from the actual input buffer. Comparing those representations as an edit prerequisite rejects a legitimate keyboard connection.",
+  "repair": "Keyboard input exclusively owns text and coordinates for keyboard range edits. Accessibility identifies the same focused, non-protected field. Offset=-1 uses an immutable IME selection surviving the read and matching selection width. Validate every shared keyboard character and all characters in the mutation before a single dispatch; confirm through that same API. Bounded appends remain possible; unseen revisions/cancel are rejected. Typing protects dispatched speech and reanchors its future tail without stopping capture. Keep a guarded node-action fallback for positively empty fields without a keyboard connection.",
+  "integration": {
+    "environment": "API 36 x86_64 disposable emulator; Gboard; WebView 133.0.6943.137; official Termux 0.118.3 x86_64",
+    "browser": "Actual overlay taps, real accessibility broker/IME IPC and DOM observations: empty rich editor, live final revision, selected replacement preserving draft anchors, real keyboard typing while dictation stays active, future speech tail, repeated Unicode session.",
+    "termux": "Actual installed terminal echo: final text once after Stop, no premature partial text or Enter, repeated terminal session, live ordinary field after terminal, then return to terminal.",
+    "boundary": "Transcript and capture-readiness fixtures; microphone and paid provider not exercised."
+  },
+  "preliminary_runs": [
+    {
+      "run": 38419689915,
+      "source": "ab36eb238ef616018f6610a4400c5856b5500a68",
+      "result": "208 executed; 3 failures: long initial insertion confirmation window too short, plus 2 stale UI version assertions. Window sized for inserted speech and version assertions updated."
+    },
+    {
+      "run": 38420304971,
+      "source": "9cedabbd42b042910c86e591e721b6eb9fe0641e",
+      "result": "208 tests/lint and all real browser assertions passed. ADB went offline exporting screenshots; terminal test not reached. Exported future result metadata through instrumentation and bounded optional screenshot transfer."
+    },
+    {
+      "run": 38421571530,
+      "source": "d72f4543b4e39a33b1ce508265e39cc81030d629",
+      "result": "Real browser assertions passed again. Separate second instrumentation invocation force-stopped target app; Android marked accessibility as crashed, so terminal fixture setup could not bind. Combined both classes into one instrumentation process; production repair unchanged."
+    },
+    {
+      "run": 38421667657,
+      "source": "03c84c2aa29d1037251ac7770dd20ddbd3c96722",
+      "result": "Cancelled as superseded by the combined integration run; branch-scoped cancellation now prevents obsolete builds blocking newer work."
+    }
+  ],
+  "build_scope": {
+    "target_sdk": 36,
+    "aab_built": false,
+    "bundletool_downloaded": false,
+    "aab_delivery": false,
+    "paid_provider_test_calls": 0
+  },
+  "limitations": "Exact installed Chrome/ChatGPT/Fold6, custom terminal/tmux configurations, microphone/provider performance, and universal input-box support remain unverified. Real Chromium editor and installed stock Termux input behavior is verified on the API 36 emulator; this is stronger than prior simulated broker tests and does not imply physical-device acceptance.",
+  "delivery": "Original certificate verified; all 25 APK payload entries unchanged. Saved signed APK and verified its SHA-256 after saving. No AAB generated."
+}
