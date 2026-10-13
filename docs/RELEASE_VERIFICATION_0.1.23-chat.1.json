@@ -1,0 +1,120 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version_name": "0.1.23-chat.1",
+  "version_code": 24,
+  "branch": "AlienFlow(chat)",
+  "source_sha": "adda87cd9bc2e0f3cb491a35ab9a8d9877347c4f",
+  "source_tree_sha": "e65fa9b26a884de04103298f7b90f25acef07545",
+  "workflow_run_url": "https://github.com/IssisX/AlienFlow/actions/runs/38468493602",
+  "artifact_id": 11850717692,
+  "bundle_sha256": "72507ae5416be5c2114c294c01719ae2f93d462ad6ce5720c5a2f5623146ab2e",
+  "bundle_size_bytes": 6711409,
+  "manifest_member_hashes_verified": 178,
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.23-chat.1.apk",
+    "size_bytes": 4569240,
+    "sha256": "86a284711f2f69e5dda52a7091029f1246792aebfeeef4294918ba3e09e493d0",
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "scheme": "APK v3",
+    "unchanged_payload_entries": 25,
+    "added_signature_entries": [
+      "META-INF/ALIENFLO.RSA",
+      "META-INF/ALIENFLO.SF",
+      "META-INF/MANIFEST.MF"
+    ]
+  },
+  "tests": {
+    "tests": 212,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "executed": 212
+  },
+  "lint": {
+    "issues": 39,
+    "errors": 0
+  },
+  "browser_editor": {
+    "source": "adda87cd9bc2e0f3cb491a35ab9a8d9877347c4f",
+    "api": 36,
+    "provider": "fixture; no microphone or API request",
+    "initial_node": {
+      "text": "Ask ChatGPT\n",
+      "selection": "1:1",
+      "hint": "",
+      "showing_hint": false
+    },
+    "initial_ime": {
+      "text": "\n",
+      "selection": "0:0",
+      "offset": -1
+    },
+    "initial_dom": "\"\\n\"",
+    "webview": "133.0.6943.137",
+    "real_bubble_tap": true,
+    "delivered": true,
+    "after_dom": "\"Browser fixture speech\"",
+    "editor_error": "",
+    "final_dom": "\"Browser final speech\"",
+    "status": "Complete \u2022 ready for another dictation",
+    "selected_replacement": true,
+    "typing_continues_dictation": true,
+    "typed_text_preserved": true,
+    "second_dom": "\"Browser SECOND typed tail speech\"",
+    "repeat_session": true,
+    "unicode_dom": "\"\ud83d\udef8 Again Browser SECOND typed tail speech\""
+  },
+  "installed_termux": {
+    "source": "adda87cd9bc2e0f3cb491a35ab9a8d9877347c4f",
+    "version": "0.1.23-chat.1",
+    "api": 36,
+    "termux": "official v0.118.3 x86_64",
+    "real_bubble_tap": true,
+    "real_accessibility_broker": true,
+    "real_terminal_echo": true,
+    "final_count": 1,
+    "repeat_session_count": 1,
+    "ordinary_live_after_termux": true,
+    "termux_visible_after_switch": true,
+    "premature_text": false,
+    "microphone_and_provider": "not exercised; transcript fixtures"
+  },
+  "historical_termux_baseline": {
+    "baseline_sha": "7ebe095bfaa83456690b46d8934c0cad2590a94a",
+    "candidate_sha": "adda87cd9bc2e0f3cb491a35ab9a8d9877347c4f",
+    "tests": 3,
+    "expected_failed_cases": [
+      "accessibilityEventsDuringSpeechKeepTheTerminalBoundAndFinalTextCommitsOnce",
+      "finishingEventsCannotSendPartialTerminalTextBeforeTheLastTranscript"
+    ],
+    "actual_failed_cases": [
+      "accessibilityEventsDuringSpeechKeepTheTerminalBoundAndFinalTextCommitsOnce",
+      "finishingEventsCannotSendPartialTerminalTextBeforeTheLastTranscript"
+    ],
+    "errors": 0,
+    "exit_code": 1,
+    "scope": "Robolectric with production coordinator/bridge; OS broker, recognition and terminal consumer fixtures"
+  },
+  "approved_artwork_sha256": "48d0ce0aacba2fd4264100fb1af1b6a73f54290f6c5296f4adc07d3974a50671",
+  "native_libraries": [],
+  "debug_browser_fixture_packaged": false,
+  "preserved_source_owners": [
+    "DictationCoordinator",
+    "RealtimeTransport",
+    "RealtimeProtocol",
+    "OpenAiClient",
+    "TerminalDictation",
+    "LocalStore",
+    "MainActivity",
+    "PendingAudio"
+  ],
+  "integration_boundary": "Actual Android 16 emulator, Chromium WebView and installed Termux with real overlay/input IPC; recognition and capture readiness are fixtures. Not a physical Fold6, microphone or paid-provider test.",
+  "phone_acceptance": "Pending: repeat the originally failing field on the Fold6, then Termux after Stop without Enter.",
+  "scope": "Reviewed upstream keyboard-coordinate repair ported into isolated chat branch, with reported-metadata regression and negative-offset validation.",
+  "instrumentation_tests": 2,
+  "workflow_conclusion": "success",
+  "reviewed_images": [
+    "reports/browser-editor/last-screen.png",
+    "reports/installed-termux/terminal.png"
+  ]
+}

@@ -1,25 +1,31 @@
 # AlienFlow — isolated chat branch
 
-Repository: **IssisX/AlienFlow**. Working branch: **AlienFlow(chat)**. This branch preserves the previous chat work and merges the complete **AlienFlow2 0.1.19** source at `3be1cd2b5bac1206ad3f9025b64d1b55e5c2eac1`. AlienFlow2 is a branch in this repository, not a separate repository. No writes were made to AlienFlow2, main or build/first-apk.
+Repository: IssisX/AlienFlow. Working branch: AlienFlow(chat). AlienFlow2 is a separate branch in this repository, not a separate repository. This repair writes only the isolated chat branch.
 
-## Signed development update: 0.1.20-chat.1 (21)
+## Signed development update: 0.1.23-chat.1 (24)
 
-Install the signed APK delivered in the development conversation over the existing AlienFlow installation. Do not uninstall or clear data. The original package ID and signing certificate are retained. The unsigned intermediate inside the GitHub Actions bundle is not an installer.
+This update integrates the reviewed 0.1.22 browser-editing repair from AlienFlow2 while preserving the chat branch's Termux guard. It addresses the 0.1.21 diagnostic where accessibility reported 12 characters/cursor 11 and the keyboard returned one character/cursor 0. The app was trying to synchronize two different editor representations, then reporting AF-E10.
 
-Termux receives the completed transcript once after Stop, without Enter or control keys and without replacing existing terminal input. The existing premature-write fix is preserved. A new guard prevents control-only output from becoming a blank terminal fragment or consuming the one delivery. Ordinary fields retain 0.1.19 live revisions, including its IME-only suffix preservation fix. The microphone, network/model choices, accepted icon, opacity, settings, history and key storage were not redesigned or migrated.
+Accessibility now identifies the focused, non-protected field. Keyboard text and keyboard coordinates authorize keyboard mutations and confirmations. The app no longer requires browser placeholder/presentation text to equal the editable keyboard buffer. Observed mutation coverage, shared text, user edits, selected replacement and cancellation remain checked. No timeout increase, blind whole-field replacement, placeholder blacklist or automatic resend was added.
+
+The audio, OpenAI connection/models/prompts, settings, history, encrypted key storage, approved Gray image and 75% default opacity are unchanged. Native WebRTC remains absent. Termux keeps final-only delivery once after Stop, without Enter or control keys. The chat guard also rejects blank/control-only terminal output.
+
+Install the signed `AlienFlow-0.1.23-chat.1.apk` delivered in the conversation over the existing app. Do not uninstall or clear data. Application ID `io.github.issisx.alienflow` and the original certificate are retained. The unsigned APK inside the Actions bundle is not an installer.
 
 ## Actual verification
 
-[Actions run 38398347454](https://github.com/IssisX/AlienFlow/actions/runs/38398347454), compiled source `683ab2dcc5902d41ed5b283f08d6a8054def1b2d`: **198 unit tests passed**, no failures/errors/skips, release lint zero errors/38 warnings, and the installed-Termux Android 16 editor integration passed. The integration uses real screen taps, Android accessibility IPC and official Termux v0.118.3. It checks delayed final delivery, no partial/duplicate terminal input, an ordinary field with live updates, and a second Termux dictation after switching back without resetting accessibility.
+[Actions run 38468493602](https://github.com/IssisX/AlienFlow/actions/runs/38468493602), compiled source `adda87cd9bc2e0f3cb491a35ab9a8d9877347c4f`, passed 212 unit tests with zero failures/errors/skips, release lint with zero errors and 39 warnings, release assembly and the two actual Android 16 editor integration tests.
 
-Recognition callbacks and the inactive audio transport are explicit fixtures. This proves editor integration under the tested emulator conditions, not the owner's physical microphone, OpenAI account, Gboard, tmux/Codex or Fold6. An initial coordinate-only tap harness failed on the return transition; the final test verifies the actual topmost rendered touch target before tapping once. No application behavior assertion was removed.
+The browser test uses real Chromium WebView/Gboard/accessibility IPC and an actual alien tap. It observes live insertion and final revision despite placeholder/keyboard differences, selected replacement, keyboard typing without stopping dictation, preserved draft anchors and a repeated Unicode session. The official installed Termux 0.118.3 test verifies actual terminal echo once after Stop, no premature partial, a repeated session and switching between terminal and ordinary live editing. Recognition and microphone readiness are explicit fixtures; no physical microphone or paid provider request was used.
 
-The downloaded artifact and all 157 manifest member hashes were checked. The final APK signature matches the original certificate and all 25 application payload entries are unchanged after signing. The packaged icon and relevant settings/history/indicator renders were inspected. See [release verification](docs/RELEASE_VERIFICATION_0.1.20-chat.1.json), [signer output](docs/APK_SIGNATURE_0.1.20-chat.1.txt), and [current checkpoint](docs/IMPLEMENTATION.md).
+The historical 0.1.17 Termux regression still reproduces exactly its two expected failures, while current tests pass. This preserved gate is separate from current release acceptance. All 178 downloaded bundle member hashes, the packaged artwork, release source identifier, absence of native libraries/debug browser classes and original APK v3 signature were checked. All 25 original APK payload entries remained unchanged after signing.
 
-## Phone check
+[Exact release record](docs/RELEASE_VERIFICATION_0.1.23-chat.1.json), [signer output](docs/APK_SIGNATURE_0.1.23-chat.1.txt), [current checkpoint](docs/IMPLEMENTATION.md).
 
-With the usual keyboard selected, focus Termux, tap the alien, speak, and tap Stop. Text should arrive once without Enter. Switch to an ordinary text field, verify live words, then return to Termux for a second dictation. If a failure remains, open **Settings → Help & about → Diagnostics / share report** and provide the fresh version-specific report. Old native WebRTC exits are not evidence of a new failure.
+## Phone acceptance still pending
 
-## Google Play status
+Repeat the exact field that reported Editor sync timed out: dictate, pause for revisions, stop and check that text remains in the field. Then test Termux final delivery without Enter. The emulator tests do not establish the exact Fold6/Chrome/Gboard/tmux/Codex combination. If it fails, use Settings → Help & about → Diagnostics / share report and provide the new version/source and observation. No permission reset is indicated by the supplied report, which already showed accessibility bound and working microphone/server activity.
 
-This update is not submitted or store-ready. [Paid-release readiness](docs/PLAY_RELEASE_READINESS.md) records the remaining disclosure/consent, accessibility/foreground-service declarations, public privacy policy, Data safety, account/cost model, App Bundle/signing and real-device testing gates. No Play Console action, public credentials, billing integration or telemetry was added.
+## Release scope
+
+API 36 and APK-only development are preserved. No AAB, store submission, billing, new permissions, analytics or data migration was introduced. Google Play readiness remains separate from this editor repair. Prior chat verification/history and the untouched AlienFlow2 branch remain available.
