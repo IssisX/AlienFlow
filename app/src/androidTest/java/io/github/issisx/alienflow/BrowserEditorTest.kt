@@ -203,7 +203,7 @@ class BrowserEditorTest {
             assertEquals("Browser final speech", org.json.JSONArray("[" + js(activity, "editor.innerText") + "]").getString(0).trimEnd('\n'))
             // Selected replacement in an existing browser draft, then real keyboard
             // typing in the same dictation. Previously dispatched speech becomes user-owned.
-            connection.setSelection(8, 13)
+            main { service.inputMethod!!.currentInputConnection!! }.setSelection(8, 13)
             await("real browser selection") { main { service.imeSelection == EditorEvidence.Selection(8, 13) } }
             main { setField(coordinator, "transport", idleTransport) }
             tapAlien(service); await("second browser dictation") { main { coordinator.active } }
@@ -228,7 +228,7 @@ class BrowserEditorTest {
             assertTrue(js(activity, "editor.innerText").contains("Browser SECOND typed tail speech"))
             result.put("selected_replacement", true).put("typing_continues_dictation", true)
                 .put("typed_text_preserved", true).put("second_dom", js(activity, "editor.innerText"))
-            connection.setSelection(0, 0)
+            main { service.inputMethod!!.currentInputConnection!! }.setSelection(0, 0)
             await("browser cursor at start") { main { service.imeSelection == EditorEvidence.Selection(0, 0) } }
             main { setField(coordinator, "transport", idleTransport) }
             tapAlien(service); await("third browser dictation") { main { coordinator.active } }

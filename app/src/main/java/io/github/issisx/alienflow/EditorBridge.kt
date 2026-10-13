@@ -217,7 +217,8 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 val preview = if (restoring) value else continuation.tail(value)
                 val requested = owner?.replacement(preview)?.let {
                     maxOf(it.range.last.toLong() + 1 - it.range.first, it.text.length.toLong()) + 64
-                }?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt() ?: 128
+                }?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt()
+                    ?: maxOf(128L, preview.length.toLong() + 64).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
                 suspend fun read(): KeyboardWindow? {
                     val selection = service.imeSelection
                     val surrounding = withContext(Dispatchers.IO) {
