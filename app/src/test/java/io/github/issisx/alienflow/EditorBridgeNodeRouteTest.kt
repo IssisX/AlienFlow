@@ -84,12 +84,16 @@ class EditorBridgeNodeRouteTest {
     }
     private fun useAndroidDefaultSurroundingText() {
         val delegate = nativeKeyboard!!
+        // Robolectric runs on Java 17, while compilation uses Android's library
+        // surface. Resolve this JVM-only test helper through reflection.
+        val invokeDefault = java.lang.reflect.InvocationHandler::class.java.getMethod("invokeDefault",
+            Any::class.java, java.lang.reflect.Method::class.java, arrayOfNulls<Any>(0).javaClass)
         nativeKeyboard = java.lang.reflect.Proxy.newProxyInstance(InputConnection::class.java.classLoader,
             arrayOf(InputConnection::class.java)) { proxy, method, args ->
             if (method.name == "getSurroundingText") {
                 check(method.isDefault)
                 // Execute Android's actual default method, not a fabricated window.
-                java.lang.reflect.InvocationHandler.invokeDefault(proxy, method, *(args ?: emptyArray()))
+                invokeDefault.invoke(null, proxy, method, args ?: emptyArray<Any>())
             } else method.invoke(delegate, *(args ?: emptyArray()))
         } as InputConnection
     }
