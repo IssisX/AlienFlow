@@ -15,8 +15,8 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = "io.github.issisx.alienflow"
-VERSION_CODE = 20
-VERSION_NAME = "0.1.18-chat.1"
+VERSION_CODE = 21
+VERSION_NAME = "0.1.20-chat.1"
 MIN_SDK = 33
 TARGET_SDK = 36
 BUILD_TOOLS = "36.0.0"
@@ -67,7 +67,7 @@ def main() -> None:
     if bundle.exists():
         shutil.rmtree(bundle)
     (bundle / "reports").mkdir(parents=True)
-    apk = bundle / "AlienFlow-0.1.18-chat.1-unsigned.apk"
+    apk = bundle / "AlienFlow-0.1.20-chat.1-unsigned.apk"
     run(str(tools / "zipalign"), "-P", "16", "-f", "4", str(raw_apk), str(apk))
     run(str(tools / "zipalign"), "-c", "-P", "16", "4", str(apk))
 
@@ -147,7 +147,7 @@ def main() -> None:
     require(reproduction["actual_failed_cases"] == reproduction["expected_failed_cases"] and reproduction["errors"] == 0,
             "Baseline did not reproduce the specified Termux failures")
     installed = json.loads((ROOT / "build/installed-termux/termux-proof/result.json").read_text())
-    require(installed["source"] == source_sha and installed["real_terminal_echo"] and installed["final_count"] == 1,
+    require(installed["source"] == source_sha and installed["real_terminal_echo"] and installed["final_count"] == 1 and installed["repeat_session_count"] == 1 and installed["ordinary_live_after_termux"] and installed["termux_visible_after_switch"],
             "Actual installed-Termux editor test missing or failed")
     shutil.copytree(ROOT / "build/termux-baseline", reports / "termux-baseline")
     shutil.copytree(ROOT / "build/installed-termux/termux-proof", reports / "installed-termux")
@@ -155,14 +155,14 @@ def main() -> None:
     shutil.copytree(ROOT / "app/build/reports/tests/testDebugUnitTest", reports / "unit-tests")
     ui_proof = ROOT / "app/build/reports/ui-proof"
     require(
-        (ui_proof / "main-0.1.18.png").is_file()
-        and (ui_proof / "diagnostics-0.1.18.png").is_file()
-        and (ui_proof / "indicator-light-0.1.18.png").is_file()
-        and (ui_proof / "indicator-dark-0.1.18.png").is_file(),
+        (ui_proof / "main-0.1.20-chat.1.png").is_file()
+        and (ui_proof / "diagnostics-0.1.20-chat.1.png").is_file()
+        and (ui_proof / "indicator-light-0.1.20-chat.1.png").is_file()
+        and (ui_proof / "indicator-dark-0.1.20-chat.1.png").is_file(),
         "Actual activity render evidence is missing",
     )
     for screen in ("settings", "bubble-settings", "dictation-settings", "privacy-settings", "history", "settings-small-large-text", "language-small-large-text", "bubble-small-large-text", "settings-unfolded"):
-        require((ui_proof / f"{screen}-0.1.18.png").is_file(), f"Native {screen} render evidence is missing")
+        require((ui_proof / f"{screen}-0.1.20-chat.1.png").is_file(), f"Native {screen} render evidence is missing")
     shutil.copytree(ui_proof, reports / "ui-proof")
     for report in (ROOT / "app/build/reports").glob("lint-results-release.*"):
         shutil.copy2(report, reports / report.name)
@@ -197,9 +197,9 @@ def main() -> None:
         "The APK is deliberately unsigned. Never generate or store a private key in this bundle or repository.\n"
         "With Java 17, sign a COPY using an existing private keystore stored outside the repository:\n"
         "java -jar tooling/apksigner.jar sign --ks /private/path/release.jks --ks-key-alias alienflow "
-        "--out AlienFlow-0.1.18-chat.1.apk AlienFlow-0.1.18-chat.1-unsigned.apk\n"
+        "--out AlienFlow-0.1.20-chat.1.apk AlienFlow-0.1.20-chat.1-unsigned.apk\n"
         "Omit password options to use the private interactive password prompt.\n"
-        "java -jar tooling/apksigner.jar verify --verbose --print-certs AlienFlow-0.1.18-chat.1.apk\n"
+        "java -jar tooling/apksigner.jar verify --verbose --print-certs AlienFlow-0.1.20-chat.1.apk\n"
     )
 
     versions = tomllib.loads((ROOT / "gradle/libs.versions.toml").read_text())["versions"]
@@ -249,7 +249,7 @@ def main() -> None:
     }
     (bundle / "build-info.json").write_text(json.dumps(info, indent=2) + "\n")
 
-    zip_path = delivery / "AlienFlow-0.1.18-chat.1-unsigned-release-bundle.zip"
+    zip_path = delivery / "AlienFlow-0.1.20-chat.1-unsigned-release-bundle.zip"
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
         for path in sorted(bundle.rglob("*")):
             if path.is_file():

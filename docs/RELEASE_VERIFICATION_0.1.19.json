@@ -1,0 +1,114 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version": "0.1.19",
+  "version_code": 20,
+  "branch": "AlienFlow2",
+  "compiled_source_sha": "cad03c3aa1573944e7dbae8def245d2c97600680",
+  "compiled_tree_sha": "cfb2289545cb5b5d8b5a793c19ba46fd4600cea2",
+  "workflow_run": "https://github.com/IssisX/AlienFlow/actions/runs/38313624028",
+  "artifact_id": 11776216003,
+  "unsigned_bundle_sha256": "bca8a17d31c0ec91b4c01d9f8fc84462e0da6b1ebfe5f13c6d40393fbe0598bf",
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.19.apk",
+    "size_bytes": 4548561,
+    "sha256": "00f7a27f62f96aabdf7116a58d226fa7a308dd3b9790472c6a32d2b4b808ed5d",
+    "signature_scheme": "APK v3",
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "payload_entries_unchanged": 25
+  },
+  "workflow_conclusion": "success",
+  "member_hashes_verified": 138,
+  "tests": {
+    "executed": 197,
+    "total": 197,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "not run"
+  },
+  "lint": {
+    "issues": 38,
+    "errors": 0
+  },
+  "changed_path_suites": [
+    {
+      "name": "io.github.issisx.alienflow.EditorBridgeNodeRouteTest",
+      "tests": "23",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.EditorSynchronizationTest",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.TerminalCoordinatorTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.StopDeliveryTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.EditorEvidenceTest",
+      "tests": "18",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.TerminalDictationTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "reported_observation": {
+    "version": "0.1.18 (19)",
+    "source_sha": "185665b2451e1ce3b9a78e2cb4ba4697bd70e581",
+    "device": "Samsung SM-F956U; Android 16; API 36",
+    "phase": "before",
+    "node_length": 25,
+    "node_cursor": "25:25",
+    "ime_length": 27,
+    "ime_cursor": "25:25",
+    "offset": 0,
+    "composing": false
+  },
+  "cause": "The pre-write coverage guard rejected an explicitly anchored IME window whenever its end extended beyond accessibility text, including characters outside the proposed edit. The supplied lengths prove this guard rejects; the metadata does not establish equality of shared characters or identify the two extra characters.",
+  "repair": "Require exact equality of every shared character, matching absolute selection and complete edit coverage inside both representations. Ranged keyboard commits leave IME-only suffix characters untouched. No trimming, normalization, substring search, blind resends or whole-field rebuilding.",
+  "verification": [
+    "Production bridge with native EditText/InputConnection and explicit simulated remote accessibility/IME representations: 25/27 lengths at cursor 25; arbitrary two-character suffix preserved through revisions and cancellation.",
+    "Bounded nonzero-offset window, selected replacement, multiline Unicode and typing between speech updates preserve unrelated text.",
+    "Conflicting shared text dispatches no selection or commit; metadata-only rejection code recorded without text contents.",
+    "All 192 prior tests plus five regressions passed. Full release lint and unsigned assembly succeeded. All 138 member hashes, compiled source, original signing certificate and 25 unchanged APK payload entries verified."
+  ],
+  "preliminary_runs": [
+    {
+      "run_id": 38313257863,
+      "source_sha": "b7a4124980229cfbd4350c3bedb85f4a1b5701b4",
+      "conclusion": "failure",
+      "reason": "The new negative conflict test wait helper did not advance Robolectric's paused Android clock, so its production rejection timeout never completed. The other 196 tests passed."
+    },
+    {
+      "run_id": 38313341155,
+      "source_sha": "d716746af17d0d69e04f7ee0edd8e1e3bc356725",
+      "conclusion": "failure",
+      "reason": "Diagnostic accessor was corrected from historical crash report to current diagnostics, but the same paused-clock fixture failure remained. The other 196 tests passed."
+    }
+  ],
+  "scope": "Accessibility broker/remote IPC and representation publication are simulated; bridge regressions run on Robolectric SDK 35. The real 0.1.18 Fold6 report is diagnostic evidence, not successful 0.1.19 device verification. Installed ChatGPT/Chrome/Termux on Android 16, physical microphone, provider performance/billing and Google Play approval remain unverified. No paid provider call was made.",
+  "preserved": "Terminal final-only coordinator gate, live ordinary-field typing/composition and focus protections, selected keyboard, background readiness, recognition/model/audio behavior, cleanup budgets, API cost reductions and approved artwork retained.",
+  "delivery": "Signed installable update saved successfully, local file identity applied, SHA-256 unchanged after saving."
+}

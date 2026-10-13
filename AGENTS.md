@@ -2,7 +2,7 @@
 
 Repository: IssisX/AlienFlow. Working branch for this checkout: AlienFlow(chat). Application ID: io.github.issisx.alienflow.
 
-- AlienFlow(chat) is the owner-authorized isolated repair branch copied from AlienFlow2 at 185665b2451e1ce3b9a78e2cb4ba4697bd70e581. Do not merge, reset, or write AlienFlow2, build/first-apk or main. Version 0.1.17 is owner-confirmed working outside Termux and is the regression baseline.
+- AlienFlow(chat) is the owner-authorized isolated repair branch copied from AlienFlow2 at 185665b2451e1ce3b9a78e2cb4ba4697bd70e581. Do not merge, reset, or write AlienFlow2, build/first-apk or main. The owner now requests the 0.1.19 source from AlienFlow2 at 3be1cd2b5bac1206ad3f9025b64d1b55e5c2eac1. Integrate into this branch only; preserve its prior Termux repair and tests. Version 0.1.17 remains the historical failing regression baseline, not the current product version.
 - The owner gives standing approval for routine AlienFlow(chat) source edits, commits, remote updates, existing CI builds, signing and APK delivery. Continue those authorized actions without asking again; this does not authorize publishing private keys or taking over unrelated destinations.
 
 Read docs/PRODUCT_SPEC.md for the product requirements and docs/IMPLEMENTATION.md for actual implementation/evidence status. Requirements are not runtime evidence.

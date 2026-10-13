@@ -1,6 +1,10 @@
 package io.github.issisx.alienflow
 
 import android.app.UiAutomation
+import android.graphics.Rect
+import android.content.Context
+import android.widget.EditText
+import android.view.inputmethod.InputMethodManager
 import android.graphics.Bitmap
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
@@ -135,6 +139,69 @@ class InstalledTermuxTest {
             assertEquals("Duplicate terminal send or unintended Enter", 1, Regex("CHAT_FIRST").findAll(observed).count())
             assertFalse(observed.contains("CHAT_PARTIAL")); assertFalse(observed.contains("CHAT_UNFINISHED"))
             assertEquals("Sent to Termux • press Enter yourself", main { coordinator.status })
+            // Real transition away from Termux: the ordinary field must regain a bubble
+            // and retain live updates, not inherit the terminal's end-only policy.
+            val monitor = instrumentation.addMonitor(MainActivity::class.java.name, null, false)
+            shell("am start -n io.github.issisx.alienflow/.MainActivity")
+            val activity = monitor.waitForActivityWithTimeout(15_000) as? MainActivity
+                ?: error("AlienFlow main activity did not open")
+            instrumentation.removeMonitor(monitor)
+            val practice = main {
+                val field = activity.window.decorView.findViewWithTag<EditText>("practice")
+                    ?: error("The real practice field is missing")
+                field.setText("DOC_SEED "); field.setSelection(field.length()); field.requestFocus()
+                field.requestRectangleOnScreen(Rect(0, 0, field.width, field.height), true)
+                activity.getSystemService(InputMethodManager::class.java).showSoftInput(field, 0)
+                setField(coordinator, "transport", idleTransport)
+                field
+            }
+            await("ordinary field replaces terminal focus") { main {
+                service.bridge.focused()?.packageName?.toString() == app.packageName &&
+                    service.inputMethod?.currentInputConnection != null
+            } }
+            tapAlien(service)
+            await("ordinary dictation starts after terminal") { main { coordinator.active } }
+            main {
+                assertFalse(service.bridge.isTerminal)
+                coordinator.captured(); coordinator.connected(); coordinator.turnCommitted()
+                event(coordinator, "input_audio_buffer.committed", "doc-ack", "doc")
+                event(coordinator, "conversation.item.input_audio_transcription.delta", "doc-delta", "doc", "DOC_PARTIAL")
+            }
+            await("ordinary live text before Stop") { main { practice.text.toString() == "DOC_SEED DOC_PARTIAL" } }
+            assertTrue(main { coordinator.active })
+            main { event(coordinator, "conversation.item.input_audio_transcription.completed", "doc-final", "doc", "DOC_FINAL") }
+            await("ordinary live final revision") { main { practice.text.toString() == "DOC_SEED DOC_FINAL" } }
+            main { setField(coordinator, "transport", null) }
+            tapAlien(service)
+            await("ordinary finish") { main { !coordinator.finishing } }
+            assertEquals("DOC_SEED DOC_FINAL", main { practice.text.toString() })
+
+            // Return to the same installed terminal without toggling accessibility.
+            // A second dictation must allocate fresh one-shot insertion ownership.
+            shell("am start -n com.termux/.app.TermuxActivity")
+            await("terminal focus restored") { main {
+                service.bridge.focused()?.packageName?.toString() == "com.termux" &&
+                    service.inputMethod?.currentInputConnection != null
+            } }
+            main { setField(coordinator, "transport", idleTransport) }
+            tapAlien(service)
+            await("repeat terminal session starts") { main { coordinator.active } }
+            main {
+                assertTrue(service.bridge.isTerminal)
+                coordinator.captured(); coordinator.connected(); coordinator.turnCommitted()
+                event(coordinator, "input_audio_buffer.committed", "repeat-ack", "repeat")
+                event(coordinator, "conversation.item.input_audio_transcription.delta", "repeat-delta", "repeat", "NEVER_PARTIAL")
+                coordinator.targetEvent()
+            }
+            assertFalse(terminalText().contains("NEVER_PARTIAL"))
+            main { event(coordinator, "conversation.item.input_audio_transcription.completed", "repeat-final", "repeat", "_SECOND_PASS") }
+            main { setField(coordinator, "transport", null) }
+            tapAlien(service)
+            await("repeat terminal final insertion") { main { !coordinator.finishing } && terminalText().contains("END_SECOND_PASS") }
+            val repeated = terminalText()
+            assertEquals(1, Regex("CHAT_FIRST").findAll(repeated).count())
+            assertEquals(1, Regex("SECOND_PASS").findAll(repeated).count())
+            assertFalse(repeated.contains("NEVER_PARTIAL"))
             val directory = File(app.getExternalFilesDir(null), "termux-proof").apply { mkdirs() }
             File(directory, "terminal.png").outputStream().use { automation.takeScreenshot().compress(Bitmap.CompressFormat.PNG, 100, it) }
             File(directory, "result.json").writeText(JSONObject()
@@ -142,7 +209,8 @@ class InstalledTermuxTest {
                 .put("api", android.os.Build.VERSION.SDK_INT).put("termux", "official v0.118.3 x86_64")
                 .put("real_bubble_tap", true).put("real_accessibility_broker", true)
                 .put("real_terminal_echo", true).put("final_count", 1)
-                .put("premature_text", false).put("microphone_and_provider", "not exercised; transcript fixtures")
+                .put("repeat_session_count", 1).put("ordinary_live_after_termux", true)
+                .put("termux_visible_after_switch", true).put("premature_text", false).put("microphone_and_provider", "not exercised; transcript fixtures")
                 .toString(2))
         } finally {
             main { coordinator.cancel(); idleTransport.close() }

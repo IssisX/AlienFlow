@@ -17,6 +17,15 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = Application::class)
 class TerminalDictationTest {
+    @Test fun controlOnlyResultCannotConsumeTheOneTerminalDelivery() {
+        val insertion = TerminalInsertion()
+        assertFalse(insertion.send("\u001b\u0003\u007f", true) { error("Control-only speech must not send a blank command fragment") })
+        assertFalse(insertion.sent)
+        val delivered = mutableListOf<String>()
+        assertTrue(insertion.send("real words", true) { delivered.add(it) })
+        assertEquals(listOf("real words"), delivered)
+    }
+
     @Test fun defaultTermuxViewIsAvailableEvenThoughItIsNotAnEditableDocument() {
         assertTrue(TerminalDictation.supported("android.view.View", "com.termux", "com.termux", InputType.TYPE_NULL))
         assertTrue(TerminalDictation.supported("android.view.View", "com.termux", "com.termux",

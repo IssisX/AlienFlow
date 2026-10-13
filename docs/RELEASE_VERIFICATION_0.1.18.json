@@ -1,0 +1,84 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version": "0.1.18",
+  "version_code": 19,
+  "branch": "AlienFlow2",
+  "compiled_source_sha": "185665b2451e1ce3b9a78e2cb4ba4697bd70e581",
+  "compiled_tree_sha": "9fe35381143839860f557e052292f9003d5e737a",
+  "workflow_run": "https://github.com/IssisX/AlienFlow/actions/runs/38310603246",
+  "artifact_id": 11775385743,
+  "unsigned_bundle_sha256": "c11d3b4f73fe505a532dc881772ba577da13b664605a2c909cf055d99a7ddf33",
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.18.apk",
+    "size_bytes": 4548561,
+    "sha256": "7cf31ebb890795d6d84d55b1f345fd256bc59d281da63add71cf2639023d5913",
+    "signature_scheme": "APK v3",
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "payload_entries_unchanged": 25
+  },
+  "workflow_conclusion": "success",
+  "member_hashes_verified": 134,
+  "tests": {
+    "executed": 192,
+    "total": 192,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "not run"
+  },
+  "lint": {
+    "issues": 38,
+    "errors": 0
+  },
+  "changed_path_suites": [
+    {
+      "name": "io.github.issisx.alienflow.TerminalCoordinatorTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.TerminalDictationTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.EditorBridgeNodeRouteTest",
+      "tests": "19",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.StopDeliveryTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.BackgroundReadinessTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "cause": "Event-triggered pumpWrite bypassed the end-only policy. An active terminal write is rejected by the terminal adapter and clears the coordinator editor; a finishing event can prematurely consume its single commit.",
+  "repair": "One central gate blocks terminal/end-only live or event writes. tryFinish alone authorizes finalDelivery after required recognition/drain/acknowledgement/polish state is ready.",
+  "verification": [
+    "Public start/event/stop through the production coordinator, bridge and native BaseInputConnection consume-and-clear terminal fixture.",
+    "Accessibility events during active speech preserve terminal binding and dispatch no text.",
+    "Finishing events before the last transcript dispatch no partial text; the complete result commits once after recognition is ready.",
+    "Existing terminal input and Unicode preserved; newline/control actions removed; no Enter; focus loss never writes to another field.",
+    "End-only ordinary document remains untouched during capture and inserts at Stop, preserving external anchors.",
+    "All 188 prior tests plus four new tests passed; release lint reports zero errors.",
+    "Exact compiled source, all 134 bundle-member hashes, approved artwork and unchanged signed payload verified. Original update certificate matched."
+  ],
+  "preserved": "Ordinary live-field editor/Chrome window and tail algorithms, typing/composition, capture/model/audio format, background readiness, cleanup budgets and cost controls unchanged.",
+  "scope": "Accessibility broker/remote IPC, key and recognition events are explicit fixtures. Tests ran under Robolectric SDK 35. Native terminal input semantics are exercised, but installed Termux/Fold6, physical microphone, provider latency/billing and Play approval are not verified. The old implementation was inspected, not executed with the added tests.",
+  "delivery": "Signed installable update saved successfully; local file identity applied and APK SHA256 unchanged after save."
+}

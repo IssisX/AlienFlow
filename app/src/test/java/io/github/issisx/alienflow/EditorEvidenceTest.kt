@@ -82,6 +82,19 @@ class EditorEvidenceTest {
         val snapshot = node("draft", start = 0).snapshot!!
         assertNull(EditorEvidence.corroborate(snapshot, EditorEvidence.KeyboardText("", 0, 0, 0)).snapshot)
     }
+    @Test fun imeOnlySuffixOutsideTheEditDoesNotInvalidateMatchingTextAndCursor() {
+        val snapshot = node("abcdefghijklmnopqrstuvwxy", start = 25).snapshot!!
+        val keyboard = EditorEvidence.KeyboardText(snapshot.text + "XY", 25, 25, 0)
+        assertEquals(snapshot, EditorEvidence.corroborate(snapshot, keyboard).snapshot)
+        assertEquals(snapshot, EditorEvidence.corroborate(snapshot,
+            EditorEvidence.KeyboardText(snapshot.text.takeLast(8) + "XY", 8, 8, 17), 20 until 25).snapshot)
+        assertNull(EditorEvidence.corroborate(snapshot, keyboard, 25 until 27).snapshot)
+        assertNull(EditorEvidence.corroborate(snapshot, keyboard.copy(offset = -1)).snapshot)
+        assertNull(EditorEvidence.corroborate(snapshot, keyboard.copy(start = 27, end = 27)).snapshot)
+        assertNull(EditorEvidence.corroborate(snapshot, keyboard.copy(text = "X" + keyboard.text.drop(1))).snapshot)
+        assertNull(EditorEvidence.corroborate(EditorSnapshot(7, "", 0, 0),
+            EditorEvidence.KeyboardText("XY", 0, 0, 0)).snapshot)
+    }
     @Test fun aChangedTailPreservesTheConfirmedPrefixAndNeverSplitsASurrogatePair() {
         val initial = EditorSnapshot(7, "left  right", 5, 5)
         val owner = EditorOwnership(initial)

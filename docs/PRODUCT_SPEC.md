@@ -1,6 +1,6 @@
 # AlienFlow — Product Design and Implementation Plan
 
-**Version:** 0.1.18 contract · **Updated:** 12 October 2026 · **Stage:** Implemented Android client; exact verification and remaining device limits are in IMPLEMENTATION.md.
+**Version:** 0.1.19 contract · **Updated:** 12 October 2026 · **Stage:** Implemented Android client; exact verification and remaining device limits are in IMPLEMENTATION.md.
 
 **Working product name:** AlienFlow. This is an Android dictation application inspired by the interaction of Wispr Flow, with a personal-key development client and a planned paid Google Play release. The name is provisional and has not been checked for publication or trademark use.
 
@@ -593,3 +593,8 @@ The owner additionally requires an always-visible live appearance preview beside
 ## Owner correction — prompt-like corruption and selected ChatGPT composer, 2026-10-12
 
 The 0.1.13 owner observation overrides any implication that ordinary-field support passed on the phone. Do not splice placeholder or merged label text into dictation. The existing whole-field replacement prohibition applies to unrelated user text; a node action may update a field only when its entirety is a positively established dictation-owned span from an initially empty field. Existing drafts require range edits. Resolve virtual input focus through the actual input-focused application window, not the touched/active window or an app-name rule. Preserve the accepted public interface and snappy capture. A screenshot of a selected composer with AF-E01 is a focus-discovery failure observation; precise installed framework behavior and transcription provenance remain facts to establish.
+
+
+## Owner regression — 2026-10-12 / AlienFlow2 0.1.19
+
+The supplied 0.1.18 Fold6 diagnostic overrides any implication that ChatGPT and Chrome acceptance passed. An explicitly anchored keyboard window may extend beyond the accessibility text representation. Authorize a ranged edit only when every shared character, absolute selection and complete mutation range agree. Preserve all IME-only suffix characters by leaving them outside the edit; never guess or trim them. A representation fixture is regression evidence, not installed-device certification.

@@ -18,10 +18,12 @@ object TerminalDictation {
 class TerminalInsertion {
     var sent = false; private set
     fun send(value: String, sameTarget: Boolean, commit: (String) -> Unit): Boolean {
-        if (sent || !sameTarget || value.isBlank()) return false
+        if (sent || !sameTarget) return false
+        val literal = TerminalDictation.text(value)
+        if (literal.isBlank()) return false
         // Set before the external operation: an uncertain return must never cause a duplicate.
         sent = true
-        commit(TerminalDictation.text(value))
+        commit(literal)
         return true
     }
 }

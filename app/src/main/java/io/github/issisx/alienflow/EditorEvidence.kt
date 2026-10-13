@@ -34,7 +34,9 @@ object EditorEvidence {
     }
 
     /** An explicit Android offset anchors a window, including the entire mutation range.
-     * Unknown offsets still require full text. Never search for matching substrings.
+     * Compare all shared characters. IME-only text beyond the node is outside the
+     * permitted edit and remains untouched by ranged commits. Never trim it or
+     * infer its contents. Unknown offsets still require exact full text.
      */
     fun corroborate(node: EditorSnapshot, keyboard: KeyboardText,
                     required: IntRange = node.start until node.end): Read {
@@ -42,15 +44,17 @@ object EditorEvidence {
         val end = maxOf(keyboard.start, keyboard.end)
         val offset = if (keyboard.offset == -1 && keyboard.text == node.text) 0 else keyboard.offset
         val windowEnd = offset.toLong() + keyboard.text.length
-        if (offset < 0 || windowEnd > node.text.length || (keyboard.text.isEmpty() && node.text.isNotEmpty()) || required.first < offset ||
-            required.last.toLong() + 1 > windowEnd) {
+        val sharedEnd = minOf(windowEnd, node.text.length.toLong())
+        if (offset < 0 || offset > node.text.length ||
+            (sharedEnd <= offset && (node.text.isNotEmpty() || keyboard.text.isNotEmpty())) ||
+            required.first < offset || required.last.toLong() + 1 > sharedEnd) {
             return Read(error = "[AF-E09] The keyboard window does not cover this edit; no text was replaced")
         }
         if (start < 0 || end > keyboard.text.length || offset.toLong() + start != node.start.toLong() ||
             offset.toLong() + end != node.end.toLong()) {
             return Read(error = "[AF-E11] Keyboard and text-box cursor positions disagree; tap the field again")
         }
-        if (!node.text.regionMatches(offset, keyboard.text, 0, keyboard.text.length)) {
+        if (!node.text.regionMatches(offset, keyboard.text, 0, (sharedEnd - offset).toInt())) {
             return Read(error = "[AF-E10] Keyboard and text-box contents disagree; no text was replaced")
         }
         return Read(node)
