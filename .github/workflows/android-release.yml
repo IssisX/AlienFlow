@@ -20,7 +20,7 @@ permissions:
 
 concurrency:
   group: alienflow-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   release:
@@ -58,7 +58,7 @@ jobs:
           mkdir -p build/ci
           bash gradlew --no-daemon --no-configuration-cache --console=plain --stacktrace \
             :app:testDebugUnitTest :app:lintRelease :app:assembleRelease :app:assembleDebug :app:assembleDebugAndroidTest 2>&1 | tee build/ci/gradle.log
-      - name: Trace real Android 16 Chromium input
+      - name: Real Android 16 browser and installed terminal input
         run: bash scripts/test_browser_editor.sh
       - name: Upload browser probe evidence
         if: always()

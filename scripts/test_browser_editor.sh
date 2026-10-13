@@ -71,29 +71,24 @@ cd "$ROOT"
 "$ADB" shell pm grant io.github.issisx.alienflow android.permission.RECORD_AUDIO
 "$ADB" shell pm grant io.github.issisx.alienflow android.permission.POST_NOTIFICATIONS
 "$ADB" shell appops set io.github.issisx.alienflow ACCESS_RESTRICTED_SETTINGS allow
-timeout 300 "$ADB" shell am instrument -w -r -e disableAnalytics true -e class io.github.issisx.alienflow.BrowserEditorTest io.github.issisx.alienflow.test/androidx.test.runner.AndroidJUnitRunner | tee "$PROOF/instrumentation.txt"
-grep -F 'OK (1 test)' "$PROOF/instrumentation.txt"
+# One instrumentation process preserves the bound accessibility service between
+# the browser and Termux classes. Separate invocations force-stop the target app.
+timeout 300 "$ADB" shell am instrument -w -r -e disableAnalytics true -e class io.github.issisx.alienflow.BrowserEditorTest,io.github.issisx.alienflow.InstalledTermuxTest io.github.issisx.alienflow.test/androidx.test.runner.AndroidJUnitRunner | tee "$PROOF/instrumentation.txt"
+grep -F 'OK (2 tests)' "$PROOF/instrumentation.txt"
+python3 - "$PROOF" <<'PY'
+import json,sys,os,pathlib
+root=pathlib.Path(sys.argv[1])
+results=[json.loads(x.split('fixture_result=',1)[1]) for x in open(root/'instrumentation.txt') if x.startswith('INSTRUMENTATION_STATUS: fixture_result=')]
+assert len(results)==2,results
+for kind in ('browser','termux'):
+ r=next(x for x in results if ('initial_node' in x)==(kind=='browser'))
+ assert r['source']==os.environ['GITHUB_SHA'] and r['api']==36,r
+ if kind=='browser':assert r['delivered'] and r['selected_replacement'] and r['typing_continues_dictation'] and r['repeat_session'],r
+ else:assert r['final_count']==1 and r['real_terminal_echo'] and r['ordinary_live_after_termux'],r
+ path=root/f'{kind}-proof/result.json';path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(r,indent=2))
+ print(json.dumps(r,indent=2))
+PY
+# Optional screenshots never determine delivery success; results above come
+# directly from assertions and real editor observations in instrumentation.
 timeout 15 "$ADB" pull /sdcard/Android/data/io.github.issisx.alienflow/files/browser-proof "$PROOF/" || true
-python3 - "$PROOF/instrumentation.txt" "$PROOF/browser-proof/result.json" <<'PY'
-import json,sys,os,pathlib
-line=next(x for x in open(sys.argv[1]) if x.startswith('INSTRUMENTATION_STATUS: fixture_result='))
-r=json.loads(line.split('fixture_result=',1)[1]); assert r['source']==os.environ['GITHUB_SHA'] and r['delivered'] and r['selected_replacement'] and r['typing_continues_dictation'] and r['repeat_session'],r
-pathlib.Path(sys.argv[2]).parent.mkdir(parents=True,exist_ok=True);pathlib.Path(sys.argv[2]).write_text(json.dumps(r,indent=2))
-print(json.dumps(r,indent=2))
-PY
-# Reconnect a lost transport only; never repeat a behavioral test.
-"$ADB" reconnect offline
-timeout 30 "$ADB" wait-for-device
-
-
-
-timeout 300 "$ADB" shell am instrument -w -r -e disableAnalytics true -e class io.github.issisx.alienflow.InstalledTermuxTest io.github.issisx.alienflow.test/androidx.test.runner.AndroidJUnitRunner | tee "$PROOF/termux-instrumentation.txt"
-grep -F 'OK (1 test)' "$PROOF/termux-instrumentation.txt"
 timeout 15 "$ADB" pull /sdcard/Android/data/io.github.issisx.alienflow/files/termux-proof "$PROOF/" || true
-python3 - "$PROOF/termux-instrumentation.txt" "$PROOF/termux-proof/result.json" <<'PY'
-import json,sys,os,pathlib
-line=next(x for x in open(sys.argv[1]) if x.startswith('INSTRUMENTATION_STATUS: fixture_result='))
-r=json.loads(line.split('fixture_result=',1)[1]); assert r['source']==os.environ['GITHUB_SHA'] and r['final_count']==1 and r['real_terminal_echo'],r
-pathlib.Path(sys.argv[2]).parent.mkdir(parents=True,exist_ok=True);pathlib.Path(sys.argv[2]).write_text(json.dumps(r,indent=2))
-print(json.dumps(r,indent=2))
-PY
