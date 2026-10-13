@@ -1,13 +1,13 @@
-name: AlienFlow2 source handoff
+name: AlienFlow chat source handoff
 on:
   workflow_dispatch:
   push:
-    branches: [AlienFlow2]
+    branches: ['AlienFlow(chat)']
     paths: ['.github/workflows/source-handoff.yml']
 permissions:
   contents: read
 concurrency:
-  group: alienflow2-source
+  group: alienflow-chat-source
   cancel-in-progress: false
 jobs:
   source:
@@ -19,18 +19,21 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 0
-      - name: Export tracked source
+      - name: Export tracked source and pinned upstream revision
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git diff --exit-code
-          git bundle create "${RUNNER_TEMP}/AlienFlow2-source.bundle" HEAD
-          git bundle verify "${RUNNER_TEMP}/AlienFlow2-source.bundle"
-          sha256sum "${RUNNER_TEMP}/AlienFlow2-source.bundle"
+          git cat-file -e 3be1cd2b5bac1206ad3f9025b64d1b55e5c2eac1^{commit}
+          git update-ref refs/heads/source-0.1.19-copy 3be1cd2b5bac1206ad3f9025b64d1b55e5c2eac1
+          git bundle create "${RUNNER_TEMP}/AlienFlow-chat-source.bundle" HEAD refs/heads/source-0.1.19-copy
+          git bundle verify "${RUNNER_TEMP}/AlienFlow-chat-source.bundle"
+          git bundle list-heads "${RUNNER_TEMP}/AlienFlow-chat-source.bundle"
+          sha256sum "${RUNNER_TEMP}/AlienFlow-chat-source.bundle"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          path: ${{ runner.temp }}/AlienFlow2-source.bundle
+          path: ${{ runner.temp }}/AlienFlow-chat-source.bundle
           archive: false
           if-no-files-found: error
           retention-days: 2
