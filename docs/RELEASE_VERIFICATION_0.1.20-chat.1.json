@@ -1,0 +1,88 @@
+{
+  "repository": "IssisX/AlienFlow",
+  "branch": "AlienFlow(chat)",
+  "version_name": "0.1.20-chat.1",
+  "version_code": 21,
+  "compiled_source_sha": "683ab2dcc5902d41ed5b283f08d6a8054def1b2d",
+  "workflow_run_url": "https://github.com/IssisX/AlienFlow/actions/runs/38398347454",
+  "source_0_1_19_sha": "3be1cd2b5bac1206ad3f9025b64d1b55e5c2eac1",
+  "artifact_id": 11814466968,
+  "unsigned_bundle_sha256": "d1549d65e8f7cf194c15a906928881f0f715c1b9d6944f78c01e74d0fada8335",
+  "bundle_member_hashes_verified": 157,
+  "tests": {
+    "tests": 198,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "lint": {
+    "errors": 0,
+    "issues": 38
+  },
+  "installed_termux": {
+    "source": "683ab2dcc5902d41ed5b283f08d6a8054def1b2d",
+    "version": "0.1.20-chat.1",
+    "api": 36,
+    "termux": "official v0.118.3 x86_64",
+    "real_bubble_tap": true,
+    "real_accessibility_broker": true,
+    "real_terminal_echo": true,
+    "final_count": 1,
+    "repeat_session_count": 1,
+    "ordinary_live_after_termux": true,
+    "termux_visible_after_switch": true,
+    "premature_text": false,
+    "microphone_and_provider": "not exercised; transcript fixtures"
+  },
+  "baseline_reproduction": {
+    "baseline_sha": "7ebe095bfaa83456690b46d8934c0cad2590a94a",
+    "candidate_sha": "683ab2dcc5902d41ed5b283f08d6a8054def1b2d",
+    "tests": 3,
+    "expected_failed_cases": [
+      "accessibilityEventsDuringSpeechKeepTheTerminalBoundAndFinalTextCommitsOnce",
+      "finishingEventsCannotSendPartialTerminalTextBeforeTheLastTranscript"
+    ],
+    "actual_failed_cases": [
+      "accessibilityEventsDuringSpeechKeepTheTerminalBoundAndFinalTextCommitsOnce",
+      "finishingEventsCannotSendPartialTerminalTextBeforeTheLastTranscript"
+    ],
+    "errors": 0,
+    "exit_code": 1,
+    "scope": "Robolectric with production coordinator/bridge; OS broker, recognition and terminal consumer fixtures"
+  },
+  "apk": {
+    "filename": "AlienFlow-0.1.20-chat.1.apk",
+    "size_bytes": 4552856,
+    "sha256": "27193414f7d4e3a2e7e91ed14b7f0a4ec91ba6bfec9244656f070cf7b4d06be8",
+    "signature_scheme": "APK v3",
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "unchanged_payload_entries": 25,
+    "added_signature_metadata": [
+      "META-INF/ALIENFLO.RSA",
+      "META-INF/ALIENFLO.SF",
+      "META-INF/MANIFEST.MF"
+    ]
+  },
+  "artwork_sha256": "48d0ce0aacba2fd4264100fb1af1b6a73f54290f6c5296f4adc07d3974a50671",
+  "native_libraries": [],
+  "test_boundary": "Real installed Termux, Android 16 accessibility IPC and real overlay touches. Transcript events and unstarted transport are explicit fixtures. No physical Fold6/Gboard/tmux/Codex or live microphone/provider call in this test.",
+  "google_play_status": "Development update; not submitted or approved. Remaining disclosure/consent, policy, FGS and store-delivery gates are documented.",
+  "compiled_tree_sha": "dadbe62f548408e2a5d58ba0083f5c88be85ccc8",
+  "prior_run": {
+    "run_id": 38396676169,
+    "source_sha": "a912cd3f0d8a6bb08be0893e5812db587ea7efe8",
+    "unit_tests": "198 passed",
+    "integration": "First Termux and ordinary field passed; return-to-Termux session-start tap timed out.",
+    "response": "Test harness now requires stable geometry and actual topmost accessibility-overlay hit before a single tap. Production source and behavioral assertions were not changed in this step. The first tap did not establish a new production input defect."
+  },
+  "visual_inspection": [
+    "installed Termux before repeat session",
+    "installed Termux final text and visible alien",
+    "settings",
+    "large-text small-screen bubble controls",
+    "history",
+    "light-background indicator states",
+    "dark-background indicator states"
+  ],
+  "runtime_delta_from_source_0_1_19": "TerminalInsertion rejects control-only text after conversion, before consuming once-only delivery. Working 0.1.19 transport, coordinator, editor, main UI and data formats remain byte-identical."
+}

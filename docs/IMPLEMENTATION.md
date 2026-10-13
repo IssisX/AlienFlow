@@ -1,32 +1,45 @@
-# AlienFlow(chat) — 0.1.19 integration and Termux verification
+# AlienFlow(chat) — verified 0.1.19 integration
 
-Repository: IssisX/AlienFlow. Working branch: AlienFlow(chat). Date: 2026-10-13.
-Candidate version: 0.1.20-chat.1 (21). Build/device evidence is pending at this source checkpoint.
+Date: 2026-10-13. Repository: IssisX/AlienFlow. Branch: AlienFlow(chat).
+Signed development version: **0.1.20-chat.1 (21)**.
+Compiled source: **683ab2dcc5902d41ed5b283f08d6a8054def1b2d**.
+Compiled tree: dadbe62f548408e2a5d58ba0083f5c88be85ccc8.
 
-## Source and preservation
+## Preserved source and contracts
 
-The requested AlienFlow2 is a branch, not a second repository. AlienFlow(chat) already existed at f24ace1d85b480005d5587b618e6cf37db48ab55 with a tested Termux repair. That work and history are preserved. This integration adds the complete upstream 0.1.19 checkpoint, 3be1cd2b5bac1206ad3f9025b64d1b55e5c2eac1 (compiled cad03c3aa1573944e7dbae8def245d2c97600680), without writing AlienFlow2, build/first-apk or main.
+AlienFlow2 is a branch, not another repository. AlienFlow(chat) already contained the prior Termux repair at f24ace1d85b480005d5587b618e6cf37db48ab55. Merge a912cd3f0d8a6bb08be0893e5812db587ea7efe8 preserves that ancestry and the complete upstream 0.1.19 at 3be1cd2b5bac1206ad3f9025b64d1b55e5c2eac1. No writes were made to AlienFlow2, main or build/first-apk. Historical checkpoints are preserved verbatim under history/IMPLEMENTATION_CHAT_0.1.18-chat.1.md and history/IMPLEMENTATION_ALIENFLOW2_0.1.19.md.
 
-Both source histories are preserved verbatim in history/IMPLEMENTATION_CHAT_0.1.18-chat.1.md and history/IMPLEMENTATION_ALIENFLOW2_0.1.19.md. The approved icon, opacity, public interface, history, private key storage, package identity, background readiness, microphone/transport and model choices are not redesigned or reset.
+The working 0.1.19 coordinator, microphone/transport, model choices, editor bridge, IME-only suffix preservation, main UI, approved icon, opacity, settings, history, key-storage format and package identity remain. No new permission or data migration was added.
 
-## What the Termux repair actually is
+## Termux behavior
 
-The historical .17 coordinator attempted terminal writes during speech and while final recognition was incomplete. The terminal adapter refused a premature write or consumed its one delivery too early. The existing centralized finalDelivery gate fixes both paths. It already exists in .18/.19 and in the preserved chat branch; this turn does not claim it is a newly discovered .19 defect. The user reports Termux remains a concern, but no new .19-specific Termux failure trace was supplied.
+The historical .17 coordinator attempted terminal writes while speaking or before the last recognition result completed. The centralized finalDelivery gate fixes both paths. This gate already existed in .18/.19 and the preserved chat branch; it is not a newly discovered .19 defect. No new .19-specific phone failure trace was supplied.
 
-Termux continues to receive final corrected text once after Stop, keeping existing input and never sending Enter or control keys. Live ordinary document fields retain .19's exact ranged-editor behavior, including the IME-only suffix preservation repair. The only additional runtime delta versus .19 is that a control-only result, which becomes blank after terminal control conversion, cannot consume a delivery slot or insert a blank fragment. Its regression exercises the actual TerminalInsertion owner.
+Termux receives final text once after Stop, retaining existing input without Enter or control-key actions. Ordinary fields retain live revisions. The only additional production delta versus .19 is a TerminalInsertion guard: after converting terminal control characters, a blank result cannot insert a blank fragment or consume one-shot delivery. The regression exercises that actual owner.
 
-## Verification plan and test boundaries
+## Executed verification
 
-The inherited regression discriminator still runs the same three tests on shipped .17 and requires exactly the two premature-write failures; the changed-field protection case must pass. Candidate runs retain all .19 editor tests and chat tests.
+[Actions run 38398347454](https://github.com/IssisX/AlienFlow/actions/runs/38398347454) passed all required steps:
 
-The installed-Termux Android 16 emulator test now verifies a real cross-app round trip: Termux final delivery with delayed final recognition; an ordinary native field with live partial words and live final correction before Stop; then Termux again for an independent second final-only dictation. Actual injected screen taps exercise the real overlay, accessibility service and cross-process InputConnection. Existing prefix, no duplicates, no partial terminal sends and no Enter are asserted. A release requires every leg to pass, not just a unit fixture.
+- 198 unit tests executed, no failures/errors/skips. The same historical regression reproduced exactly the two expected .17 failures; changed-target protection passed.
+- Real installed official Termux v0.118.3 x86_64 on Android 16/API 36. Actual overlay touches and accessibility/InputConnection IPC delivered completed text once, held partial/delayed results until ready, preserved the prefix and did not send Enter. Switching to an ordinary field produced live partial/final revisions before Stop. Returning to Termux allowed a second session without resetting accessibility.
+- Release lint: zero errors, 38 reviewed warnings. They concern deliberate diagnostic persistence, pinned versions/SDK, localization/RTL, programmatic view constructors and launcher-theme metadata. No suppression or relaxed gate was added.
+- Release assembly, identity, absence of native WebRTC, icon digest and required UI artifacts passed. Termux screenshots plus settings, large-text small-screen controls, history and light/dark indicators were visually inspected.
 
-Recognition callbacks and an unstarted audio transport are explicit test fixtures. These checks do not exercise paid OpenAI calls, a physical microphone, Gboard, tmux/Codex, or the user's Fold6. Successful emulator output cannot certify those boundaries.
+The first expanded run, 38396676169, passed the unit suite and first two editor legs, but the return tap timed out. Its harness checked only View.isShown/coordinates, not the actual topmost touch target after a keyboard transition. The final harness observes settled geometry and the topmost accessibility-overlay region before one tap; it also retains geometry/screenshots/diagnostics on failure. No application source or behavioral assertion changed in that test-only repair. Do not cite the first timeout as an established production input defect.
 
-## Release polish and pending store work
+Recognition/readiness callbacks and an unstarted transport are explicit fixtures. The integration is NOT a physical microphone, OpenAI, Gboard, tmux/Codex or Fold6 test. Synthetic timing records are not measured dictation latency.
 
-The branch/version identifies this update distinctly and versionCode 21 permits an in-place update over both .19 and the previous chat build. Versioned UI artifacts, package checks and historical release records are retained. Terminal control-only output has an explicit non-delivery regression instead of a false successful send. PLAY_RELEASE_READINESS.md records the current publishing gaps after checking official Play/Android documentation; this is still a development APK.
+## Signed delivery
 
-## Next physical check
+Artifact 11814466968, AlienFlow-0.1.20-chat.1-unsigned-release-bundle.zip: SHA-256 d1549d65e8f7cf194c15a906928881f0f715c1b9d6944f78c01e74d0fada8335. Download digest and all 157 manifest-listed member hashes matched.
 
-Install the signed candidate in place without clearing data. Keep the usual keyboard. Dictate in Termux and tap Stop; text should arrive once without Enter. Switch to an ordinary field and verify live updates, then return to Termux for a second dictation. If it fails, use Settings → Help & about → Diagnostics / share report and send the new version-specific session events. Do not substitute older WebRTC crash records for the current failure.
+Installer: AlienFlow-0.1.20-chat.1.apk; 4,552,856 bytes; SHA-256 27193414f7d4e3a2e7e91ed14b7f0a4ec91ba6bfec9244656f070cf7b4d06be8. APK v3 signature verified against original certificate d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f. All 25 unsigned application payload entries remained identical; only three META-INF signer entries were added. Approved icon SHA-256 remains 48d0ce0aacba2fd4264100fb1af1b6a73f54290f6c5296f4adc07d3974a50671. Private signing material was not changed or published.
+
+Exact evidence: RELEASE_VERIFICATION_0.1.20-chat.1.json and APK_SIGNATURE_0.1.20-chat.1.txt. Later documentation-only commits do not change the compiled app.
+
+## Remaining acceptance and paid release
+
+Install in place without clearing data. With the usual keyboard, dictate in Termux and Stop, verify no Enter, switch to an ordinary live field, then return to Termux. A remaining failure needs the new version-specific report from Settings → Help & about → Diagnostics / share report. Older WebRTC exits are not current evidence.
+
+PLAY_RELEASE_READINESS.md records pending disclosure/consent, accessibility/foreground-service declarations, privacy policy/Data safety, account/cost decisions, App Bundle/signing and real-device release validation. This is a development APK, not a Play submission or approval.
