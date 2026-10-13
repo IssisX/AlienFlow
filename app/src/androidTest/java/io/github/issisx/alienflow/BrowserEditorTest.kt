@@ -246,6 +246,7 @@ class BrowserEditorTest {
 
         } finally {
             File(evidenceDirectory, "result.json").writeText(result.toString(2))
+            instrumentation.sendStatus(2, android.os.Bundle().apply { putString("fixture_result", result.toString()) })
             File(evidenceDirectory, "session-diagnostic.txt").writeText(DiagnosticReport.collect(app))
             File(evidenceDirectory, "last-screen.png").outputStream().use {
                 automation.takeScreenshot().compress(Bitmap.CompressFormat.PNG, 100, it)

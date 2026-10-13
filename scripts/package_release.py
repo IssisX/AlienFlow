@@ -168,7 +168,7 @@ def main() -> None:
         f"Unit tests: {tests}; failures: {failures}; errors: {errors}; skipped: {skipped}\n"
         f"Release lint: {len(issues)} issues; errors/fatal: {lint_errors}\n"
         "Gradle gates: :app:testDebugUnitTest :app:lintRelease :app:assembleRelease succeeded.\n"
-        "Device, microphone, provider account, and editor behavior have not been validated by CI.\n"
+        "Real API 36 Chromium/Termux editor paths use transcript fixtures; physical phone, microphone and provider account are not validated.\n"
     )
 
     tooling = bundle / "tooling"
@@ -190,6 +190,19 @@ def main() -> None:
         "Omit password options to use the private interactive password prompt.\n"
         "java -jar tooling/apksigner.jar verify --verbose --print-certs AlienFlow-0.1.22.apk\n"
     )
+
+    editor_proof = {}
+    for kind in ("browser", "termux"):
+        proof = ROOT / f"build/browser-editor/{kind}-proof/result.json"
+        require(proof.is_file(), f"Real {kind} editor proof missing")
+        result = json.loads(proof.read_text())
+        require(result["source"] == source_sha and result["api"] == 36, f"Wrong {kind} proof source/API")
+        if kind == "browser":
+            require(all(result.get(x) is True for x in ("delivered", "selected_replacement", "typing_continues_dictation", "typed_text_preserved", "repeat_session")), "Browser delivery regression failed")
+        else:
+            require(result.get("real_terminal_echo") is True and result.get("final_count") == 1 and result.get("ordinary_live_after_termux") is True, "Installed Termux regression failed")
+        editor_proof[kind] = result
+        shutil.copy2(proof, bundle / "reports" / f"{kind}-editor-result.json")
 
     versions = tomllib.loads((ROOT / "gradle/libs.versions.toml").read_text())["versions"]
     require("webrtc" not in versions, "WebRTC version remains in the release dependency catalog")
@@ -225,7 +238,8 @@ def main() -> None:
             "failures": failures,
             "errors": errors,
             "skipped": skipped,
-            "device_tests": "not run",
+            "device_tests": "API 36 emulator: real Chromium rich editor and installed official Termux; transcript fixtures",
+            "editor_integration": editor_proof,
         },
         "lint": {"issues": len(issues), "errors": lint_errors},
         "sha256": {

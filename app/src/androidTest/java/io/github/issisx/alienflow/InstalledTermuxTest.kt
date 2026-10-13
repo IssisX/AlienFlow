@@ -237,14 +237,16 @@ class InstalledTermuxTest {
             assertFalse(repeated.contains("NEVER_PARTIAL"))
             val directory = File(app.getExternalFilesDir(null), "termux-proof").apply { mkdirs() }
             File(directory, "terminal.png").outputStream().use { automation.takeScreenshot().compress(Bitmap.CompressFormat.PNG, 100, it) }
-            File(directory, "result.json").writeText(JSONObject()
+            val result = JSONObject()
                 .put("source", BuildConfig.SOURCE_REVISION).put("version", BuildConfig.VERSION_NAME)
                 .put("api", android.os.Build.VERSION.SDK_INT).put("termux", "official v0.118.3 x86_64")
                 .put("real_bubble_tap", true).put("real_accessibility_broker", true)
                 .put("real_terminal_echo", true).put("final_count", 1)
                 .put("repeat_session_count", 1).put("ordinary_live_after_termux", true)
                 .put("termux_visible_after_switch", true).put("premature_text", false).put("microphone_and_provider", "not exercised; transcript fixtures")
-                .toString(2))
+                .toString()
+            File(directory, "result.json").writeText(result)
+            instrumentation.sendStatus(2, android.os.Bundle().apply { putString("fixture_result", result) })
         } finally {
             File(evidenceDirectory, "session-diagnostic.txt").writeText(DiagnosticReport.collect(app))
             File(evidenceDirectory, "before-instrumentation-exit.png").outputStream().use {
