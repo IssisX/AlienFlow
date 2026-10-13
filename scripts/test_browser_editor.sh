@@ -37,6 +37,7 @@ EMULATOR_PID=$!
 cleanup() {
   # Preserve in-process geometry/session evidence even if an assertion fails.
   timeout 10 "$ADB" pull /sdcard/Android/data/io.github.issisx.alienflow/files/browser-proof "$PROOF/" > "$PROOF/pull-on-exit.txt" 2>&1 || true
+  timeout 10 "$ADB" pull /sdcard/Android/data/io.github.issisx.alienflow/files/termux-proof "$PROOF/" > "$PROOF/termux-pull-on-exit.txt" 2>&1 || true
   timeout 5 "$ADB" logcat -d -t 3000 > "$PROOF/logcat.txt" 2>&1 || true
   timeout 5 "$ADB" exec-out screencap -p > "$PROOF/last-screen.png" 2>/dev/null || true
   timeout 5 "$ADB" shell dumpsys accessibility > "$PROOF/accessibility.txt" 2>&1 || true
@@ -56,6 +57,15 @@ test "$("$ADB" shell getprop ro.kernel.qemu | tr -d '\r')" = 1
 "$ADB" shell settings put global window_animation_scale 0
 "$ADB" shell settings put global transition_animation_scale 0
 "$ADB" shell settings put global animator_duration_scale 0
+TERMUX_FILE='termux-app_v0.118.3+github-debug_x86_64.apk'
+cd "$PROOF"
+curl --fail --location --retry 2 'https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3%2Bgithub-debug_x86_64.apk' -o "$TERMUX_FILE"
+curl --fail --location --retry 2 'https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3%2Bgithub-debug_sha256sums' -o upstream-sha256sums.txt
+grep -F "$TERMUX_FILE" upstream-sha256sums.txt | sha256sum --check --strict
+"$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$TERMUX_FILE" > termux-signature.txt
+"$ADB" install -r "$TERMUX_FILE"
+rm "$TERMUX_FILE"
+cd "$ROOT"
 "$ADB" install -r app/build/outputs/apk/debug/app-debug.apk
 "$ADB" install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 "$ADB" shell pm grant io.github.issisx.alienflow android.permission.RECORD_AUDIO
@@ -70,3 +80,12 @@ r=json.load(open(sys.argv[1])); assert r['source']==os.environ['GITHUB_SHA'],r
 print(json.dumps(r,indent=2))
 PY
 
+
+timeout 300 "$ADB" shell am instrument -w -r -e disableAnalytics true -e class io.github.issisx.alienflow.InstalledTermuxTest io.github.issisx.alienflow.test/androidx.test.runner.AndroidJUnitRunner | tee "$PROOF/termux-instrumentation.txt"
+grep -F 'OK (1 test)' "$PROOF/termux-instrumentation.txt"
+"$ADB" pull /sdcard/Android/data/io.github.issisx.alienflow/files/termux-proof "$PROOF/"
+python3 - "$PROOF/termux-proof/result.json" <<'PY'
+import json,sys,os
+r=json.load(open(sys.argv[1])); assert r['source']==os.environ['GITHUB_SHA'] and r['final_count']==1 and r['real_terminal_echo'],r
+print(json.dumps(r,indent=2))
+PY

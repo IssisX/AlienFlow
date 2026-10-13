@@ -150,6 +150,15 @@ class CrashJournal(private val application: Application) {
         try { prefs.edit().putString("editor_observation", metadata).commit() }
         catch (_: Exception) { persistFailed = true }
     }
+    @Synchronized fun keyboardObservation(phase: String, node: EditorEvidence.NodeText?,
+                                           keyboard: EditorEvidence.KeyboardText?, code: String) {
+        val metadata = "route=keyboard; phase=$phase; node_length=${node?.text?.length}; " +
+            "node_cursor=${node?.start}:${node?.end}; ime_length=${keyboard?.text?.length}; " +
+            "ime_cursor=${keyboard?.start}:${keyboard?.end}; offset=${keyboard?.offset}; " +
+            "ime_absolute_cursor=${keyboard?.selection?.start}:${keyboard?.selection?.end}; evidence_code=$code"
+        try { prefs.edit().putString("editor_observation", metadata).commit() }
+        catch (_: Exception) { persistFailed = true }
+    }
     @Synchronized fun rejectedAudioCommit(bytes: Long, capturing: Boolean, generation: Int) {
         try { prefs.edit().putString("audio_commit", "sent_bytes=$bytes; capturing=$capturing; generation=$generation").commit() }
         catch (_: Exception) { persistFailed = true }

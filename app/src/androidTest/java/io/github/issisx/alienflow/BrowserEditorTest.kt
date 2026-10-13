@@ -189,6 +189,7 @@ class BrowserEditorTest {
                 if (delivered || main { service.bridge.lastError.isNotEmpty() }) break
                 Thread.sleep(100)
             }
+            assertTrue("The reproduced AF-E10 must now deliver actual browser text", delivered)
             result.put("real_bubble_tap", true).put("delivered", delivered)
                 .put("after_dom", js(activity, "editor.innerText"))
                 .put("editor_error", main { service.bridge.lastError })
@@ -199,6 +200,50 @@ class BrowserEditorTest {
             await("dictation finish") { main { !coordinator.finishing && !coordinator.active } }
             result.put("final_dom", js(activity, "editor.innerText"))
                 .put("status", main { coordinator.status })
+            assertEquals("Browser final speech", org.json.JSONArray("[" + js(activity, "editor.innerText") + "]").getString(0).trimEnd('\n'))
+            // Selected replacement in an existing browser draft, then real keyboard
+            // typing in the same dictation. Previously dispatched speech becomes user-owned.
+            connection.setSelection(8, 13)
+            await("real browser selection") { main { service.imeSelection == EditorEvidence.Selection(8, 13) } }
+            main { setField(coordinator, "transport", idleTransport) }
+            tapAlien(service); await("second browser dictation") { main { coordinator.active } }
+            main {
+                coordinator.captured(); coordinator.connected(); coordinator.turnCommitted()
+                event(coordinator, "input_audio_buffer.committed", "second-ack", "second")
+                event(coordinator, "conversation.item.input_audio_transcription.delta", "second-delta", "second", "SECOND")
+            }
+            await("selected range replaced without losing draft anchors") {
+                js(activity, "editor.innerText").contains("Browser SECOND speech") && main {
+                    !coordinator.javaClass.getDeclaredField("writing").apply { isAccessible = true }.getBoolean(coordinator)
+                }
+            }
+            shell("input text %styped")
+            await("real keyboard text") { js(activity, "editor.innerText").contains("SECOND typed") }
+            assertTrue("Typing must not stop recording", main { coordinator.active })
+            main { event(coordinator, "conversation.item.input_audio_transcription.delta", "second-tail", "second", " tail") }
+            await("speech continues after typing") { js(activity, "editor.innerText").contains("Browser SECOND typed tail speech") }
+            main { event(coordinator, "conversation.item.input_audio_transcription.completed", "second-final", "second", "Second. tail") }
+            main { setField(coordinator, "transport", null) }; tapAlien(service)
+            await("second browser finish") { main { !coordinator.finishing && !coordinator.active } }
+            assertTrue(js(activity, "editor.innerText").contains("Browser SECOND typed tail speech"))
+            result.put("selected_replacement", true).put("typing_continues_dictation", true)
+                .put("typed_text_preserved", true).put("second_dom", js(activity, "editor.innerText"))
+            connection.setSelection(0, 0)
+            await("browser cursor at start") { main { service.imeSelection == EditorEvidence.Selection(0, 0) } }
+            main { setField(coordinator, "transport", idleTransport) }
+            tapAlien(service); await("third browser dictation") { main { coordinator.active } }
+            main {
+                coordinator.captured(); coordinator.connected(); coordinator.turnCommitted()
+                event(coordinator, "input_audio_buffer.committed", "third-ack", "third")
+                event(coordinator, "conversation.item.input_audio_transcription.completed", "third-final", "third", "🛸 Again ")
+            }
+            await("repeat session preserves Unicode and existing draft") {
+                js(activity, "editor.innerText").contains("Again Browser SECOND typed tail speech")
+            }
+            main { setField(coordinator, "transport", null) }; tapAlien(service)
+            await("third browser finish") { main { !coordinator.finishing && !coordinator.active } }
+            result.put("repeat_session", true).put("unicode_dom", js(activity, "editor.innerText"))
+
         } finally {
             File(evidenceDirectory, "result.json").writeText(result.toString(2))
             File(evidenceDirectory, "session-diagnostic.txt").writeText(DiagnosticReport.collect(app))

@@ -41,7 +41,7 @@ class EditorBridgeNodeRouteTest {
         var serviceForCallbacks: AlienAccessibilityService? = null
         var keyboardWindow = Int.MAX_VALUE
         var unexposedSuffix = ""
-        var conflictingKeyboard = false
+        var conflictingPresentation = false
         val committedTexts = mutableListOf<String>()
         fun publishSelection() {
             val current = field ?: return
@@ -64,8 +64,7 @@ class EditorBridgeNodeRouteTest {
     class KeyboardIpc {
         @Implementation fun getSurroundingText(before: Int, after: Int, flags: Int): SurroundingText? {
             val read = nativeKeyboard?.getSurroundingText(minOf(before, keyboardWindow), minOf(after, keyboardWindow), flags) ?: return null
-            return if (conflictingKeyboard && read.text.isNotEmpty()) SurroundingText(
-                "!" + read.text.toString().drop(1), read.selectionStart, read.selectionEnd, read.offset) else read
+            return read
         }
         @Implementation fun setSelection(start: Int, end: Int) {
             selections.add(start to end); nativeKeyboard!!.setSelection(start, end); publishSelection()
@@ -111,6 +110,8 @@ class EditorBridgeNodeRouteTest {
                 // editor and InputConnection retain every suffix character.
                 if (unexposedSuffix.isNotEmpty() && source.text?.endsWith(unexposedSuffix) == true)
                     actual.text = source.text!!.dropLast(unexposedSuffix.length)
+                if (conflictingPresentation && actual.text?.isNotEmpty() == true)
+                    actual.text = "!" + actual.text.toString().drop(1)
                 actual.isShowingHintText = source.isShowingHintText
                 actual.setTextSelection(source.textSelectionStart, source.textSelectionEnd)
             }
@@ -131,7 +132,7 @@ class EditorBridgeNodeRouteTest {
         field = null; focused = null; mutations = 0; nativeKeyboard = null; inputMethod = null
         connection = null; info = null; brokenHint = false; hideCompositionSpans = false; selections.clear(); serviceForCallbacks = null
         keyboardWindow = Int.MAX_VALUE
-        unexposedSuffix = ""; conflictingKeyboard = false
+        unexposedSuffix = ""; conflictingPresentation = false
         committedTexts.clear()
     }
     private fun withField(text: String = "", hint: String = "", keyboard: Boolean = false, block: (AlienAccessibilityService) -> Unit) {
@@ -180,12 +181,12 @@ class EditorBridgeNodeRouteTest {
             assertTrue(service.bridge.hasUserInteraction)
             assertEquals(0, mutations)
         }
-    @Test fun defaultImeWindowCannotWriteWithAContradictorySelectionCallback() =
+    @Test fun defaultImeWindowCannotWriteWithAnUnusableSelectionCallback() =
         withField("older draft\n".repeat(20) + "existing words", keyboard = true) { service ->
             useAndroidDefaultSurroundingText(); keyboardWindow = 24
             assertTrue(service.bridge.begin()); activate(service)
             val initial = field!!.text.toString(); val cursor = field!!.selectionStart
-            inputMethod!!.onUpdateSelection(-1, -1, cursor - 1, cursor - 1, -1, -1)
+            inputMethod!!.onUpdateSelection(-1, -1, cursor - 1, cursor, -1, -1)
             assertEquals(EditorWriteResult.FAILED, write(service, "spoken"))
             assertEquals(initial, field!!.text.toString()); assertTrue(committedTexts.isEmpty()); assertTrue(selections.isEmpty())
         }
@@ -233,16 +234,13 @@ class EditorBridgeNodeRouteTest {
             assertEquals(listOf(start to start + 8, start to start + "hello 🛸".length), selections)
             assertEquals(0, mutations)
         }
-    @Test fun longerKeyboardBufferStillRejectsConflictingSharedTextBeforeAnyCommit() =
+    @Test fun presentationTextIsNotAnAuthorityForKeyboardRangeEdits() =
         withField("abcdefghijklmnopqrstuvwxyXY", keyboard = true) { service ->
-            unexposedSuffix = "XY"; field!!.setSelection(25)
-            assertTrue(service.bridge.begin()); activate(service); conflictingKeyboard = true
-            assertEquals(EditorWriteResult.FAILED, write(service, "hello"))
-            assertEquals("abcdefghijklmnopqrstuvwxyXY", field!!.text.toString())
-            assertTrue(committedTexts.isEmpty()); assertTrue(selections.isEmpty()); assertEquals(0, mutations)
-            val report = (service.application as AlienApp).crashJournal.diagnostic()
-            assertTrue(report, report.contains("evidence_code=10"))
-            assertFalse(report.contains("abcdefghijklmnopqrstuvwxy"))
+            unexposedSuffix = "XY"; conflictingPresentation = true; field!!.setSelection(25)
+            assertTrue(service.bridge.begin()); activate(service)
+            assertEquals(EditorWriteResult.APPLIED, write(service, "hello"))
+            assertEquals("abcdefghijklmnopqrstuvwxyhelloXY", field!!.text.toString())
+            assertEquals(listOf("hello"), committedTexts); assertEquals(0, mutations)
         }
     @Test fun typingBetweenSpeechUpdatesWithAnUnexposedSuffixRemainsUserOwned() =
         withField("draft XY", keyboard = true) { service ->
