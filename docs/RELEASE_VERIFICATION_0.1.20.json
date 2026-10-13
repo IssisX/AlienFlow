@@ -1,0 +1,108 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version": "0.1.20",
+  "version_code": 21,
+  "branch": "AlienFlow2",
+  "compiled_source_sha": "658c9186056e84f91d12f34addf823e645200dd4",
+  "compiled_tree_sha": "1a26d7cc616590239e3b80c200b9fefb1884073e",
+  "workflow_run": "https://github.com/IssisX/AlienFlow/actions/runs/38399312969",
+  "workflow_conclusion": "success",
+  "artifact_id": 11813089141,
+  "unsigned_bundle_sha256": "74212c4685f86b9036fb9a8757b6daf4df445d4ef0f8b6491cf9a5f61eda4185",
+  "member_hashes_verified": 141,
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.20.apk",
+    "size_bytes": 4552657,
+    "sha256": "7e6ec001ef928a37af86871d24520517235ffd8976dd2ea17fe348e18d7fe32b",
+    "signature_scheme": "APK v3",
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "payload_entries_unchanged": 25
+  },
+  "unsigned_aab": {
+    "filename": "AlienFlow-0.1.20-unsigned.aab",
+    "sha256": "4d95d0a0870de9f7797473f4840cf785b98ea883dc1e46e8824696ed8f395982",
+    "validated_with": "bundletool 1.18.3",
+    "signing": "unsigned; upload signing and Play App Signing enrollment pending"
+  },
+  "tests": {
+    "executed": 198,
+    "total": 198,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "not run"
+  },
+  "lint": {
+    "issues": 38,
+    "errors": 0
+  },
+  "changed_path_suites": [
+    {
+      "name": "io.github.issisx.alienflow.BubbleEditorHandoffTest",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.TerminalCoordinatorTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.StopDeliveryTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.EditorBridgeNodeRouteTest",
+      "tests": "23",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.EditorSynchronizationTest",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.EditorEvidenceTest",
+      "tests": "18",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.issisx.alienflow.TerminalDictationTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "implemented": [
+    "API 36 retained; CI builds APK and AAB from the same release source.",
+    "Pinned and hash-checked bundletool 1.18.3 validates AAB; manifest gates package/version/minimum and target SDK/non-debuggable state. Bundle gates verify source identity, no native libraries and unsigned state.",
+    "One unavailable external-input metadata snapshot survives opening AlienFlow Diagnostics; package/class identifiers are sanitized and editor contents omitted.",
+    "Terminal bound/dispatched/rejected/exception stage recorded; dispatch is not represented as receipt confirmation."
+  ],
+  "verified": [
+    "198 tests passed with zero failures/errors/skips. Release lint has zero errors and 38 non-error issues.",
+    "Added actual service lifecycle test: unavailable external input, switch to AlienFlow, retained original failure metadata and omitted private field text. Framework broker is simulated.",
+    "All 141 bundle-member hashes verified; APK signed with original certificate and all 25 payload entries unchanged. APK and unsigned AAB saved and both hashes verified afterward."
+  ],
+  "unresolved": [
+    "The owner reports Termux failure and a missing ChatGPT bubble. A fresh diagnostic for these current failures is missing; neither issue is claimed fixed.",
+    "Upstream Termux and Android 16 source inspection matches the existing adapter contract, but does not establish installed-app behavior.",
+    "Play App Signing enrollment, upload signing, store review and physical-device acceptance are not performed."
+  ],
+  "scope": "Diagnostic/store-preparation update, not a demonstrated Termux or ChatGPT repair. Tests use Robolectric SDK 35 and simulated accessibility IPC. Existing editor algorithms, terminal final-only delivery, selected keyboard and recognition/cost behavior preserved. No paid provider request.",
+  "delivery": "Signed APK and unsigned AAB saved with file identity applied and unchanged SHA-256."
+}

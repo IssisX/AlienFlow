@@ -1,6 +1,6 @@
 # AlienFlow — Product Design and Implementation Plan
 
-**Version:** 0.1.20 contract · **Updated:** 12 October 2026 · **Stage:** Implemented Android client; exact verification and remaining device limits are in IMPLEMENTATION.md.
+**Version:** 0.1.20 contract · **Updated:** 13 October 2026 · **Stage:** Implemented Android client; exact verification and remaining device limits are in IMPLEMENTATION.md.
 
 **Working product name:** AlienFlow. This is an Android dictation application inspired by the interaction of Wispr Flow, with a personal-key development client and a planned paid Google Play release. The name is provisional and has not been checked for publication or trademark use.
 

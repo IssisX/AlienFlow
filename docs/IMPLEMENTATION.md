@@ -16,7 +16,7 @@ The project already compiled and targeted API 36. Release CI now builds both APK
 
 ## Verification
 
-Pending exact-source CI, APK signing and delivered artifact checks. The added service test drives a missing external input, then switches to AlienFlow and verifies that the failure metadata survives without the private editor text. Existing terminal/document regressions remain required. SDK 35 framework fixtures do not certify installed Termux, ChatGPT, Android 16 or provider behavior. Termux insertion and intermittent ChatGPT bubble availability remain unresolved requirements; request a fresh diagnostic immediately after each failure using this diagnostic build.
+Exact source 658c9186056e84f91d12f34addf823e645200dd4 (tree 1a26d7cc616590239e3b80c200b9fefb1884073e) passed the single workflow 38399312969: 198 tests, zero failures/errors/skips, release lint zero errors (38 non-error issues), APK assembly and AAB assembly/validation. All 141 bundle-member hashes were verified. The APK uses the original certificate with all 25 payload entries unchanged. The signed APK and unsigned AAB were saved and their hashes verified afterward. Exact evidence: RELEASE_VERIFICATION_0.1.20.json. The added service test drives a missing external input, then switches to AlienFlow and verifies that the failure metadata survives without the private editor text. Existing terminal/document regressions remain required. SDK 35 framework fixtures do not certify installed Termux, ChatGPT, Android 16 or provider behavior. Termux insertion and intermittent ChatGPT bubble availability remain unresolved requirements; request a fresh diagnostic immediately after each failure using this diagnostic build.
 
 ## Primary sources
 
