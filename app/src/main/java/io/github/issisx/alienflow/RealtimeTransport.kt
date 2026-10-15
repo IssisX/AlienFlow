@@ -62,6 +62,7 @@ class RealtimeTransport internal constructor(
     private var interruptionReported = false
     private var remoteBufferedBytes = 0L
     private var commitSequence = 0L
+    private var editorEpoch = 0L
     private var reconnectJob: Job? = null
     private var captureJob: Job? = null
     private var firstSample = true
@@ -142,6 +143,10 @@ class RealtimeTransport internal constructor(
                             if (type == "input_audio_buffer.committed") {
                                 synchronized(state) { coverage.acknowledge(value.optString("item_id")) }
                             }
+                            val item = value.optString("item_id", value.optJSONObject("item")?.optString("id").orEmpty())
+                            if (item.isNotBlank()) value.put("_editor_epoch", synchronized(state) {
+                                coverage.editorEpochFor(item) ?: -1L
+                            })
                             if (type == "error") app.crashJournal.liveConnectionFailure(LiveConnectionProblem.event(value))
                             listener.event(value.put("_connection_generation", generation))
                         }
@@ -181,10 +186,11 @@ class RealtimeTransport internal constructor(
             interruptionReported = false
             reconnecting = false
             // The same lock orders startup replay, turn commits, and newly captured frames.
+            var replayEpoch = editorEpoch
             val flushed = startup.drain { entry ->
                 when (entry) {
-                    is StartupAudioBuffer.Entry.Audio -> appendLocked(webSocket, entry.pcm)
-                    StartupAudioBuffer.Entry.Commit -> commitLocked(webSocket)
+                    is StartupAudioBuffer.Entry.Audio -> { replayEpoch = entry.editorEpoch; appendLocked(webSocket, entry.pcm) }
+                    StartupAudioBuffer.Entry.Commit -> commitLocked(webSocket, replayEpoch)
                 }
             }
             if (!flushed) failed = breakStreamLocked()
@@ -260,7 +266,7 @@ class RealtimeTransport internal constructor(
             if (closed || terminalFailure || localOnly) return
             val current = socket
             if (!sessionReady || current == null) {
-                if (!startup.append(pcm)) {
+                if (!startup.append(pcm, editorEpoch)) {
                     overflow = true
                     failed = breakStreamLocked()
                 }
@@ -278,6 +284,23 @@ class RealtimeTransport internal constructor(
     }
 
     fun commit(): Boolean = sendCommit()
+
+    /** The same lock serializes capture frames, old-field commit, and new-field audio.
+     * Capture/connection stay alive; delayed old-item results retain the old epoch. */
+    fun switchEditor(nextEpoch: Long) {
+        var failed: WebSocket? = null
+        synchronized(state) {
+            if (nextEpoch == editorEpoch) return
+            val current = socket
+            if (!closed && !terminalFailure && !localOnly) {
+                if (sessionReady && current != null) {
+                    if (!commitLocked(current)) failed = breakStreamLocked()
+                } else startup.commit()
+            }
+            editorEpoch = nextEpoch
+        }
+        if (failed != null) reportSendFailure(failed)
+    }
 
     private fun sendCommit(): Boolean {
         var failed: WebSocket? = null
@@ -297,7 +320,7 @@ class RealtimeTransport internal constructor(
         return committed
     }
 
-    private fun commitLocked(current: WebSocket): Boolean {
+    private fun commitLocked(current: WebSocket, targetEpoch: Long = editorEpoch): Boolean {
         if (remoteBufferedBytes <= 0L) return true
         val capturedBytes = remoteBufferedBytes
         // Preserve a short final frame: silence extends only the network envelope to 100ms.
@@ -306,7 +329,7 @@ class RealtimeTransport internal constructor(
         if (padding > 0 && !appendLocked(current, ByteArray(padding))) return false
         val id = "commit-$socketGeneration-${++commitSequence}"
         if (!current.send(RealtimeProtocol.commitEvent(id))) return false
-        coverage.sent(id, capturedBytes)
+        coverage.sent(id, capturedBytes, targetEpoch)
         remoteBufferedBytes = 0L
         main.post { if (!closed) listener.turnCommitted() }
         return true

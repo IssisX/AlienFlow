@@ -8,6 +8,25 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class DictationLogicTest {
+    @Test fun commitEpochsFollowAcknowledgedAudioRatherThanTheCurrentlyFocusedApp() {
+        val coverage = AudioCoverage()
+        coverage.sent("old-commit", 4800, 0); coverage.sent("new-commit", 4800, 2)
+        coverage.acknowledge("old-item"); coverage.acknowledge("old-item")
+        assertEquals(0L, coverage.editorEpochFor("old-item")); assertTrue(coverage.hasUnacknowledgedCommit)
+        coverage.acknowledge("new-item")
+        assertEquals(2L, coverage.editorEpochFor("new-item")); assertFalse(coverage.hasUnacknowledgedCommit)
+        assertNull(coverage.editorEpochFor("unacknowledged"))
+    }
+    @Test fun lateFinalsAndCleanupStayInTheOriginalFieldSegment() {
+        val ledger = TranscriptLedger()
+        ledger.event("old", "old-item", delta = "old provisional", editorEpoch = 0)
+        ledger.event("new", "new-item", delta = "new speech", editorEpoch = 2)
+        ledger.event("old-final", "old-item", final = "Old final.", editorEpoch = 0)
+        val cleanup = mapOf("old-item" to "Old polished.")
+        assertEquals("new speech", ledger.displayedFor(cleanup, 2))
+        assertEquals("Old polished.", ledger.displayedFor(cleanup, 0))
+        assertEquals("Old polished. new speech", ledger.displayed(cleanup))
+    }
     @Test fun editorFocusLossDetachesOnlyFieldNotRecording() {
         assertEquals(InlineEditorContinuity.Action.DETACH,
             InlineEditorContinuity.action(hasEditor = true, writePending = false, editorValid = false))

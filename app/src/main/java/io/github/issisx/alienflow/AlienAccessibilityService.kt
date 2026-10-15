@@ -30,6 +30,7 @@ class AlienAccessibilityService : AccessibilityService() {
     private var safeBottom = 0
     var composing = false; private set
     var imeSelection: EditorEvidence.Selection? = null; private set
+    var inputEpoch = 0L; private set
     private var layoutKey = "folded"
     private var availabilityPass = 0
     private var previousReadiness = DictationReadiness.IDLE
@@ -54,6 +55,7 @@ class AlienAccessibilityService : AccessibilityService() {
     fun confirmEmptyComposition() { composing = false }
     override fun onCreateInputMethod(): android.accessibilityservice.InputMethod = object : android.accessibilityservice.InputMethod(this) {
         override fun onStartInput(info: android.view.inputmethod.EditorInfo, restarting: Boolean) {
+            inputEpoch++
             super.onStartInput(info, restarting); composing = false
             imeSelection = if (info.initialSelStart >= 0 && info.initialSelEnd >= 0)
                 EditorEvidence.Selection(info.initialSelStart, info.initialSelEnd) else null
@@ -61,6 +63,7 @@ class AlienAccessibilityService : AccessibilityService() {
             if (::bridge.isInitialized) { bridge.inputStarted(info, restarting); refreshAvailability(clearFocusCache = true) }
         }
         override fun onFinishInput() {
+            inputEpoch++
             super.onFinishInput(); composing = false
             imeSelection = null
             clearStatusNotice()

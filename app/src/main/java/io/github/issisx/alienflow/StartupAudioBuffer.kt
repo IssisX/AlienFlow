@@ -5,17 +5,17 @@ internal class StartupAudioBuffer(
     private val limitBytes: Int = RealtimeProtocol.SAMPLE_RATE * 2 * 15,
 ) {
     sealed interface Entry {
-        data class Audio(val pcm: ByteArray) : Entry
+        data class Audio(val pcm: ByteArray, val editorEpoch: Long = 0) : Entry
         data object Commit : Entry
     }
     private val entries = ArrayDeque<Entry>()
     var bytes = 0; private set
     private var turnBytes = 0
 
-    fun append(pcm: ByteArray): Boolean {
+    fun append(pcm: ByteArray, editorEpoch: Long = 0): Boolean {
         if (pcm.isEmpty()) return true
         if (pcm.size > limitBytes - bytes) return false
-        entries.addLast(Entry.Audio(pcm.copyOf()))
+        entries.addLast(Entry.Audio(pcm.copyOf(), editorEpoch))
         bytes += pcm.size
         turnBytes += pcm.size
         return true

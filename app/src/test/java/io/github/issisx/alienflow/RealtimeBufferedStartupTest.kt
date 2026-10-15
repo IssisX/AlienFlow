@@ -66,9 +66,10 @@ class RealtimeBufferedStartupTest {
         lateinit var network: WebSocketListener
         var captured = 0; var connected = 0; var commits = 0; var interrupted = 0
         val failures = mutableListOf<String>()
+        val events = mutableListOf<JSONObject>()
         val dispatcher = StandardTestDispatcher(scope.testScheduler)
         val transport = RealtimeTransport(app, audio, object : RealtimeTransport.Listener {
-            override fun event(value: JSONObject) {}
+            override fun event(value: JSONObject) { events += value }
             override fun captured() { captured++ }
             override fun connected() { connected++ }
             override fun turnCommitted() { commits++ }
@@ -104,6 +105,41 @@ class RealtimeBufferedStartupTest {
             advanceTimeBy(5); runCurrent(); b.pumpUi(); assertTrue(finished); b.audio.close()
             assertArrayEquals(uploaded, b.file.readBytes().drop(44).toByteArray())
             assertEquals(1, b.commits); assertFalse(b.transport.hasPendingCoverage)
+        }
+    }
+    @Test fun switchingBeforeHandshakePreservesAudioBoundariesAndLateResultDestinations() = runTest {
+        Boundary(this).use { b ->
+            b.input.speech(); runCurrent()
+            b.transport.switchEditor(2)
+            b.input.speech(); advanceTimeBy(5); runCurrent()
+            b.open(); b.ready(); runCurrent(); b.pumpUi()
+            assertEquals(1, b.commits)
+            assertTrue(b.transport.commit()); b.pumpUi(); assertEquals(2, b.commits)
+            for (item in listOf("old", "new")) b.network.onMessage(b.socket,
+                JSONObject().put("type", "input_audio_buffer.committed").put("item_id", item).toString())
+            b.pumpUi()
+            b.network.onMessage(b.socket, JSONObject().put("type", "conversation.item.input_audio_transcription.completed")
+                .put("item_id", "old").put("transcript", "delayed old result").toString())
+            b.pumpUi()
+            assertEquals(listOf(0L, 2L, 0L), b.events.map { it.getLong("_editor_epoch") })
+            assertTrue(b.input.started); assertFalse(b.input.stopped); assertEquals(0, b.interrupted)
+            assertEquals(0, b.failures.size)
+        }
+    }
+    @Test fun switchingAReadyConnectionCommitsOldFramesBeforeNewFramesWithoutStoppingCapture() = runTest {
+        Boundary(this).use { b ->
+            b.open(); b.ready(); b.input.speech(); runCurrent(); b.pumpUi()
+            b.transport.switchEditor(2); b.pumpUi()
+            b.input.speech(); advanceTimeBy(5); runCurrent()
+            assertTrue(b.transport.commit()); b.pumpUi()
+            val messages = b.socket.sent.map { it.getString("type") }
+            assertEquals(listOf("session.update") + List(5) { "input_audio_buffer.append" } +
+                listOf("input_audio_buffer.commit") + List(5) { "input_audio_buffer.append" } +
+                listOf("input_audio_buffer.commit"), messages)
+            assertFalse(b.input.stopped); assertEquals(2, b.commits)
+            for (item in listOf("old", "new")) b.network.onMessage(b.socket,
+                JSONObject().put("type", "input_audio_buffer.committed").put("item_id", item).toString())
+            b.pumpUi(); assertEquals(listOf(0L, 2L), b.events.map { it.getLong("_editor_epoch") })
         }
     }
     @Test fun stopBeforeHandshakeStillFlushesTheFirstWordsExactlyOnce() = runTest {

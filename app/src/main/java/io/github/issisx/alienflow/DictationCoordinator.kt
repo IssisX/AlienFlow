@@ -65,6 +65,9 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     /** Captured before finish so a real rejection is never masked by the recovery banner. */
     private var terminalReason: String? = null
     private var terminalTarget = false
+    private var editorEpoch = 0L
+    private var waitingForTarget = false
+    private var switchedTargets = false
     private fun update(value: String? = null) {
         val changed = value != null && value != status
         if (value != null) status = value
@@ -92,6 +95,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         terminalTarget = bridge.isTerminal
         displayLive = store.prefs.getBoolean("live_display", true) && !terminalTarget; cleanLive = store.prefs.getBoolean("live_cleanup", true); correctionMode = store.mode(); fillersEnabled = store.prefs.getBoolean("fillers", false); continueLocal = store.prefs.getBoolean("continue_local", true)
         session++; ledger = TranscriptLedger(); cleanupMemo = CleanupMemo(); endCleanupDone = false; original = ""; result = ""; desired = ""; lastWritten = ""
+        editorEpoch = 0; waitingForTarget = false; switchedTargets = false
         saved = false; liveFailed = false; userEdited = false; terminalReason = null; microphoneConfirmed = false; serverConnected = false; interrupted = false; finalizing = false; audioClosing = false; corrections.clear(); cleaned.clear(); writing = false; writeRetryScheduled = false; commits = 0; completeItems.clear(); committedItems.clear(); seenErrors.clear(); editor = bridge; captureTarget = bridge
         active = true; finishing = false; update("Starting microphone and realtime connection…")
         app.crashJournal.mark("service.start-requested")
@@ -129,12 +133,39 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         app.crashJournal.mark("editor.detached")
         update("Text field changed; dictation continues. Stop when finished, then copy the result")
     }
+    /** Switching releases only the editor, never capture. Speech recorded with no
+     * eligible field has its own epoch and stays in history; it is not backfilled. */
+    private fun followFocusedTarget() {
+        val previous = editor ?: captureTarget
+        if (previous != null && !previous.sameTarget()) {
+            previous.invalidate()
+            editor = null; captureTarget = null
+            writing = false; writeRetryScheduled = false
+            waitingForTarget = true; switchedTargets = true
+            editorEpoch++; transport?.switchEditor(editorEpoch)
+            desired = ""; lastWritten = ""
+            app.crashJournal.mark("editor.detached")
+            update("Listening • select a text field for new speech")
+        }
+        if (!waitingForTarget || !active || finishing) return
+        val bridge = service?.bridge ?: return
+        if (bridge.focused() == null || !bridge.begin()) return
+        editorEpoch++; transport?.switchEditor(editorEpoch)
+        editor = bridge; captureTarget = bridge; waitingForTarget = false
+        terminalTarget = bridge.isTerminal
+        displayLive = store.prefs.getBoolean("live_display", true) && !terminalTarget
+        desired = ""; lastWritten = ""
+        app.crashJournal.mark("editor.ready")
+        update(if (terminalTarget) "Listening • Termux text inserts when you stop" else "Listening • tap the alien to stop")
+    }
     private fun monitorTarget(token: Long) {
         main.postDelayed({
             if (session != token || (!active && !finishing)) return@postDelayed
             if (!app.screenReady()) { screenUnavailable(); return@postDelayed }
             if (interrupted) {
                 if (captureTarget != null && captureTarget?.detachedTargetUnchanged() != true) detachInlineEditor()
+            } else if (active) {
+                followFocusedTarget()
             } else if (InlineEditorContinuity.action(editor != null, writing,
                     editor?.sameTarget() == true) == InlineEditorContinuity.Action.DETACH) {
                 detachInlineEditor()
@@ -146,6 +177,8 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         if (!active && !finishing) return
         if (interrupted) {
             if (captureTarget != null && captureTarget?.detachedTargetUnchanged() != true) detachInlineEditor()
+        } else if (active) {
+            followFocusedTarget()
         } else if (InlineEditorContinuity.action(editor != null, writing,
                 editor?.sameTarget() == true) == InlineEditorContinuity.Action.DETACH) {
             detachInlineEditor()
@@ -177,13 +210,16 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         val rawId = value.optString("item_id", value.optJSONObject("item")?.optString("id").orEmpty())
         val id = "${value.optInt("_connection_generation")}:$rawId"
         val previous = value.optString("previous_item_id").takeIf { it.isNotEmpty() }?.let { "${value.optInt("_connection_generation")}:$it" }
+        // Production attaches the epoch of the ACKNOWLEDGED audio commit. Missing
+        // fixture metadata stays at the original epoch, never the current screen.
+        val targetEpoch = if (value.has("_editor_epoch")) value.optLong("_editor_epoch", -1L) else 0L
         when (type) {
-            "conversation.item.created", "input_audio_buffer.committed" -> if (rawId.isNotBlank()) { if (type == "input_audio_buffer.committed") committedItems.add(id); ledger.event(value.optString("event_id"), id, previous); render(); tryFinish() }
+            "conversation.item.created", "input_audio_buffer.committed" -> if (rawId.isNotBlank()) { if (type == "input_audio_buffer.committed") committedItems.add(id); ledger.event(value.optString("event_id"), id, previous, editorEpoch = targetEpoch); render(); tryFinish() }
             "conversation.item.input_audio_transcription.delta" -> if (rawId.isNotBlank()) {
-                ledger.event(value.optString("event_id"), id, previous, delta = value.optString("delta")); render()
+                ledger.event(value.optString("event_id"), id, previous, delta = value.optString("delta"), editorEpoch = targetEpoch); render()
             }
             "conversation.item.input_audio_transcription.completed" -> if (rawId.isNotBlank()) {
-                ledger.event(value.optString("event_id"), id, previous, final = value.optString("transcript")); completeItems.add(id); render(); scheduleCleanup(); tryFinish()
+                ledger.event(value.optString("event_id"), id, previous, final = value.optString("transcript"), editorEpoch = targetEpoch); completeItems.add(id); render(); scheduleCleanup(); tryFinish()
             }
             "conversation.item.input_audio_transcription.failed" -> failure("Recognition failed; pending audio preserved")
             "error" -> {
@@ -201,7 +237,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         }
     }
     private fun render() {
-        original = ledger.stable(); result = ledger.displayed(corrections); desired = result
+        original = ledger.stable(); result = ledger.displayed(corrections); desired = ledger.displayedFor(corrections, editorEpoch)
         if (displayLive) pumpWrite()
         update()
     }
@@ -210,9 +246,9 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         // recognition. End-only targets must wait for tryFinish's ready gate.
         if ((terminalTarget || !displayLive) && !finalDelivery) return
         if (writing || desired == lastWritten || editor == null) return
-        writing = true; val proposed = desired; val token = session
+        writing = true; val proposed = desired; val token = session; val targetToken = editorEpoch
         editor!!.write(proposed) { outcome ->
-            if (token != session) return@write
+            if (token != session || targetToken != editorEpoch) return@write
             writing = false
             userEdited = userEdited || editor?.hasUserInteraction == true
             when (outcome) {
@@ -222,7 +258,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                     if (!writeRetryScheduled) {
                         writeRetryScheduled = true
                         main.postDelayed({
-                            if (token == session) {
+                            if (token == session && targetToken == editorEpoch) {
                                 writeRetryScheduled = false
                                 if (finishing && System.currentTimeMillis() - stoppingAt >= 15_000) {
                                     liveFailed = true; editor = null; tryFinish(); return@postDelayed
@@ -256,7 +292,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                     // A later turn may arrive; the exact completed item, session and ownership
                     // still must match. A completion never doubles an earlier provisional span.
                     if (session == token && active && !finalizing && ledger.finals().any { it.first == item && it.second == source }) {
-                        corrections[item] = output; result = ledger.displayed(corrections); desired = result
+                        corrections[item] = output; result = ledger.displayed(corrections); desired = ledger.displayedFor(corrections, editorEpoch)
                         if (displayLive || (finishing && !terminalTarget)) pumpWrite()
                         update()
                     }
@@ -326,7 +362,9 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                 }
                 withContext(Dispatchers.Main) {
                     if (session == token && finishing && !finalizing && original == source && output != null) {
-                        result = output; desired = result
+                        result = output
+                        // A whole-session polish cannot rewrite separate field segments.
+                        if (!switchedTargets) desired = result
                         if (displayLive && !terminalTarget) pumpWrite()
                     }
                 }
@@ -345,7 +383,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         transport?.close(); transport = null
         val captured = audio; val token = session; val source = original.ifBlank { ledger.text() }; val finalText = result
         val reason = terminalReason
-        val delivered = CompletionFeedback.inlineDelivered(finalText, lastWritten)
+        val delivered = CompletionFeedback.inlineDelivered(desired, lastWritten)
         val insertionFailed = liveFailed && !delivered
         val retainAudio = keepAudio || (insertionFailed && store.prefs.getInt("retention", 7) == -1)
         val outcome = if (retainAudio) "Incomplete • audio pending" else if (terminalTarget && delivered) "Sent to Termux" else if (userEdited) "Preserved • user edited the field" else if (insertionFailed) "Preserved • live insertion failed" else "Completed"
@@ -380,6 +418,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                         userEdited -> "Text saved in AlienFlow • your field edits were preserved"
                         insertionFailed -> "Result saved • inline editing unavailable; copy the transcript"
                         terminalTarget && delivered -> "Sent to Termux • press Enter yourself"
+                        switchedTargets -> "Complete • text saved across apps"
                         else -> "Complete • ready for another dictation"
                     })
                     if (storageOk && keepAudio && interrupted && captured != null && continueLocal) recover(captured.file)

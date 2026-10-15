@@ -1,6 +1,6 @@
 # AlienFlow — Product Design and Implementation Plan
 
-**Version:** 0.1.22 contract · **Updated:** 13 October 2026 · **Stage:** Implemented Android client; exact verification and remaining device limits are in IMPLEMENTATION.md.
+**Version:** 0.1.24-chat.1 contract · **Updated:** 13 October 2026 · **Stage:** Implemented Android client; exact verification and remaining device limits are in IMPLEMENTATION.md.
 
 **Working product name:** AlienFlow. This is an Android dictation application inspired by the interaction of Wispr Flow, with a personal-key development client and a planned paid Google Play release. The name is provisional and has not been checked for publication or trademark use.
 
@@ -94,7 +94,7 @@ When configured to appear for active fields, the bubble stays visible through li
 
 Manual typing and cursor movement must not pause capture, transcription, or detach dictation. Preserve keyboard edits in the same field and insert newly recognized speech at the current cursor without a restart tap. Previously dispatched speech becomes protected from late recognition/correction rewrites after a keyboard interaction. Do not wait for the user to finish a keyboard composing word or type a space. Use the Android accessibility commit behavior that finishes composition before insertion, preserving the literal typed word; require matching fresh text/cursor evidence. Retry only conflicting changed evidence or temporarily unavailable metadata, without a capture/transcription pause. Focus changes, microphone interruptions, locking the screen, permission revocation, or service disconnection invalidate the target binding. A late response must not appear in a newly focused application.
 
-Default behavior on losing the active field is to stop capture and preserve unfinished work. Re-entering that field does not silently resume microphone capture or retrospective edits. A fresh tap starts a fresh dictation session.
+While recording, switching fields or apps keeps capture running and starts a new editor-owned speech segment after the focused field is eligible. Prior speech and delayed results retain their original audio segment; they are never backfilled into the new field. Speech captured without an eligible field remains in history. During finishing, a focus change saves pending text without adopting a new field. See the 2026-10-14 owner amendment below.
 
 Cancel stops recording and processing. If the app can still prove ownership of its inserted span, it can remove that span and restore the initial selection contents. If ownership is uncertain, leave the field unchanged and report that cancellation stopped further work. Never undo the user's subsequent edits. An interrupted recording explicitly retained for recovery is different from a recording the user has deliberately discarded.
 
@@ -615,3 +615,10 @@ Keep target API 36 and defer all AAB build/download/validation work until final 
 ## Reproduced browser input failure — 2026-10-13 / 0.1.22
 
 A real API 36 WebView rich editor reproduced the exact AF-E10 through an actual floating-alien tap and accessibility IPC. Accessibility exposed CSS placeholder text `Ask ChatGPT\n`, selection 1:1, no hint metadata; the IME exposed `\n`, selection 0:0, offset -1, absolute selection 0:0. Binding succeeded; the old cross-representation equality/cursor gate refused the first insertion. This runtime result supersedes the earlier 0.1.19–0.1.21 cross-node/IME equality requirements: keyboard text and coordinates now own keyboard edits. Do not strip or blacklist placeholder phrases, infer IME coordinates from accessibility labels, or increase the timeout. Maintain exact observed mutation coverage, focused-field identity, original keyboard, typed-text preservation and one dispatch per proposal. Real editor integration uses fixture transcripts and does not establish microphone/provider or physical Fold6/Chrome/ChatGPT acceptance. API 36 and APK-only development delivery remain required; AAB work stays deferred.
+
+
+## Owner amendment — app switching, 2026-10-14 / 0.1.24-chat.1
+
+The owner requires switching apps at will. This supersedes prior restrictions against adopting a new target during active capture: future audio follows the newly focused eligible field, with a transport-serialized audio commit separating field epochs. Earlier provisional/final results and cleanup retain their original epoch and do not mutate the newly focused app. A gap with no eligible field has its own non-delivery epoch. Capture and connection continue; lock, permission loss and service disconnection still stop capture. Finishing never retargets pending speech.
+
+The supplied AF-E14 report shows a valid local keyboard window with an unknown absolute offset and a stale absolute selection callback. An unknown offset does not prevent cursor-relative edits: authorize only the fresh selected region and observed owned suffix immediately before it; confirm deletion and insertion through the keyboard's actual local text and cursor. No inferred absolute cursor, placeholder blacklist, substring search, timeout increase or blind resend. Typed text, existing drafts and terminal final-only/no-Enter behavior remain protected. Cancellation restores only the current owned span, never text in apps visited earlier. API 36, original signing identity and APK-only development remain mandatory.

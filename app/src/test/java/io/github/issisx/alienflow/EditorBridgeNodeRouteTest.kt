@@ -42,8 +42,10 @@ class EditorBridgeNodeRouteTest {
         var keyboardWindow = Int.MAX_VALUE
         var unexposedSuffix = ""
         var conflictingPresentation = false
+        var suppressSelectionUpdates = false
         val committedTexts = mutableListOf<String>()
         fun publishSelection() {
+            if (suppressSelectionUpdates) return
             val current = field ?: return
             inputMethod?.onUpdateSelection(-1, -1, current.selectionStart, current.selectionEnd,
                 BaseInputConnection.getComposingSpanStart(current.text), BaseInputConnection.getComposingSpanEnd(current.text))
@@ -62,6 +64,10 @@ class EditorBridgeNodeRouteTest {
     }
     @Implements(InputMethod.AccessibilityInputConnection::class)
     class KeyboardIpc {
+        @Implementation fun deleteSurroundingText(before: Int, after: Int) {
+            nativeKeyboard!!.deleteSurroundingText(before, after)
+            publishSelection()
+        }
         @Implementation fun getSurroundingText(before: Int, after: Int, flags: Int): SurroundingText? {
             val read = nativeKeyboard?.getSurroundingText(minOf(before, keyboardWindow), minOf(after, keyboardWindow), flags) ?: return null
             return read
@@ -133,6 +139,7 @@ class EditorBridgeNodeRouteTest {
         connection = null; info = null; brokenHint = false; hideCompositionSpans = false; selections.clear(); serviceForCallbacks = null
         keyboardWindow = Int.MAX_VALUE
         unexposedSuffix = ""; conflictingPresentation = false
+        suppressSelectionUpdates = false
         committedTexts.clear()
     }
     private fun withField(text: String = "", hint: String = "", keyboard: Boolean = false, block: (AlienAccessibilityService) -> Unit) {
@@ -181,15 +188,60 @@ class EditorBridgeNodeRouteTest {
             assertTrue(service.bridge.hasUserInteraction)
             assertEquals(0, mutations)
         }
-    @Test fun defaultImeWindowCannotWriteWithAnUnusableSelectionCallback() =
+    @Test fun defaultImeWindowUsesLocalSelectionDespiteAnUnusableAbsoluteCallback() =
         withField("older draft\n".repeat(20) + "existing words", keyboard = true) { service ->
             useAndroidDefaultSurroundingText(); keyboardWindow = 24
             assertTrue(service.bridge.begin()); activate(service)
             val initial = field!!.text.toString(); val cursor = field!!.selectionStart
             inputMethod!!.onUpdateSelection(-1, -1, cursor - 1, cursor, -1, -1)
-            assertEquals(EditorWriteResult.FAILED, write(service, "spoken"))
-            assertEquals(initial, field!!.text.toString()); assertTrue(committedTexts.isEmpty()); assertTrue(selections.isEmpty())
+            assertEquals(EditorWriteResult.APPLIED, write(service, "spoken"))
+            assertEquals(initial + "spoken", field!!.text.toString()); assertEquals(listOf("spoken"), committedTexts); assertTrue(selections.isEmpty())
         }
+    @Test fun defaultWindowConfirmsActualTextWhenAbsoluteCallbackStaysAtZero() = withField(keyboard = true) { service ->
+        useAndroidDefaultSurroundingText(); suppressSelectionUpdates = true
+        assertEquals(EditorEvidence.Selection(0, 0), service.imeSelection)
+        assertTrue(service.bridge.begin()); activate(service)
+        assertEquals(EditorWriteResult.APPLIED, write(service, "hi"))
+        assertEquals("hi", field!!.text.toString())
+        assertEquals(EditorEvidence.Selection(0, 0), service.imeSelection)
+        assertEquals(EditorWriteResult.APPLIED, write(service, "Hi. again"))
+        assertEquals("Hi. again", field!!.text.toString())
+        assertEquals(listOf("hi", "Hi. again"), committedTexts)
+    }
+    @Test fun repeatedNewFieldsAcceptSpeechWithoutRestartingTheCoordinator() = withField(keyboard = true) { service ->
+        val app = service.application as AlienApp
+        app.store.prefs.edit().putString("correction", "A").commit()
+        val coordinator = DictationCoordinator(app, app.store, keyProvider = { "fixture-not-a-key" })
+        org.robolectric.util.ReflectionHelpers.setField(app, "coordinator", coordinator)
+        coordinator.service = service
+        shadowOf(app).grantPermissions(android.Manifest.permission.RECORD_AUDIO)
+        coordinator.start(); assertTrue(coordinator.active)
+        fun speech(id: String, epoch: Long, words: String) {
+            coordinator.event(org.json.JSONObject().put("type", "conversation.item.input_audio_transcription.completed")
+                .put("event_id", id).put("item_id", id).put("_editor_epoch", epoch).put("transcript", words))
+            val until = System.currentTimeMillis() + 3_000
+            do { shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(5) }
+            while (org.robolectric.util.ReflectionHelpers.getField<Boolean>(coordinator, "writing") && System.currentTimeMillis() < until)
+        }
+        speech("first", 0, "first app")
+        val firstField = field!!
+        assertEquals("first app", firstField.text.toString())
+        repeat(3) { index ->
+            focused = null; inputMethod!!.onFinishInput(); coordinator.targetEvent()
+            val next = EditText(firstField.context).apply { setText("draft "); setSelection(length()) }
+            field = next; focused = next.createAccessibilityNodeInfo()
+            info = EditorInfo().apply { packageName = focused!!.packageName.toString(); fieldId = 43 + index; inputType = next.inputType; initialSelStart = 6; initialSelEnd = 6 }
+            nativeKeyboard = next.onCreateInputConnection(EditorInfo())!!
+            inputMethod!!.onStartInput(info!!, false); coordinator.targetEvent()
+            assertTrue(coordinator.active)
+            speech("late-$index", index * 2L, "late old words")
+            assertEquals("draft ", next.text.toString())
+            speech("new-$index", (index + 1) * 2L, "new field $index")
+            assertEquals("draft new field $index", next.text.toString())
+            assertEquals("first app", firstField.text.toString())
+        }
+        coordinator.cancel()
+    }
     private fun activate(service: AlienAccessibilityService) {
         val app = service.application as AlienApp
         app.coordinator.javaClass.getDeclaredField("active").apply { isAccessible = true }.setBoolean(app.coordinator, true)

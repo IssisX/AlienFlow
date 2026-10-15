@@ -54,7 +54,7 @@ class SettingsNavigationTest {
             tagged(activity, "nav-SETTINGS").performClick()
             assertFalse(texts(activity).any { it.contains("Fixture: a long transcript") })
             assertFalse(descendants(activity.window.decorView).any { it is Switch || it is SeekBar })
-            render(activity, "settings-0.1.23-chat.1.png")
+            render(activity, "settings-0.1.24-chat.1.png")
             row(activity, "Floating alien").performClick()
             assertTrue(tagged(activity, "size") is SeekBar)
             val preview = tagged(activity, "bubble-preview") as BubblePreview
@@ -66,7 +66,7 @@ class SettingsNavigationTest {
             assertTrue(storedSize > 32)
             assertEquals((storedSize * activity.resources.displayMetrics.density).toInt(), preview.diameterPixels)
             assertFalse(texts(activity).contains("Writing style"))
-            render(activity, "bubble-settings-0.1.23-chat.1.png")
+            render(activity, "bubble-settings-0.1.24-chat.1.png")
             val point = IntArray(2)
             tagged(activity, "nav-SETTINGS").getLocationOnScreen(point)
             assertTrue(point[1] + tagged(activity, "nav-SETTINGS").height <= 1782)
@@ -80,7 +80,7 @@ class SettingsNavigationTest {
             tagged(activity, "back").performClick()
             assertTrue(row(activity, "Language & vocabulary").isShown)
             row(activity, "Dictation & writing").performClick()
-            render(activity, "dictation-settings-0.1.23-chat.1.png")
+            render(activity, "dictation-settings-0.1.24-chat.1.png")
             assertFalse(descendants(activity.window.decorView).any { it.tag == "size" })
         }
     }
@@ -112,7 +112,7 @@ class SettingsNavigationTest {
             val activity = controller.get(); val store = app(activity).store
             repeat(120) { index -> store.saveResult("Fixture original $index", "Fixture transcript $index " + "long words ".repeat(60), "complete") }
             tagged(activity, "nav-HISTORY").performClick()
-            render(activity, "history-0.1.23-chat.1.png")
+            render(activity, "history-0.1.24-chat.1.png")
             val list = tagged(activity, "transcript-list") as ListView
             assertEquals(120, list.adapter.count)
             assertTrue("Only visible rows should be inflated", list.childCount < 15)
@@ -160,7 +160,7 @@ class SettingsNavigationTest {
             val group = tagged(activity, "retention") as RadioGroup
             (0 until group.childCount).map { group.getChildAt(it) }.single { it.tag == "30" }.performClick()
             assertEquals(30, app(activity).store.prefs.getInt("retention", 7))
-            render(activity, "privacy-settings-0.1.23-chat.1.png")
+            render(activity, "privacy-settings-0.1.24-chat.1.png")
         }
     }
     @Test fun floatingMenuSettingsIntentOpensSettingsAndDoesNotResetExistingPreferences() {
@@ -194,15 +194,15 @@ class SettingsNavigationTest {
             @Suppress("DEPRECATION")
             activity.resources.updateConfiguration(configuration, activity.resources.displayMetrics)
             tagged(activity, "nav-SETTINGS").performClick()
-            render(activity, "settings-small-large-text-0.1.23-chat.1.png", 720, 1600)
+            render(activity, "settings-small-large-text-0.1.24-chat.1.png", 720, 1600)
             val nav = tagged(activity, "nav-HOME")
             assertTrue(nav.height >= (48 * activity.resources.displayMetrics.density).toInt())
             assertTrue(nav.bottom <= 1600)
             row(activity, "Language & vocabulary").performClick()
-            render(activity, "language-small-large-text-0.1.23-chat.1.png", 720, 1600)
+            render(activity, "language-small-large-text-0.1.24-chat.1.png", 720, 1600)
             assertTrue(tagged(activity, "vocabulary").isShown)
             tagged(activity, "nav-SETTINGS").performClick(); row(activity, "Floating alien").performClick()
-            render(activity, "bubble-small-large-text-0.1.23-chat.1.png", 720, 1600)
+            render(activity, "bubble-small-large-text-0.1.24-chat.1.png", 720, 1600)
             val preview = tagged(activity, "bubble-preview")
             val position = IntArray(2); preview.getLocationOnScreen(position)
             assertTrue(position[1] >= 0 && position[1] + preview.height < 1600)
@@ -215,7 +215,7 @@ class SettingsNavigationTest {
         Robolectric.buildActivity(MainActivity::class.java).setup().use { controller ->
             val activity = controller.get()
             tagged(activity, "nav-SETTINGS").performClick()
-            render(activity, "settings-unfolded-0.1.23-chat.1.png", 1680, 1782)
+            render(activity, "settings-unfolded-0.1.24-chat.1.png", 1680, 1782)
             val category = row(activity, "Floating alien")
             val point = IntArray(2); category.getLocationOnScreen(point)
             assertTrue(category.width <= 1440)

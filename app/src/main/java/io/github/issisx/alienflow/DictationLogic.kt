@@ -9,32 +9,39 @@ object BubbleOpacity {
 }
 
 class AudioCoverage {
-    private val outstanding = linkedMapOf<String, Long>()
-    private val acknowledged = mutableSetOf<String>()
+    private data class Commit(val bytes: Long, val editorEpoch: Long)
+    private val outstanding = linkedMapOf<String, Commit>()
+    private val acknowledged = mutableMapOf<String, Long>()
     var uncertain = false; private set
     val hasUnacknowledgedCommit: Boolean get() = outstanding.isNotEmpty()
     fun markUncertain() { uncertain = true }
-    fun sent(id: String, bytes: Long = 0) { outstanding[id] = bytes }
+    fun sent(id: String, bytes: Long = 0, editorEpoch: Long = 0) { outstanding[id] = Commit(bytes, editorEpoch) }
     fun acknowledge(item: String) {
-        if (item.isNotBlank() && acknowledged.add(item)) outstanding.keys.firstOrNull()?.let { outstanding.remove(it) }
+        if (item.isNotBlank() && item !in acknowledged) outstanding.keys.firstOrNull()?.let {
+            outstanding.remove(it)?.let { commit -> acknowledged[item] = commit.editorEpoch }
+        }
     }
     fun rejectEmpty(clientEventId: String): Boolean {
         // A server-side empty buffer cannot establish that local audio was empty.
         uncertain = true
         return outstanding.remove(clientEventId) != null
     }
-    fun bytesFor(id: String): Long? = outstanding[id]
+    fun bytesFor(id: String): Long? = outstanding[id]?.bytes
+    fun editorEpochFor(item: String): Long? = acknowledged[item]
 }
 
 /** Transcripts are keyed by item identity; completion replaces provisional words. */
 class TranscriptLedger {
-    data class Turn(val id: String, var previous: String?, var provisional: String = "", var final: String? = null)
+    data class Turn(val id: String, var previous: String?, var provisional: String = "", var final: String? = null,
+                    var editorEpoch: Long? = null)
     private val turns = linkedMapOf<String, Turn>()
     private val seenEvents = mutableSetOf<String>()
     var revision = 0L; private set
-    fun event(eventId: String?, id: String, previous: String? = null, delta: String? = null, final: String? = null): Boolean {
+    fun event(eventId: String?, id: String, previous: String? = null, delta: String? = null, final: String? = null,
+              editorEpoch: Long? = null): Boolean {
         if (eventId != null && !seenEvents.add(eventId)) return false
         val t = turns.getOrPut(id) { Turn(id, previous) }
+        if (t.editorEpoch == null || t.editorEpoch == -1L) t.editorEpoch = editorEpoch
         val reordered = previous != null && t.previous != previous
         if (previous != null) t.previous = previous
         if (t.final != null) { if (reordered) revision++; return reordered }
@@ -55,6 +62,8 @@ class TranscriptLedger {
     fun stable() = ordered().mapNotNull { it.final }.filter { it.isNotBlank() }.joinToString(" ")
     fun finals() = ordered().mapNotNull { t -> t.final?.let { t.id to it } }
     fun displayed(corrections: Map<String, String>) = ordered().map { corrections[it.id] ?: it.final ?: it.provisional }.filter { it.isNotBlank() }.joinToString(" ")
+    fun displayedFor(corrections: Map<String, String>, editorEpoch: Long) = ordered().filter { it.editorEpoch == editorEpoch }
+        .map { corrections[it.id] ?: it.final ?: it.provisional }.filter { it.isNotBlank() }.joinToString(" ")
     fun pending() = turns.values.any { it.final == null }
     fun has(id: String) = turns.containsKey(id)
 }

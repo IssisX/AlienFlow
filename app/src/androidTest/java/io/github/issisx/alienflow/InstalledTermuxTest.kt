@@ -235,6 +235,41 @@ class InstalledTermuxTest {
             assertEquals(1, Regex("CHAT_FIRST").findAll(repeated).count())
             assertEquals(1, Regex("SECOND_PASS").findAll(repeated).count())
             assertFalse(repeated.contains("NEVER_PARTIAL"))
+            // Switch WHILE active: late terminal recognition cannot reach the native
+            // field. New speech follows that field; return to Termux remains final-only.
+            main { setField(coordinator, "transport", idleTransport) }
+            tapAlien(service); await("switch-test starts in Termux") { main { coordinator.active } }
+            main {
+                coordinator.captured(); coordinator.connected()
+                event(coordinator, "conversation.item.input_audio_transcription.delta", "switch-old-delta", "switch-old", "OLD_TERMINAL")
+            }
+            shell("am start -f 0x20000 -n io.github.issisx.alienflow/.MainActivity")
+            await("main activity resumes") { main { activity.hasWindowFocus() } }
+            main {
+                practice.setText("SWITCH_SEED "); practice.setSelection(practice.length()); practice.requestFocus()
+                activity.getSystemService(InputMethodManager::class.java).showSoftInput(practice, 0)
+            }
+            await("active recording follows native field") { main {
+                coordinator.active && service.bridge.sameTarget() && !service.bridge.isTerminal &&
+                    service.bridge.focused()?.packageName?.toString() == app.packageName
+            } }
+            val nativeEpoch = main { coordinator.javaClass.getDeclaredField("editorEpoch").apply { isAccessible = true }.getLong(coordinator) }
+            main {
+                event(coordinator, "conversation.item.input_audio_transcription.completed", "switch-old-final", "switch-old", "LATE_OLD_TERMINAL")
+                coordinator.event(JSONObject().put("type", "conversation.item.input_audio_transcription.completed")
+                    .put("event_id", "switch-new-final").put("item_id", "switch-new").put("_editor_epoch", nativeEpoch).put("transcript", "NEW_NATIVE"))
+            }
+            await("only new segment enters native field") { main { practice.text.toString() == "SWITCH_SEED NEW_NATIVE" } }
+            shell("am start -n com.termux/.app.TermuxActivity")
+            await("active recording follows Termux again") { main { coordinator.active && service.bridge.sameTarget() && service.bridge.isTerminal } }
+            val terminalEpoch = main { coordinator.javaClass.getDeclaredField("editorEpoch").apply { isAccessible = true }.getLong(coordinator) }
+            main { coordinator.event(JSONObject().put("type", "conversation.item.input_audio_transcription.completed")
+                .put("event_id", "switch-terminal-final").put("item_id", "switch-terminal").put("_editor_epoch", terminalEpoch).put("transcript", "_SWITCH_BACK")) }
+            assertFalse(terminalText().contains("SWITCH_BACK"))
+            main { setField(coordinator, "transport", null) }; tapAlien(service)
+            await("switched terminal receives only its new final segment") { main { !coordinator.finishing } && terminalText().contains("SECOND_PASS_SWITCH_BACK") }
+            assertFalse(terminalText().contains("OLD_TERMINAL")); assertFalse(terminalText().contains("NEW_NATIVE"))
+            assertEquals("SWITCH_SEED NEW_NATIVE", main { practice.text.toString() })
             val directory = File(app.getExternalFilesDir(null), "termux-proof").apply { mkdirs() }
             File(directory, "terminal.png").outputStream().use { automation.takeScreenshot().compress(Bitmap.CompressFormat.PNG, 100, it) }
             val result = JSONObject()
@@ -244,6 +279,7 @@ class InstalledTermuxTest {
                 .put("real_terminal_echo", true).put("final_count", 1)
                 .put("repeat_session_count", 1).put("ordinary_live_after_termux", true)
                 .put("termux_visible_after_switch", true).put("premature_text", false).put("microphone_and_provider", "not exercised; transcript fixtures")
+                .put("active_app_switch", true).put("late_old_result_preserved", true).put("active_return_to_terminal", true)
                 .toString()
             File(directory, "result.json").writeText(result)
             instrumentation.sendStatus(2, android.os.Bundle().apply { putString("fixture_result", result) })

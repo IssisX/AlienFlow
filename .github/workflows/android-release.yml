@@ -54,6 +54,8 @@ jobs:
           "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --channel=0 "platforms;android-${COMPILE_SDK}" "build-tools;${BUILD_TOOLS_VERSION}"
       - name: Reproduce the shipped 0.1.17 Termux regression
         run: python3 scripts/prove_termux_regression.py
+      - name: Reproduce shipped stale-cursor and app-switch failures
+        run: python3 scripts/prove_app_switch_regression.py
       - name: Unit tests, release lint, and unsigned release
         shell: bash
         run: |
@@ -69,7 +71,7 @@ jobs:
       - name: Upload single delivery ZIP
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          path: build/delivery/AlienFlow-0.1.23-chat.1-unsigned-release-bundle.zip
+          path: build/delivery/AlienFlow-0.1.24-chat.1-unsigned-release-bundle.zip
           archive: false
           if-no-files-found: error
           retention-days: 14
@@ -81,6 +83,7 @@ jobs:
           name: alienflow-chat-test-evidence
           path: |
             build/termux-baseline
+            build/app-switch-baseline
             build/browser-editor
             build/ci
             app/build/test-results
