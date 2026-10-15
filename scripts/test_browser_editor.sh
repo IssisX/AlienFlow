@@ -38,7 +38,9 @@ sudo chmod 666 /dev/kvm
 "$AVDMANAGER" list avd
 "$ANDROID_HOME/emulator/emulator" -list-avds | tee "$PROOF/available-avds.txt"
 grep -Fx "$AVD" "$PROOF/available-avds.txt"
-"$ANDROID_HOME/emulator/emulator" -avd "$AVD" -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > "$PROOF/emulator.log" 2>&1 &
+# Large-screen images under software rendering starved the launcher into an ANR dialog that
+# covered every app (API 35 tablet, run 38786492968); give the guest the runner's resources.
+"$ANDROID_HOME/emulator/emulator" -avd "$AVD" -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -memory 4096 -cores 4 > "$PROOF/emulator.log" 2>&1 &
 EMULATOR_PID=$!
 cleanup() {
   # Preserve in-process geometry/session evidence even if an assertion fails.
@@ -63,6 +65,9 @@ test "$("$ADB" shell getprop ro.kernel.qemu | tr -d '\r')" = 1
 "$ADB" shell settings put global window_animation_scale 0
 "$ADB" shell settings put global transition_animation_scale 0
 "$ADB" shell settings put global animator_duration_scale 0
+# A system "isn't responding" dialog is emulator load, not the app under test; never let it own focus.
+"$ADB" shell settings put global hide_error_dialogs 1
+"$ADB" shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS
 if [ "$API" -lt 33 ]; then
   "$ADB" install -r app/build/outputs/apk/debug/app-debug.apk
   "$ADB" install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk

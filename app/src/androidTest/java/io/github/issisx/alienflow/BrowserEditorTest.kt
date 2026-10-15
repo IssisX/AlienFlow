@@ -61,6 +61,7 @@ class BrowserEditorTest {
         var prior: Rect? = null
         var stable = 0
         var target: Rect? = null
+        var keyboardSeen = false
         // Window/input focus can become ready before the IME and overlay finish moving.
         // Select the actual topmost touch target, not merely View.isShown at stale coordinates.
         await("stable, topmost alien touch target", 10_000) {
@@ -76,9 +77,15 @@ class BrowserEditorTest {
                 val region = android.graphics.Region(); window.getRegionInScreen(region)
                 region.contains(area.centerX(), area.centerY())
             } }
-            val canTap = bounds != null && hit?.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
+            // The overlay is stacked above the keyboard: it must settle clear of any visible keyboard
+            // window (which may still be sliding in), or it would take taps meant for keys.
+            val keyboards = windows.filter { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+                .map { Rect().also(it::getBoundsInScreen) }
+            val overKeyboard = bounds != null && keyboards.any { Rect.intersects(bounds, it) }
+            val canTap = bounds != null && hit?.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY && !overKeyboard
+            if (canTap && keyboards.isNotEmpty()) keyboardSeen = true
             if (bounds != prior || !canTap) {
-                trace.appendLine("time=${SystemClock.uptimeMillis()} view=$bounds hitType=${hit?.type}")
+                trace.appendLine("time=${SystemClock.uptimeMillis()} view=$bounds hitType=${hit?.type} overKeyboard=$overKeyboard")
                 windows.forEach { window ->
                     val area = Rect(); window.getBoundsInScreen(area)
                     trace.appendLine("window=${window.id} type=${window.type} layer=${window.layer} bounds=$area")
@@ -90,12 +97,7 @@ class BrowserEditorTest {
             stable >= 3
         }
         val point = checkNotNull(target)
-        // An accessibility overlay sits above the keyboard window: if it overlapped the keyboard it
-        // would take taps meant for keys such as Gboard's microphone.
-        automation.windows.filter { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }.forEach { window ->
-            val keyboard = Rect(); window.getBoundsInScreen(keyboard); keyboardWindowsChecked++
-            assertFalse("The alien $point covers the keyboard window $keyboard", Rect.intersects(point, keyboard))
-        }
+        if (keyboardSeen) keyboardWindowsChecked++
         tapNumber++
         File(evidenceDirectory, "before-tap-$tapNumber.png").outputStream().use {
             automation.takeScreenshot().compress(Bitmap.CompressFormat.PNG, 100, it)
