@@ -188,9 +188,13 @@ class InstalledTermuxTest {
                 setField(coordinator, "transport", idleTransport)
                 field
             }
+            // begin() requires the keyboard session itself to belong to this app, not merely a
+            // connection: Termux's editor attributes can outlive the accessibility focus change.
             await("ordinary field replaces terminal focus") { main {
                 service.bridge.focused()?.packageName?.toString() == app.packageName &&
-                    service.inputMethod?.currentInputConnection != null
+                    service.inputMethod?.currentInputConnection != null &&
+                    service.inputMethod?.currentInputStarted == true &&
+                    service.inputMethod?.currentInputEditorInfo?.packageName == app.packageName
             } }
             tapAlien(service)
             await("ordinary dictation starts after terminal") { main { coordinator.active } }
