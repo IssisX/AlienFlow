@@ -44,7 +44,20 @@ class NoKeyboardSessionEditorTest {
     }
     /** Taps the alien only once it is the topmost window at its own, stable center. */
     private fun tapAlien(service: AlienAccessibilityService) {
-        var prior: Rect? = null; var stable = 0; var target: Rect? = null
+        var target: Rect? = null
+        val trace = StringBuilder()
+        try { awaitTarget(service, trace) { bounds -> target = bounds } } catch (e: IllegalStateException) {
+            throw IllegalStateException("${e.message}; windows=${trace.takeLast(1500)}")
+        }
+        val point = checkNotNull(target); val now = SystemClock.uptimeMillis()
+        for ((action, time) in listOf(MotionEvent.ACTION_DOWN to now, MotionEvent.ACTION_UP to now + 40)) {
+            val event = MotionEvent.obtain(now, time, action, point.exactCenterX(), point.exactCenterY(), 0)
+            event.source = InputDevice.SOURCE_TOUCHSCREEN
+            try { assertTrue(automation.injectInputEvent(event, true)) } finally { event.recycle() }
+        }
+    }
+    private fun awaitTarget(service: AlienAccessibilityService, trace: StringBuilder, settled: (Rect?) -> Unit) {
+        var prior: Rect? = null; var stable = 0
         await("stable, topmost alien touch target", 10_000) {
             val bounds = main {
                 val view = service.javaClass.getDeclaredField("bubble").apply { isAccessible = true }.get(service) as View
@@ -57,15 +70,14 @@ class NoKeyboardSessionEditorTest {
                 region.contains(area.centerX(), area.centerY())
             } }
             val canTap = bounds != null && hit?.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
+            if (!canTap) {
+                trace.clear().append("view=$bounds hitType=${hit?.type};")
+                automation.windows.forEach { window -> val area = Rect(); window.getBoundsInScreen(area)
+                    trace.append(" w${window.id}:t${window.type}:l${window.layer}:$area") }
+            }
             stable = if (canTap && bounds == prior) stable + 1 else 0
-            prior = bounds; target = bounds
+            prior = bounds; settled(bounds)
             stable >= 3
-        }
-        val point = checkNotNull(target); val now = SystemClock.uptimeMillis()
-        for ((action, time) in listOf(MotionEvent.ACTION_DOWN to now, MotionEvent.ACTION_UP to now + 40)) {
-            val event = MotionEvent.obtain(now, time, action, point.exactCenterX(), point.exactCenterY(), 0)
-            event.source = InputDevice.SOURCE_TOUCHSCREEN
-            try { assertTrue(automation.injectInputEvent(event, true)) } finally { event.recycle() }
         }
     }
     private fun event(c: DictationCoordinator, type: String, eventId: String, item: String, value: String = "") {

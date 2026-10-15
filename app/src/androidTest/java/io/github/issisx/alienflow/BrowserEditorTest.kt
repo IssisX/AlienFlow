@@ -170,6 +170,11 @@ class BrowserEditorTest {
                 service.bridge.focused()?.isEditable == true &&
                     service.inputMethod?.currentInputConnection != null
             } }
+            // The alien moves above the keyboard when it appears; pick a tap target only once the
+            // keyboard is on screen (Android 15 tablet: the tap landed where the alien had been).
+            await("keyboard window shown", 10_000) {
+                automation.windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+            }
             // Direct observations from the real broker, before starting any dictation.
             val node = main { service.bridge.focused()!! }
             val connection = main { service.inputMethod!!.currentInputConnection!! }
