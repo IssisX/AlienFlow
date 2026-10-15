@@ -635,3 +635,22 @@ Use sentence case, preserve coherent phrasing across recognition pauses, and use
 The candidate uses the documented balanced transcription delay (`medium`) instead of `minimal`; live partial delivery remains enabled. Compare real microphone accuracy and latency before public release. Source: https://developers.openai.com/api/docs/guides/realtime-transcription#tune-latency-and-accuracy (reviewed 15 October 2026).
 
 Context is limited to up to 512 characters before and 256 after the insertion from the authoritative keyboard window. It is transient, sent only with an enabled cleanup request, excluded from diagnostic logs/history, and reset at binding changes. The privacy screen describes this use. No paid provider tests are authorized by this amendment.
+
+
+## Implementation change — 15 October 2026 / 0.1.26-claude.1 (branch `claude/alienflow`)
+
+This section supersedes the "small audited set" sentence above. The owner reported frequent incorrect or oddly spelled words and excessive capitalization.
+
+**Light polish:** the result is merged word by word instead of being accepted or rejected whole. Where the model's words align with the recognized words, its case and punctuation are used. Any other lexical edit reverts to the recognized words:
+- Polish never adds words.
+- Polish never drops recognized words, except fillers and exact repeats when that setting is on.
+- A substitution of the same length is accepted only as a near-miss spelling of an ordinary lowercase word:
+  - letters only, at least four letters, same first letter;
+  - edit distance 1, or 2 for words of seven or more letters;
+  - neither word is a negation, modal, uncertainty, quantity, time, direction or profanity word.
+
+Names, identifiers, numbers and paths keep the recognized spelling. Rewrite keeps its whole-output check.
+
+This is a bounded spelling repair, not general spelling correction. Recognition-level improvement must be measured with real audio (docs/EVALUATION.md).
+
+**Live text before a commit:** the live model streams a turn before its commit. Those words go into the current field only when no earlier field's commit is still unacknowledged. Ambiguous words wait for their commit, so they can never land in a newly focused app. An acknowledged commit always decides a turn's field.

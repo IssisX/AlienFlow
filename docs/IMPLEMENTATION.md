@@ -1,25 +1,53 @@
-# AlienFlow chat implementation — 0.1.25-chat.1 (26)
+# AlienFlow implementation — 0.1.26-claude.1 (27), branch `claude/alienflow`
 
-The 15 October 2026 writing-quality repair is built, verified and signed. This is a development APK, **not signed off for a paid public launch**. [Paid release readiness](PAID_RELEASE_READINESS.md) records the remaining acceptance evidence.
+This is a development APK built from `claude/alienflow`, which was branched from `AlienFlow(chat)` at `2b3455d` (0.1.25-chat.1). It is **not signed off for a paid public launch**. [Paid release readiness](PAID_RELEASE_READINESS.md) lists the acceptance evidence still required. Previous checkpoint: [0.1.25-chat.1](history/IMPLEMENTATION_CHAT_0.1.25-chat.1.md).
 
-## Behavior
+## Defects repaired
 
-Recording stays active when the focused eligible field changes. New speech goes inline into the new field; late prior-field results stay with their original segment/history. Existing keyboard, API 36, APK-only development, and Termux final-only insertion without Enter remain unchanged.
+Both defects were reproduced by tests against the shipped 0.1.25-chat.1 source (`2b3455d`) before the fix. CI repeats that replay on every build (`scripts/prove_live_polish_regression.py`), and packaging refuses to proceed without it.
 
-Cleanup now considers a completed speech prefix together, preserving later provisional speech and the complete raw original. It receives up to 512 characters before and 256 after the insertion from the authoritative keyboard snapshot, only as read-only data. The privacy screen describes this use. Context is absent from logs and history, and old-field context cannot authorize new-field cleanup. Manual edits remain protected. Context-sensitive memoization prevents reusing a sentence-start capitalization decision in a different insertion context; long chunks preserve their separators.
+1. **Live text waited for each pause commit (regression since 0.1.24).**
+   - The live model streams words before the client commits a turn. Every event for an item without an acknowledged commit was tagged with no field (`-1`), so the field received a turn's words only after the 850 ms pause commit was acknowledged. Fixture tests always supplied an explicit field, so this real event order was never exercised.
+   - **Owner of the fix:** the transport's audio coverage. Unacknowledged speech can only belong to the current field's open buffer or to an in-flight commit, so it is assigned to the current field only when every candidate is in that field. While an earlier field's commit is unacknowledged, the words wait. An acknowledged commit always decides a turn's field, and a provisional owner never overrides it.
+   - **Shipped result:** field owners `[-1, -1, -1, 0, -1]`, expected `[0, -1, -1, 0, 2]`.
 
-The prompt requests sentence case and coherent continuation across pauses, without inventing missing facts. Light polish permits a small audited set of model-proposed common spelling substitutions (including the reported lowercase thet/that), while protecting capitalized names, paths, identifiers, quantities and meaning. This is deliberately not a claim of general spelling accuracy. Initial insertion now separates neighboring words with owned whitespace, which cancel can remove without changing the original draft.
+2. **Light polish discarded casing and punctuation whenever one word changed.**
+   - The cleanup prompt asks for spelling repair, but the guard accepted or rejected the whole answer. Any word outside the five-entry typo list threw away the answer, including the sentence-case and punctuation repairs that join turns split at pauses. Users kept the raw per-turn "Sentence. Fragment. Fragment." text.
+   - **Owner of the fix:** `PolishMerge`. Words that align keep the model's case and punctuation. Other edits revert to the recognized words: proposals never add words or drop recognized ones (fillers and exact repeats only with that setting). A same-length substitution is accepted only as a near-miss spelling of an ordinary lowercase word: letters only, at least four letters, same first letter, edit distance ≤1 (≤2 from seven letters), and not a negation, modal, uncertainty, quantity, time, direction or profanity word. Names, identifiers, numbers and paths keep the recognized spelling. Rewrite and Recognition only are unchanged. The cleanup memo stores only the usable merged text.
+   - **Shipped result:** the reported proposal returned `store. And then. I bought seperate tickets. For Maria.`; it now returns `store, and then I bought separate tickets for Maria.`
 
-The recognition delay is medium instead of minimal, a documented balance of latency/audio context; the actual microphone accuracy/latency tradeoff is unmeasured. Stop cancels unfinished live cleanup, then permits one final complete-segment pass within the existing 2.5-second budget if needed. Failure or timeout retains recognized words. This also covers speech finalized only after Stop.
+The account screen and the accessibility description now describe the implemented behavior:
+- Switching fields sends new speech into the new field.
+- With Light polish or Rewrite, up to 512 characters before and 256 after the cursor are sent as read-only context.
+- Recognition only sends no field text.
 
-## Exact verification
+## Real-audio evaluation path
 
-Compiled source: `39a8e71bcbdff6397e056c211c053bf07b96da5c`. Workflow: https://github.com/IssisX/AlienFlow/actions/runs/38731098492 — success.
+[EVALUATION.md](EVALUATION.md) describes an opt-in, paid measurement with the owner's recordings. It uses the same session configuration, VAD commit policy, ledger, cleanup request and merge as the app. It reports these separately, for raw and polished text:
+- word errors;
+- casing on correctly recognized words;
+- inserted or missing sentence breaks;
+- meaning-word differences;
+- missing phrases;
+- latency.
 
-232 unit tests, zero failures/errors/skips; release lint 39 warnings, zero errors. Historical .17 Termux and .23 app-switch/stale-cursor behavioral regressions remain required gates. Two new tests fail by assertion against shipped .24, proving the typo-guard and insertion-boundary defects before repair. New tests cover real widget/InputConnection context and insertion, context-dependent request caching, connected finalized prefixes, out-of-order finals, late cleanup, long-chunk whitespace and final-stop HTTP cancellation/budget behavior.
+It can compare recognition delay, commit silence and a transcription prompt without changing the app. It is verified against a scripted provider. **It has not been run with real recordings or a real key**: no recordings or paid-provider authorization were available.
 
-The Android 16 emulator exercised real Chromium/WebView and official installed Termux, including active app switching and return to terminal. The input IPC, DOM and terminal echo are real; recognition and microphone readiness are fixtures. **No paid provider request or physical microphone test was performed.** Real Fold6 update, recording quality, capitalization, semantic coherence and real-device switching require acceptance before public release.
+## Unchanged
 
-All 199 downloaded bundle member hashes and the workflow artifact digest matched. The APK contains the compiled source SHA. APK v3 verification passed with the original certificate `d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f`; all unsigned payload entries remain identical after signing. Signed APK SHA-256: `fb2bc74c68bd6ec6423e84d3159fb167dff80e7c746d62b1c6e7b2f61f0e72c3`. The ZIP download contains byte-identical APK bytes. No private signing material was uploaded or committed.
+- The selected keyboard and the nonfocusable bubble with its 75% default opacity and approved artwork.
+- Live in-field text, light polish by default, the final cleanup pass after Stop, bounded context, editor-generation and segment ownership, unknown-offset keyboard handling.
+- Termux final-only insertion without Enter.
+- The audio, provider models and prompts, `medium` delay, 850 ms commit silence, settings, history and encrypted key.
+- API 36, APK-only development, application ID and signing identity. No AAB was built.
 
-[Release verification](RELEASE_VERIFICATION_0.1.25-chat.1.json) and [signer output](APK_SIGNATURE_0.1.25-chat.1.txt) record exact evidence. Preliminary runs were superseded during review; no failed check is represented as a passing release. [Previous 0.1.24 evidence](history/IMPLEMENTATION_CHAT_0.1.24-chat.1.md).
+## Known limits and unknowns
+
+- **UNVERIFIED:** pre-commit deltas use the `item_id` that `input_audio_buffer.committed` later reports. This was also the assumption of every build before 0.1.24. If a real session ever shows provisional words that are never finalized (the Stop timeout reports "Final transcription timed out"), this assumption is false.
+- Each 850 ms pause still finalizes a separate transcript. Polish now repairs casing and breaks across turns, but whether a longer commit silence or a different delay improves recognition is unmeasured. Use the evaluation variants before changing defaults.
+- Live cleanup resends the whole completed field text after each turn, within a 4 s budget, plus one 2.5 s pass after Stop. Long dictations may exceed these budgets and keep recognized text unpolished; the evaluation reports cleanup time.
+- No physical microphone, paid provider request, Fold6 update, or real-app switching was tested in this work.
+
+## Verification
+
+Recorded after CI completes, below.
