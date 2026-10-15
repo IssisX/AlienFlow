@@ -82,7 +82,7 @@ class BrowserEditorTest {
             val keyboards = windows.filter { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
                 .map { Rect().also(it::getBoundsInScreen) }
             val overKeyboard = bounds != null && keyboards.any { Rect.intersects(bounds, it) }
-            val canTap = bounds != null && hit?.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY && !overKeyboard
+            val canTap = bounds != null && alienOnTop(windows, bounds) && !overKeyboard
             if (canTap && keyboards.isNotEmpty()) keyboardSeen = true
             if (bounds != prior || !canTap) {
                 trace.appendLine("time=${SystemClock.uptimeMillis()} view=$bounds hitType=${hit?.type} overKeyboard=$overKeyboard")
@@ -110,6 +110,15 @@ class BrowserEditorTest {
         }
         inject(MotionEvent.ACTION_DOWN, now)
         inject(MotionEvent.ACTION_UP, now + 40)
+    }
+    /** The overlay's own entry can lag after it moves (Android 12 kept the old bounds for 10 s), so judge
+     * by layer: no non-overlay window above the alien's layer may contain its real center. */
+    private fun alienOnTop(windows: List<AccessibilityWindowInfo>, alien: Rect): Boolean {
+        val overlay = windows.filter { it.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY }.maxOfOrNull { it.layer } ?: return false
+        val covering = windows.filter { it.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY }.filter { window ->
+            val region = android.graphics.Region(); window.getRegionInScreen(region); region.contains(alien.centerX(), alien.centerY())
+        }.maxOfOrNull { it.layer }
+        return covering == null || overlay > covering
     }
     private fun setField(owner: Any, name: String, value: Any?) {
         owner.javaClass.getDeclaredField(name).apply { isAccessible = true }.set(owner, value)

@@ -75,7 +75,8 @@ class InstalledTermuxTest {
                 val region = android.graphics.Region(); window.getRegionInScreen(region)
                 region.contains(area.centerX(), area.centerY())
             } }
-            val canTap = bounds != null && hit?.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
+            val keyboards = windows.filter { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }.map { Rect().also(it::getBoundsInScreen) }
+            val canTap = bounds != null && alienOnTop(windows, bounds) && keyboards.none { Rect.intersects(bounds, it) }
             if (bounds != prior || !canTap) {
                 trace.appendLine("time=${SystemClock.uptimeMillis()} view=$bounds hitType=${hit?.type}")
                 windows.forEach { window ->
@@ -101,6 +102,14 @@ class InstalledTermuxTest {
         }
         inject(MotionEvent.ACTION_DOWN, now)
         inject(MotionEvent.ACTION_UP, now + 40)
+    }
+    /** Judged by layer at the alien's real center: its own window entry can lag after it moves. */
+    private fun alienOnTop(windows: List<AccessibilityWindowInfo>, alien: Rect): Boolean {
+        val overlay = windows.filter { it.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY }.maxOfOrNull { it.layer } ?: return false
+        val covering = windows.filter { it.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY }.filter { window ->
+            val region = android.graphics.Region(); window.getRegionInScreen(region); region.contains(alien.centerX(), alien.centerY())
+        }.maxOfOrNull { it.layer }
+        return covering == null || overlay > covering
     }
     private fun setField(owner: Any, name: String, value: Any?) {
         owner.javaClass.getDeclaredField(name).apply { isAccessible = true }.set(owner, value)

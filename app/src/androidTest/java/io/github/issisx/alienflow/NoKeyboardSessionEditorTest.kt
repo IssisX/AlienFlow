@@ -69,7 +69,15 @@ class NoKeyboardSessionEditorTest {
                 val region = android.graphics.Region(); window.getRegionInScreen(region)
                 region.contains(area.centerX(), area.centerY())
             } }
-            val canTap = bounds != null && hit?.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
+            // Judged by layer at the alien's real center: Android 12 kept the overlay's old bounds for
+            // 10 s after it moved above the keyboard. getRegionInScreen needs Android 13, so use bounds.
+            val windows = automation.windows
+            val overlay = windows.filter { it.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY }.maxOfOrNull { it.layer }
+            val covering = bounds?.let { area -> windows.filter { it.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY }
+                .filter { Rect().also(it::getBoundsInScreen).contains(area.centerX(), area.centerY()) }.maxOfOrNull { it.layer } }
+            val overKeyboard = bounds != null && windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD &&
+                Rect.intersects(bounds, Rect().also(it::getBoundsInScreen)) }
+            val canTap = bounds != null && overlay != null && (covering == null || overlay > covering) && !overKeyboard
             if (!canTap) {
                 trace.clear().append("view=$bounds hitType=${hit?.type};")
                 automation.windows.forEach { window -> val area = Rect(); window.getBoundsInScreen(area)
