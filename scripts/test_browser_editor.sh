@@ -7,8 +7,8 @@ PROOF="$ROOT/build/browser-editor"
 mkdir -p "$PROOF"
 exec > >(tee "$PROOF/driver.log") 2>&1
 set -x
-# API level and device profile are explicit so CI can cover Android 12 through 16 and several
-# screen classes. Android 12 has no accessibility keyboard session: it runs Android12EditorTest.
+# API level and device profile are explicit so CI can cover Android 11 through 16 and several
+# screen classes. Android 11-12 have no accessibility keyboard session: they run NoKeyboardSessionEditorTest.
 API="${ALIENFLOW_EMULATOR_API:-36}"
 DEVICE="${ALIENFLOW_EMULATOR_DEVICE:-pixel_6}"
 AVD="alienflow-browser-api${API}"
@@ -67,7 +67,7 @@ if [ "$API" -lt 33 ]; then
   "$ADB" install -r app/build/outputs/apk/debug/app-debug.apk
   "$ADB" install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
   "$ADB" shell pm grant io.github.issisx.alienflow android.permission.RECORD_AUDIO
-  timeout 300 "$ADB" shell am instrument -w -r -e disableAnalytics true -e class io.github.issisx.alienflow.Android12EditorTest io.github.issisx.alienflow.test/androidx.test.runner.AndroidJUnitRunner | tee "$PROOF/instrumentation.txt"
+  timeout 300 "$ADB" shell am instrument -w -r -e disableAnalytics true -e class io.github.issisx.alienflow.NoKeyboardSessionEditorTest io.github.issisx.alienflow.test/androidx.test.runner.AndroidJUnitRunner | tee "$PROOF/instrumentation.txt"
   grep -F 'OK (1 test)' "$PROOF/instrumentation.txt"
   python3 - "$PROOF" "$API" <<'PY'
 import json,sys,os,pathlib
@@ -76,7 +76,7 @@ results=[json.loads(x.split('fixture_result=',1)[1]) for x in open(root/'instrum
 assert len(results)==1,results
 r=results[0]
 assert r['source']==os.environ['GITHUB_SHA'] and r['api']==int(sys.argv[2]) and r['empty_field_live'] and r['existing_text_refused'],r
-path=root/'android12-proof/result.json';path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(r,indent=2))
+path=root/'no-keyboard-session-proof/result.json';path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(r,indent=2))
 print(json.dumps(r,indent=2))
 PY
   exit 0

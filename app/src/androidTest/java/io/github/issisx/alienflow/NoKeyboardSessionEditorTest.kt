@@ -20,10 +20,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 
-/** Disposable Android 12 emulator only (for example Galaxy Note10+ class devices). Real overlay tap,
+/** Disposable Android 11–12 emulator only (for example Galaxy Note10+ class devices). Real overlay tap,
  * accessibility node IPC and native field; speech events are fixtures and no microphone is used. */
 @RunWith(AndroidJUnit4::class)
-class Android12EditorTest {
+class NoKeyboardSessionEditorTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val automation get() = instrumentation.getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
     private val app get() = instrumentation.targetContext.applicationContext as AlienApp
@@ -90,7 +90,7 @@ class Android12EditorTest {
             app.store.prefs.edit().clear().putString("correction", "A").commit()
             DictationCoordinator(app, app.store, keyProvider = { "fixture-not-a-key" }).also { setField(app, "coordinator", it); it.service = service }
         }
-        val idleTransport = RealtimeTransport(app, PendingAudio(File(app.cacheDir, "android12-fixture.wav")), coordinator,
+        val idleTransport = RealtimeTransport(app, PendingAudio(File(app.cacheDir, "no-keyboard-session-fixture.wav")), coordinator,
             microphoneFactory = { error("Editor integration must never activate a microphone") })
         val monitor = instrumentation.addMonitor(MainActivity::class.java.name, null, false)
         shell("am start -n io.github.issisx.alienflow/.MainActivity")
@@ -125,7 +125,7 @@ class Android12EditorTest {
         main { setField(coordinator, "transport", null) }
         await("draft field focused") { main { service.bridge.focused()?.packageName?.toString() == app.packageName } }
         tapAlien(service)
-        await("explicit Android 12 refusal") { main { coordinator.status.startsWith("[AF-E17]") } }
+        await("explicit pre-Android 13 refusal") { main { coordinator.status.startsWith("[AF-E17]") } }
         assertFalse(main { coordinator.active })
         assertEquals("EXISTING_DRAFT", main { practice.text.toString() })
 

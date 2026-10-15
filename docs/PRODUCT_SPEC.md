@@ -660,6 +660,7 @@ This is a bounded spelling repair, not general spelling correction. Recognition-
 
 Support as many Android devices as practical, explicitly including the Samsung Galaxy Note10+. Its last major update is Android 12 (One UI 4.1).
 
-- **Minimum version** is now Android 12 (API 31). Android 13 and newer keep the full behavior: the selected keyboard's session, live text anywhere, live polish and Termux.
-- **Android 12 has no accessibility keyboard session.** AlienFlow therefore dictates live only into positively empty fields, using the existing guarded node-action path with read-back confirmation. Fields with existing text and Termux are refused with an explicit AF-E17 reason, and nothing is written. It never overwrites a whole draft or pastes through the clipboard.
-- **Compatibility evidence:** CI runs the real-editor emulator tests on Android 12, 13, 14, 15 and 16 across phone, small-phone, foldable and tablet profiles. Emulators are not physical-device evidence.
+- **Minimum version** is now Android 11 (API 30), because the app is to be sold on Google Play to as many devices as practical. Android 13 and newer keep the full behavior: the selected keyboard's session, live text anywhere, live polish and Termux.
+- **Android 10 is excluded.** Keeping the overlay off the keyboard depends on Android 11 window-inset APIs.
+- **Android 11 and 12 have no accessibility keyboard session.** AlienFlow therefore dictates live only into positively empty fields, using the existing guarded node-action path with read-back confirmation. Fields with existing text and Termux are refused with an explicit AF-E17 reason, and nothing is written. It never overwrites a whole draft or pastes through the clipboard.
+- **Compatibility evidence:** CI runs the real-editor emulator tests on Android 11, 12, 13, 14, 15 and 16 across phone, small-phone, foldable and tablet profiles. Emulators are not physical-device evidence.

@@ -106,12 +106,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - api: 30 # Android 11: oldest supported, no accessibility keyboard session
+            device: medium_phone
           - api: 31 # Android 12: Galaxy Note10+ class, no accessibility keyboard session
             device: pixel_6
           - api: 33
             device: small_phone
-          - api: 34
-            device: pixel_fold
+          - api: 34 # The runner's avdmanager has no pixel_fold profile.
+            device: 7.6in Foldable
           - api: 35
             device: pixel_tablet
     env:

@@ -253,25 +253,6 @@ class EditorBridgeNodeRouteTest {
         }
         coordinator.cancel()
     }
-    @Test fun android12HasNoKeyboardSessionSoOnlyEmptyFieldsBindAndTheReasonIsExplicit() {
-        val actual = android.os.Build.VERSION.SDK_INT
-        ReflectionHelpers.setStaticField(android.os.Build.VERSION::class.java, "SDK_INT", 31)
-        try {
-            withField("draft", keyboard = true) { service ->
-                assertFalse("Android 12 exposes no accessibility keyboard session", service.keyboardAttached)
-                assertFalse(service.bridge.begin())
-                assertTrue(service.bridge.lastError, service.bridge.lastError.startsWith("[AF-E17]"))
-                assertEquals("draft", field!!.text.toString()); assertEquals(0, mutations)
-            }
-            withField("", keyboard = true) { service ->
-                assertTrue(service.bridge.begin()); activate(service)
-                assertEquals(EditorWriteResult.APPLIED, write(service, "hello"))
-                assertEquals(EditorWriteResult.APPLIED, write(service, "Hello there."))
-                assertEquals("Hello there.", field!!.text.toString())
-                assertTrue("Node actions only; no keyboard IPC", committedTexts.isEmpty() && selections.isEmpty())
-            }
-        } finally { ReflectionHelpers.setStaticField(android.os.Build.VERSION::class.java, "SDK_INT", actual) }
-    }
     @Test fun uncommittedLiveSpeechIsWrittenWhileAmbiguousOwnershipWaitsForItsCommit() = withField(keyboard = true) { service ->
         val app = service.application as AlienApp
         app.store.prefs.edit().putString("correction", "A").commit()

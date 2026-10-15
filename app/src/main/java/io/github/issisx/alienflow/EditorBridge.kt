@@ -135,7 +135,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         if (!nodeActions) return fail(if (ambiguousHint)
             "[AF-E16] This field’s placeholder cannot be separated from its text; no text was changed"
             else if (Build.VERSION.SDK_INT < 33)
-                "[AF-E17] On Android 12, AlienFlow dictates into empty text fields; existing text needs Android 13 or newer"
+                "[AF-E17] Before Android 13, AlienFlow dictates into empty text fields; existing text needs Android 13 or newer"
             else "[AF-E04] Can't safely edit the existing text; select the field again or start in an empty field")
         // Binding permits microphone startup during typing; writes use fresh
         // matching text/cursor evidence and finish composition before insertion.
