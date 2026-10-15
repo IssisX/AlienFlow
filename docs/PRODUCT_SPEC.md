@@ -1,6 +1,6 @@
 # AlienFlow — Product Design and Implementation Plan
 
-**Version:** 0.1.24-chat.1 contract · **Updated:** 13 October 2026 · **Stage:** Implemented Android client; exact verification and remaining device limits are in IMPLEMENTATION.md.
+**Version:** 0.1.25-chat.1 contract · **Updated:** 15 October 2026 · **Stage:** Implemented Android client; exact verification and remaining device limits are in IMPLEMENTATION.md.
 
 **Working product name:** AlienFlow. This is an Android dictation application inspired by the interaction of Wispr Flow, with a personal-key development client and a planned paid Google Play release. The name is provisional and has not been checked for publication or trademark use.
 
@@ -137,7 +137,7 @@ Retain the latest stable recognition text separately from the current displayed 
 
 ### 4.2 Default B: Very light
 
-Allowed changes are punctuation, capitalization, and an unambiguous explicit spoken self-correction. Preserve wording, grammar, tone, slang, profanity, uncertainty, and the speaker's level of formality. Preserve names, numbers, units, identifiers, and negation unless the speaker clearly corrects that exact item.
+Allowed changes are punctuation, sentence capitalization, a small audited set of model-proposed common spelling substitutions, and an unambiguous explicit spoken self-correction. Capitalized names, paths and identifiers are excluded from spelling substitutions. Preserve wording, grammar, tone, slang, profanity, uncertainty, and the speaker's level of formality. Preserve names, numbers, units, identifiers, and negation unless the speaker clearly corrects that exact item.
 
 Examples are illustrative acceptance fixtures, not promises about recognition accuracy:
 

@@ -1,0 +1,157 @@
+{
+  "created_utc": "2026-10-15T12:08:42.964814+00:00",
+  "application_id": "io.github.issisx.alienflow",
+  "version_name": "0.1.25-chat.1",
+  "version_code": 26,
+  "branch": "AlienFlow(chat)",
+  "source_sha": "39a8e71bcbdff6397e056c211c053bf07b96da5c",
+  "source_tree_sha": "2c57346f91e5fc0119b67d6ce7749bb951358d92",
+  "workflow_run_url": "https://github.com/IssisX/AlienFlow/actions/runs/38731098492",
+  "workflow_conclusion": "success",
+  "artifact_id": 11971311799,
+  "bundle_sha256": "3c3af1bc0c8ff3166d2547cd22d613efad2d40ea32bb0be55786ac50c7053674",
+  "manifest_member_hashes_verified": 199,
+  "tests": {
+    "executed": 232,
+    "total": 232,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "Real Chromium and installed Termux on API36 emulator; transcript fixtures, no physical microphone/provider"
+  },
+  "lint": {
+    "issues": 39,
+    "errors": 0
+  },
+  "writing_baseline": {
+    "baseline_sha": "0ffaf5c5d7a8227e447785f3b6fd561bc40dfabe",
+    "candidate_sha": "39a8e71bcbdff6397e056c211c053bf07b96da5c",
+    "exit_code": 1,
+    "tests": 2,
+    "errors": 0,
+    "failures": {
+      "insertingInsideSentenceSeparatesBothUnownedAnchors": "org.junit.ComparisonFailure",
+      "lightPolishCanRepairReportedTypoWithoutChangingMeaning": "java.lang.AssertionError"
+    }
+  },
+  "app_switch_baseline": {
+    "baseline_sha": "adda87cd9bc2e0f3cb491a35ab9a8d9877347c4f",
+    "candidate_sha": "39a8e71bcbdff6397e056c211c053bf07b96da5c",
+    "exit_code": 1,
+    "tests": 2,
+    "expected_failures": [
+      "defaultWindowConfirmsActualTextWhenAbsoluteCallbackStaysAtZero",
+      "repeatedNewFieldsAcceptSpeechWithoutRestartingTheCoordinator"
+    ],
+    "actual_failures": [
+      "defaultWindowConfirmsActualTextWhenAbsoluteCallbackStaysAtZero",
+      "repeatedNewFieldsAcceptSpeechWithoutRestartingTheCoordinator"
+    ],
+    "errors": 0,
+    "failure_types": {
+      "defaultWindowConfirmsActualTextWhenAbsoluteCallbackStaysAtZero": "java.lang.AssertionError",
+      "repeatedNewFieldsAcceptSpeechWithoutRestartingTheCoordinator": "org.junit.ComparisonFailure"
+    },
+    "scope": "Production coordinator/bridge and Android default window; broker and transcript fixtures"
+  },
+  "browser_editor": {
+    "source": "39a8e71bcbdff6397e056c211c053bf07b96da5c",
+    "api": 36,
+    "provider": "fixture; no microphone or API request",
+    "initial_node": {
+      "text": "Ask ChatGPT\n",
+      "selection": "1:1",
+      "hint": "",
+      "showing_hint": false
+    },
+    "initial_ime": {
+      "text": "\n",
+      "selection": "0:0",
+      "offset": -1
+    },
+    "initial_dom": "\"\\n\"",
+    "webview": "133.0.6943.137",
+    "real_bubble_tap": true,
+    "delivered": true,
+    "after_dom": "\"Browser fixture speech\"",
+    "editor_error": "",
+    "final_dom": "\"Browser final speech\"",
+    "status": "Complete \u2022 ready for another dictation",
+    "selected_replacement": true,
+    "typing_continues_dictation": true,
+    "typed_text_preserved": true,
+    "second_dom": "\"Browser SECOND typed tail speech\"",
+    "repeat_session": true,
+    "unicode_dom": "\"\ud83d\udef8 Again Browser SECOND typed tail speech\""
+  },
+  "installed_termux": {
+    "source": "39a8e71bcbdff6397e056c211c053bf07b96da5c",
+    "version": "0.1.25-chat.1",
+    "api": 36,
+    "termux": "official v0.118.3 x86_64",
+    "real_bubble_tap": true,
+    "real_accessibility_broker": true,
+    "real_terminal_echo": true,
+    "final_count": 1,
+    "repeat_session_count": 1,
+    "ordinary_live_after_termux": true,
+    "termux_visible_after_switch": true,
+    "premature_text": false,
+    "microphone_and_provider": "not exercised; transcript fixtures",
+    "active_app_switch": true,
+    "late_old_result_preserved": true,
+    "active_return_to_terminal": true
+  },
+  "signing": {
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "scheme": "APK v3",
+    "payload_entries_unchanged": 25,
+    "signature_entries_added": [
+      "META-INF/ALIENFLO.RSA",
+      "META-INF/ALIENFLO.SF",
+      "META-INF/MANIFEST.MF"
+    ]
+  },
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.25-chat.1.apk",
+    "size_bytes": 4610200,
+    "sha256": "fb2bc74c68bd6ec6423e84d3159fb167dff80e7c746d62b1c6e7b2f61f0e72c3"
+  },
+  "zip_download": {
+    "filename": "AlienFlow-0.1.25-chat.1.zip",
+    "size_bytes": 1669399,
+    "sha256": "55e2d30c995771da26fcb6a492c54b11173ef173ccc985a648c60e29bbf6ca72",
+    "contains_byte_identical_signed_apk": true
+  },
+  "changes": [
+    "Keep dictation active across eligible input changes; delayed old-field results never land in the new field",
+    "Balanced streaming recognition delay: medium instead of minimal; actual accuracy/latency not measured",
+    "Cleanup joins finalized speech within its original editor segment and retains later provisional speech",
+    "Sentence-case and coherent-continuation instructions with bounded read-only keyboard insertion context",
+    "Up to 512 characters before and 256 after insertion, transient and absent from diagnostics/history; privacy screen updated",
+    "Context-sensitive cleanup memoization and preserved whitespace across long-text chunks",
+    "Guarded model-proposed common typo substitutions; capitalized names, identifiers, negation and quantities protected",
+    "One final cleanup pass within a 2.5-second budget when last speech is not yet polished",
+    "Initial mid-sentence insertion adds owned boundary spaces while preserving original draft and undo"
+  ],
+  "verification_boundary": "Unit and loopback HTTP tests plus API36 emulator with real Chromium/Termux input IPC. Microphone and provider events are fixtures. Real Fold6 speech quality, app switching and physical update remain unverified.",
+  "paid_release_ready": false,
+  "remaining_acceptance": "Representative real microphone accuracy/capitalization/meaning and latency measurements; repeated physical-device/app/keyboard lifecycle tests; final paid-product and store preparation.",
+  "preserved": {
+    "target_sdk": 36,
+    "aab_built": false,
+    "paid_provider_tests": 0,
+    "keyboard": "existing selected keyboard",
+    "package_and_signing_identity": "unchanged"
+  },
+  "preliminary_runs": [
+    {
+      "id": 38730029626,
+      "result": "cancelled after final-phrase cleanup correction"
+    },
+    {
+      "id": 38730344822,
+      "result": "unit tests and lint passed; superseded by continuous-prefix and context-spacing review corrections"
+    }
+  ]
+}
