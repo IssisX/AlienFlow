@@ -95,3 +95,61 @@ jobs:
             app/build/test-results
           if-no-files-found: warn
           retention-days: 7
+
+  device-matrix:
+    # Compatibility evidence beyond the Android 16 phone in the release job. Each entry is an
+    # isolated emulator; artifacts are per entry and nothing is published.
+    name: Android API ${{ matrix.api }} on ${{ matrix.device }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - api: 31 # Android 12: Galaxy Note10+ class, no accessibility keyboard session
+            device: pixel_6
+          - api: 33
+            device: small_phone
+          - api: 34
+            device: pixel_fold
+          - api: 35
+            device: pixel_tablet
+    env:
+      BUILD_TOOLS_VERSION: '36.0.0'
+      COMPILE_SDK: '36'
+      ALIENFLOW_EMULATOR_API: ${{ matrix.api }}
+      ALIENFLOW_EMULATOR_DEVICE: ${{ matrix.device }}
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+      - name: Set up Java 17
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165
+        with:
+          distribution: temurin
+          java-version: '17.0.20+101'
+      - name: Check wrapper JAR against upstream checksum
+        run: echo '497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7  gradle/wrapper/gradle-wrapper.jar' | sha256sum --check --strict
+      - name: Set up Gradle cache and wrapper validation
+        uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1
+        with:
+          cache-read-only: true
+      - name: Install exact Android SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --channel=0 "platforms;android-${COMPILE_SDK}" "build-tools;${BUILD_TOOLS_VERSION}"
+      - name: Build debug app and instrumentation
+        run: bash gradlew --no-daemon --no-configuration-cache --console=plain :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Exercise real editors on this Android version and screen
+        timeout-minutes: 22
+        run: bash scripts/test_browser_editor.sh
+      - name: Preserve device evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: alienflow-device-api${{ matrix.api }}-${{ matrix.device }}
+          path: build/browser-editor
+          if-no-files-found: warn
+          retention-days: 7
