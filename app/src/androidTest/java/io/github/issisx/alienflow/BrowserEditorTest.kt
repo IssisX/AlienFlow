@@ -54,6 +54,7 @@ class BrowserEditorTest {
         .filter { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION }
         .joinToString("\n") { text(it.root) }
     private var tapNumber = 0
+    private var keyboardWindowsChecked = 0
     private val evidenceDirectory get() = File(app.getExternalFilesDir(null), "browser-proof").apply { mkdirs() }
     private fun tapAlien(service: AlienAccessibilityService) {
         val trace = StringBuilder()
@@ -89,6 +90,12 @@ class BrowserEditorTest {
             stable >= 3
         }
         val point = checkNotNull(target)
+        // An accessibility overlay sits above the keyboard window: if it overlapped the keyboard it
+        // would take taps meant for keys such as Gboard's microphone.
+        automation.windows.filter { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }.forEach { window ->
+            val keyboard = Rect(); window.getBoundsInScreen(keyboard); keyboardWindowsChecked++
+            assertFalse("The alien $point covers the keyboard window $keyboard", Rect.intersects(point, keyboard))
+        }
         tapNumber++
         File(evidenceDirectory, "before-tap-$tapNumber.png").outputStream().use {
             automation.takeScreenshot().compress(Bitmap.CompressFormat.PNG, 100, it)
@@ -245,6 +252,7 @@ class BrowserEditorTest {
             result.put("repeat_session", true).put("unicode_dom", js(activity, "editor.innerText"))
 
         } finally {
+            result.put("keyboard_windows_checked", keyboardWindowsChecked)
             File(evidenceDirectory, "result.json").writeText(result.toString(2))
             instrumentation.sendStatus(2, android.os.Bundle().apply { putString("fixture_result", result.toString()) })
             File(evidenceDirectory, "session-diagnostic.txt").writeText(DiagnosticReport.collect(app))
