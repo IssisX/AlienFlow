@@ -16,6 +16,22 @@ Both defects were reproduced by tests against the shipped 0.1.25-chat.1 source (
    - **Owner of the fix:** `PolishMerge`. Words that align keep the model's case and punctuation. Other edits revert to the recognized words: proposals never add words or drop recognized ones (fillers and exact repeats only with that setting). A same-length substitution is accepted only as a near-miss spelling of an ordinary lowercase word: letters only, at least four letters, same first letter, edit distance ≤1 (≤2 from seven letters), and not a negation, modal, uncertainty, quantity, time, direction or profanity word. Names, identifiers, numbers and paths keep the recognized spelling. Rewrite and Recognition only are unchanged. The cleanup memo stores only the usable merged text.
    - **Shipped result:** the reported proposal returned `store. And then. I bought seperate tickets. For Maria.`; it now returns `store, and then I bought separate tickets for Maria.`
 
+3. **The alien could sit on top of the keyboard.**
+   - The owner reports that Gboard's microphone key sometimes does nothing. A new emulator assertion found an overlap on an Android 15 tablet: the alien at `Rect(2094, 1353 - 2190, 1449)` was inside the keyboard window `Rect(0, 864 - 2560, 1600)`.
+   - The alien's window is stacked above the keyboard, so it takes taps meant for the keys under it. Placement used the IME inset reported to the overlay itself, which is absent for a window above the keyboard.
+   - **Owner of the fix:** the service now reads the input-method window from the accessibility window list and moves the alien above any keyboard it would overlap. The saved position returns when the keyboard closes.
+   - This is a supported mechanism for the report, not a confirmed cause on the owner's phone.
+
+## Device support
+
+The app is to be sold on Google Play, so the minimum is now **Android 11 (API 30)**; it was Android 13. The Galaxy Note10+ ends at Android 12.
+
+- **Android 13 and newer:** unchanged, full behavior.
+- **Android 11 and 12:** Android provides no accessibility keyboard session there. Dictation goes live into empty text fields through the existing guarded node-action path. Fields with text and Termux are refused with AF-E17 and nothing is written.
+- **Android 10:** excluded. Keeping the alien off the keyboard depends on Android 11 window-inset APIs.
+
+Every Android 13 call goes through one guarded accessor, and release lint (NewApi) is clean at API 30. CI runs the real-editor emulator tests on Android 11 (medium phone), 12 (Pixel 6), 13 (small phone), 14 (7.6-inch foldable), 15 (Pixel tablet) and 16 (Pixel 6). Emulators are not physical-device evidence.
+
 The account screen and the accessibility description now describe the implemented behavior:
 - Switching fields sends new speech into the new field.
 - With Light polish or Rewrite, up to 512 characters before and 256 after the cursor are sent as read-only context.
@@ -46,7 +62,9 @@ It can compare recognition delay, commit silence and a transcription prompt with
 - **UNVERIFIED:** pre-commit deltas use the `item_id` that `input_audio_buffer.committed` later reports. This was also the assumption of every build before 0.1.24. If a real session ever shows provisional words that are never finalized (the Stop timeout reports "Final transcription timed out"), this assumption is false.
 - Each 850 ms pause still finalizes a separate transcript. Polish now repairs casing and breaks across turns, but whether a longer commit silence or a different delay improves recognition is unmeasured. Use the evaluation variants before changing defaults.
 - Live cleanup resends the whole completed field text after each turn, within a 4 s budget, plus one 2.5 s pass after Stop. Long dictations may exceed these budgets and keep recognized text unpolished; the evaluation reports cleanup time.
-- No physical microphone, paid provider request, Fold6 update, or real-app switching was tested in this work.
+- **Android 13 emulator, built-in browser engine 109:** the first live words reached a rich browser editor, but the live revision never applied. No editor error was recorded, and the evidence logcat starts after that test. The cause is unknown. The Termux and native-field tests on the same emulator passed. Real Android 13 devices normally receive browser-engine updates through Play; this is **UNVERIFIED** for every device.
+- The owner's Gboard microphone report has a supported mechanism (the keyboard overlap above), but it isn't confirmed on the phone. If it recurs, check whether the alien sits on or next to the keyboard, and whether turning AlienFlow off under Accessibility brings the microphone back.
+- No physical microphone, paid provider request, Fold6 update, Note10+ install, or real-app switching was tested in this work.
 
 ## Verification
 

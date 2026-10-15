@@ -7,6 +7,8 @@ Repository: IssisX/AlienFlow. Working branch: `claude/alienflow`, created from `
 - **Live text during speech:** words now reach the focused field while you speak. Since 0.1.24 they waited for each pause. When you switch fields, words that could belong to the previous field still wait for their own commit, so they never enter the new app.
 - **Light polish:** casing and punctuation are applied even when the model also proposes a word change that isn't allowed. Only that word keeps its recognized form. Near-miss misspellings of ordinary words can be corrected. Names, numbers, negation, uncertainty and other meaning words keep the recognized spelling.
 - **Real-audio evaluation:** [docs/EVALUATION.md](docs/EVALUATION.md) measures recognition and polish with your recordings.
+- **Keyboard overlap:** the alien no longer sits on top of the keyboard. On an Android 15 tablet emulator it covered keys and would take their taps, a supported explanation for Gboard's microphone key doing nothing.
+- **Android 11 and newer** (previously 13), including the Galaxy Note10+ (Android 12). On Android 11–12, dictation goes live into empty text fields. Fields with existing text and Termux need Android 13 or newer.
 - **Disclosures:** the switching and surrounding-text descriptions now match actual behavior.
 
 Details, evidence and limits: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md).
