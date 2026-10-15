@@ -386,6 +386,8 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 if (outcome == EditorWriteResult.USER_EDIT && current()) outcome = EditorWriteResult.RETRY
                 if (outcome == EditorWriteResult.USER_EDIT && generation == writeGeneration && bound && sameTarget()) outcome = EditorWriteResult.RETRY
                 if (outcome == EditorWriteResult.RETRY) {
+                    // Metadata only (lengths, cursors, offset): why dictated words became the user's.
+                    app.crashJournal.keyboardObservation("$phase-retry", presentation(), evidence, evidenceCode)
                     continuation.protectDispatched(); userInteracted = true; keyboardOwnership = null; relativeOwnership = null
                 }
                 if (outcome == EditorWriteResult.FAILED && current()) {
