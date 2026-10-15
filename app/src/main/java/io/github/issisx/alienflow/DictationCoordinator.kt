@@ -334,7 +334,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         if (!endCleanupDone) {
             endCleanupDone = true
             app.crashJournal.mark("dictation.transcript-ready")
-            if (!cleanLive && correctionMode != "A" && original.isNotBlank() && !interrupted) {
+            if (!cleanLive && correctionMode != "A" && (if (switchedTargets) desired else original).isNotBlank() && !interrupted) {
                 polishAfterStop(); return
             }
         }
@@ -350,7 +350,8 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     }
     /** The explicit after-stop preference gets one lossless, cancellable budget. */
     private fun polishAfterStop() {
-        val token = session; val source = original; val mode = correctionMode; val fillers = fillersEnabled
+        val token = session; val targetToken = editorEpoch; val sessionOriginal = original
+        val source = if (switchedTargets) desired else original; val mode = correctionMode; val fillers = fillersEnabled
         val memo = cleanupMemo
         val job = io.launch(start = CoroutineStart.LAZY) {
             val ownJob = currentCoroutineContext().job
@@ -361,10 +362,9 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                     memo.clean(source, mode, fillers) { api.cleanup(key, it, mode, fillers) }
                 }
                 withContext(Dispatchers.Main) {
-                    if (session == token && finishing && !finalizing && original == source && output != null) {
-                        result = output
-                        // A whole-session polish cannot rewrite separate field segments.
-                        if (!switchedTargets) desired = result
+                    if (session == token && editorEpoch == targetToken && finishing && !finalizing && original == sessionOriginal && output != null) {
+                        result = if (switchedTargets) ledger.displayedReplacingSegment(corrections, editorEpoch, output) else output
+                        desired = output
                         if (displayLive && !terminalTarget) pumpWrite()
                     }
                 }

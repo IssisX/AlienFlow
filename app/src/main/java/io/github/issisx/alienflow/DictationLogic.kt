@@ -64,6 +64,14 @@ class TranscriptLedger {
     fun displayed(corrections: Map<String, String>) = ordered().map { corrections[it.id] ?: it.final ?: it.provisional }.filter { it.isNotBlank() }.joinToString(" ")
     fun displayedFor(corrections: Map<String, String>, editorEpoch: Long) = ordered().filter { it.editorEpoch == editorEpoch }
         .map { corrections[it.id] ?: it.final ?: it.provisional }.filter { it.isNotBlank() }.joinToString(" ")
+    fun displayedReplacingSegment(corrections: Map<String, String>, editorEpoch: Long, replacement: String): String {
+        var replaced = false
+        return ordered().map { turn ->
+            if (turn.editorEpoch == editorEpoch) {
+                if (replaced) "" else replacement.also { replaced = true }
+            } else corrections[turn.id] ?: turn.final ?: turn.provisional
+        }.filter { it.isNotBlank() }.joinToString(" ")
+    }
     fun pending() = turns.values.any { it.final == null }
     fun has(id: String) = turns.containsKey(id)
 }

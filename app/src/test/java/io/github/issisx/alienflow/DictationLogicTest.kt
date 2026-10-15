@@ -26,6 +26,7 @@ class DictationLogicTest {
         assertEquals("new speech", ledger.displayedFor(cleanup, 2))
         assertEquals("Old polished.", ledger.displayedFor(cleanup, 0))
         assertEquals("Old polished. new speech", ledger.displayed(cleanup))
+        assertEquals("Old polished. New speech.", ledger.displayedReplacingSegment(cleanup, 2, "New speech."))
     }
     @Test fun editorFocusLossDetachesOnlyFieldNotRecording() {
         assertEquals(InlineEditorContinuity.Action.DETACH,
