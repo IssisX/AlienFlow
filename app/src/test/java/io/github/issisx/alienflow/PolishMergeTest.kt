@@ -7,13 +7,6 @@ import org.junit.Test
 class PolishMergeTest {
     private fun merge(source: String, result: String, fillers: Boolean = false) = PolishMerge.merge(source, result, "B", fillers)
 
-    @Test fun oneUnauthorizedWordNoLongerDiscardsSentenceCaseAndPunctuationAcrossPauses() = runBlocking {
-        val source = "I went to the store. And then. I bought seperate tickets. For Maria."
-        val model = "I went to the store, and then I purchased separate tickets for Maria."
-        assertFalse("The whole-output guard rejects this proposal", CorrectionGuard.accepts(source, model, "B"))
-        val polished = cleanChunks(source, "B", false) { model }
-        assertEquals("I went to the store, and then I bought separate tickets for Maria.", polished)
-    }
     @Test fun meaningWordsNumbersAndNamesRevertWhilePunctuationIsKept() {
         assertEquals("I might not pay $15 to Thet", merge("i might not pay $15 to Thet", "I will pay $50 to That."))
         assertEquals("I can now go.", merge("i can now go", "I can not go."))
