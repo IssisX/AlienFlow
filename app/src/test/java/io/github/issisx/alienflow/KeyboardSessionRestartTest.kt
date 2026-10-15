@@ -38,6 +38,17 @@ class KeyboardSessionRestartTest {
             assertEquals("draft spoken", EditorBridgeNodeRouteTest.field!!.text.toString())
         }
 
+    @Test fun aNewKeyboardSessionThatCannotAnswerYetIsAskedAgainWithinTheBudget() =
+        harness.withField("draft ", keyboard = true) { service ->
+            assertTrue(service.bridge.begin()); harness.activate(service)
+            // Android 14 emulator: right after binding, the first read returned nothing while the
+            // session was still current (AF-E09); a moment later it answers normally.
+            EditorBridgeNodeRouteTest.interceptRead = { null }
+            assertEquals(EditorWriteResult.APPLIED, harness.write(service, "spoken"))
+            assertEquals("draft spoken", EditorBridgeNodeRouteTest.field!!.text.toString())
+            assertEquals("", service.bridge.lastError)
+        }
+
     @Test fun switchingAppsWhileAWriteIsConfirmedStillLetsNewSpeechFollowTheNewField() =
         harness.withField("", keyboard = true) { service ->
             val app = service.application as AlienApp

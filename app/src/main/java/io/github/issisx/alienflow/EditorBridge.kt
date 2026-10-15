@@ -258,7 +258,13 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                     return evidence?.let { KeyboardWindow.read(it, readComposing) }
                         .also { evidenceCode = if (it != null) "none" else if (evidence == null) "04" else "11" }
                 }
-                val initialRead = withTimeoutOrNull(3_000L) { readRaw() }
+                // A just-started keyboard session can answer nothing at first (Android 14: null 0.9 s
+                // after binding). Ask again within the same budget; silence for all of it still fails.
+                val initialRead = withTimeoutOrNull(3_000L) {
+                    var read = readRaw()
+                    while (read == null && current()) { delay(100); read = readRaw() }
+                    read
+                }
                 // A superseded keyboard session answers nothing; that is not evidence about the
                 // current one. Currency decides first, as for every later read.
                 if (!current()) return@launch
