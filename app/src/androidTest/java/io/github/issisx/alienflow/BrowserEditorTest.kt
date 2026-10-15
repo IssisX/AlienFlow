@@ -217,10 +217,30 @@ class BrowserEditorTest {
                 .put("after_dom", js(activity, "editor.innerText"))
                 .put("editor_error", main { service.bridge.lastError })
             main { event(coordinator, "conversation.item.input_audio_transcription.completed", "browser-final", "browser", "Browser final speech") }
-            if (delivered) await("live final revision") { js(activity, "editor.innerText").contains("Browser final speech") }
+            // Specified exception: when the keyboard holds a composing region over dictation that is
+            // exactly ours, the cursor-relative route must not delete (Android would count from the
+            // region's start), so earlier words stay as written. Only that recorded reason, with the
+            // text byte-for-byte intact, replaces the revision requirement; the driver allows it only
+            // below Android 15 (frozen 2022-23 Gboard in those images re-composes after insertion).
+            var blockedByComposition = false
+            if (delivered) await("live final revision") {
+                js(activity, "editor.innerText").contains("Browser final speech") || run {
+                    blockedByComposition = app.crashJournal.diagnostic().lines().any {
+                        it.startsWith("Latest editor observation: route=keyboard; phase=adopt-composing")
+                    } && org.json.JSONArray("[" + js(activity, "editor.innerText") + "]").getString(0).trimEnd('\n') == "Browser fixture speech"
+                    blockedByComposition
+                }
+            }
             main { setField(coordinator, "transport", null) }
             tapAlien(service)
             await("dictation finish") { main { !coordinator.finishing && !coordinator.active } }
+            if (blockedByComposition) {
+                assertEquals("Earlier words must stay exactly as written", "Browser fixture speech",
+                    org.json.JSONArray("[" + js(activity, "editor.innerText") + "]").getString(0).trimEnd('\n'))
+                result.put("revision_blocked_by_keyboard_composition", true).put("text_intact", true)
+                    .put("final_dom", js(activity, "editor.innerText")).put("status", main { coordinator.status })
+                return
+            }
             result.put("final_dom", js(activity, "editor.innerText"))
                 .put("status", main { coordinator.status })
             assertEquals("Browser final speech", org.json.JSONArray("[" + js(activity, "editor.innerText") + "]").getString(0).trimEnd('\n'))

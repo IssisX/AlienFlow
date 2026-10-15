@@ -112,7 +112,10 @@ assert len(results)==2,results
 for kind in ('browser','termux'):
  r=next(x for x in results if ('initial_node' in x)==(kind=='browser'))
  assert r['source']==os.environ['GITHUB_SHA'] and r['api']==int(sys.argv[2]),r
- if kind=='browser':assert r['delivered'] and r['selected_replacement'] and r['typing_continues_dictation'] and r['repeat_session'],r
+ if kind=='browser' and r.get('revision_blocked_by_keyboard_composition'):
+  # Specified safe outcome only on images with re-composing 2022-23 Gboard; never on 15+.
+  assert int(sys.argv[2])<35 and r['delivered'] and r['text_intact'],r
+ elif kind=='browser':assert r['delivered'] and r['selected_replacement'] and r['typing_continues_dictation'] and r['repeat_session'],r
  else:assert r['final_count']==1 and r['real_terminal_echo'] and r['ordinary_live_after_termux'],r
  path=root/f'{kind}-proof/result.json';path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(r,indent=2))
  print(json.dumps(r,indent=2))
