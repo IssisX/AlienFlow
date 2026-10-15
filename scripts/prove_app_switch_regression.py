@@ -23,10 +23,14 @@ if not xml.exists():
 shutil.copy2(xml, REPORT / xml.name)
 suite = ET.parse(xml).getroot()
 failed = {case.attrib['name'] for case in suite.findall('testcase') if case.find('failure') is not None}
+failure_types = {case.attrib['name']: case.find('failure').attrib.get('type', '')
+                 for case in suite.findall('testcase') if case.find('failure') is not None}
 record = {'baseline_sha': BASE, 'candidate_sha': os.environ['GITHUB_SHA'], 'exit_code': rc,
           'tests': int(suite.attrib['tests']), 'expected_failures': sorted(EXPECTED),
           'actual_failures': sorted(failed), 'errors': int(suite.attrib['errors']),
+          'failure_types': failure_types,
           'scope': 'Production coordinator/bridge and Android default window; broker and transcript fixtures'}
 (REPORT / 'reproduction.json').write_text(json.dumps(record, indent=2) + '\n')
 assert rc != 0 and failed == EXPECTED and record['errors'] == 0 and record['tests'] == 2 and int(suite.attrib.get('skipped', 0)) == 0, record
+assert set(failure_types.values()) <= {'java.lang.AssertionError', 'org.junit.ComparisonFailure'}, record
 print(json.dumps(record, indent=2))

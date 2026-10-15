@@ -229,6 +229,7 @@ class EditorBridgeNodeRouteTest {
         repeat(3) { index ->
             focused = null; inputMethod!!.onFinishInput(); coordinator.targetEvent()
             val next = EditText(firstField.context).apply { setText("draft "); setSelection(length()) }
+            (firstField.context as Activity).setContentView(next); next.requestFocus()
             field = next; focused = next.createAccessibilityNodeInfo()
             info = EditorInfo().apply { packageName = focused!!.packageName.toString(); fieldId = 43 + index; inputType = next.inputType; initialSelStart = 6; initialSelEnd = 6 }
             nativeKeyboard = next.onCreateInputConnection(EditorInfo())!!
