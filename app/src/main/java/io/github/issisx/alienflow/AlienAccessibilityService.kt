@@ -28,6 +28,10 @@ class AlienAccessibilityService : AccessibilityService() {
     private var hidden = false
     val backgroundEnabled: Boolean get() = !hidden
     private var imeBottom = 0
+    /** The keyboard's own window from the accessibility window list. An overlay stacked above the
+     * keyboard is not given IME insets (an Android 15 tablet emulator reported none while the alien
+     * sat on the keys), and an overlap would take taps meant for keys such as the microphone. */
+    private var keyboardRect: Rect? = null
     private var safeTop = 0
     private var safeBottom = 0
     var composing = false; private set
@@ -139,7 +143,7 @@ class AlienAccessibilityService : AccessibilityService() {
         label.text = feedback
         val system = wm.currentWindowMetrics.windowInsets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
         val noticeWidth = dp(280).coerceAtMost((bounds().width() - system.left - system.right).coerceAtLeast(1))
-        val noticeBottom = max(safeTop + 1, bounds().height() - imeBottom - safeBottom)
+        val noticeBottom = max(safeTop + 1, minOf(bounds().height() - imeBottom - safeBottom, keyboardRect?.top ?: Int.MAX_VALUE))
         label.maxHeight = noticeBottom - safeTop
         label.measure(View.MeasureSpec.makeMeasureSpec(noticeWidth, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(label.maxHeight, View.MeasureSpec.AT_MOST))
@@ -179,6 +183,7 @@ class AlienAccessibilityService : AccessibilityService() {
         val insets = view.rootWindowInsets ?: wm.currentWindowMetrics.windowInsets
         imeBottom = insets.getInsets(WindowInsets.Type.ime()).bottom
         val system = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()); safeTop = system.top; safeBottom = system.bottom
+        readKeyboardWindow()
         clamp()
         val active = app.coordinator.active || app.coordinator.finishing
         val available = bridge.focused() != null
@@ -213,7 +218,18 @@ class AlienAccessibilityService : AccessibilityService() {
         val p = params ?: return; val view = bubble ?: return
         p.x = p.x.coerceIn(0, (bounds().width() - p.width).coerceAtLeast(0))
         p.y = p.y.coerceIn(safeTop, (safeTop + usableHeight() - p.height).coerceAtLeast(safeTop))
+        keyboardRect?.let { keyboard ->
+            if (Rect.intersects(keyboard, Rect(p.x, p.y, p.x + p.width, p.y + p.height)))
+                p.y = (keyboard.top - p.height).coerceAtLeast(safeTop)
+        }
         if (view.isAttachedToWindow) wm.updateViewLayout(view, p)
+    }
+    private fun readKeyboardWindow() {
+        keyboardRect = try {
+            windows.filter { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+                .map { Rect().also(it::getBoundsInScreen) }.filter { !it.isEmpty }
+                .reduceOrNull { all, next -> Rect(all).apply { union(next) } }
+        } catch (_: RuntimeException) { null }
     }
     private fun remember() { val p = params ?: return; app.store.prefs.edit().putFloat("x_$layoutKey", p.x.toFloat() / max(1, bounds().width() - p.width)).putFloat("y_$layoutKey", (p.y - safeTop).toFloat() / max(1, usableHeight() - p.height)).apply() }
     private fun openMenu() {
