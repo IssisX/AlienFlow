@@ -31,6 +31,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
     private var userInteracted = false
     private var bound = false
     val hasUserInteraction: Boolean get() = userInteracted
+    val bindingInputEpoch: Long get() = inputEpoch
     var lastError = ""; private set
     private val app get() = service.application as AlienApp
 

@@ -227,10 +227,15 @@ class EditorBridgeNodeRouteTest {
         val firstField = field!!
         assertEquals("first app", firstField.text.toString())
         repeat(3) { index ->
-            focused = null; inputMethod!!.onFinishInput(); coordinator.targetEvent()
             val next = EditText(firstField.context).apply { setText("draft "); setSelection(length()) }
             (firstField.context as Activity).setContentView(next); next.requestFocus()
             field = next; focused = next.createAccessibilityNodeInfo()
+            // Accessibility has published the new field, but the old connection
+            // and editor attributes are still active. Wait for the actual start.
+            coordinator.targetEvent()
+            assertFalse("The old input session must not bind to the new field", service.bridge.sameTarget())
+            assertEquals("draft ", next.text.toString())
+            inputMethod!!.onFinishInput(); coordinator.targetEvent()
             info = EditorInfo().apply { packageName = focused!!.packageName.toString(); fieldId = 43 + index; inputType = next.inputType; initialSelStart = 6; initialSelEnd = 6 }
             nativeKeyboard = next.onCreateInputConnection(EditorInfo())!!
             inputMethod!!.onStartInput(info!!, false); coordinator.targetEvent()

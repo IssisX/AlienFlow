@@ -67,6 +67,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     private var terminalTarget = false
     private var editorEpoch = 0L
     private var waitingForTarget = false
+    private var waitingAfterInputEpoch = -1L
     private var switchedTargets = false
     private fun update(value: String? = null) {
         val changed = value != null && value != status
@@ -95,7 +96,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         terminalTarget = bridge.isTerminal
         displayLive = store.prefs.getBoolean("live_display", true) && !terminalTarget; cleanLive = store.prefs.getBoolean("live_cleanup", true); correctionMode = store.mode(); fillersEnabled = store.prefs.getBoolean("fillers", false); continueLocal = store.prefs.getBoolean("continue_local", true)
         session++; ledger = TranscriptLedger(); cleanupMemo = CleanupMemo(); endCleanupDone = false; original = ""; result = ""; desired = ""; lastWritten = ""
-        editorEpoch = 0; waitingForTarget = false; switchedTargets = false
+        editorEpoch = 0; waitingForTarget = false; waitingAfterInputEpoch = -1; switchedTargets = false
         saved = false; liveFailed = false; userEdited = false; terminalReason = null; microphoneConfirmed = false; serverConnected = false; interrupted = false; finalizing = false; audioClosing = false; corrections.clear(); cleaned.clear(); writing = false; writeRetryScheduled = false; commits = 0; completeItems.clear(); committedItems.clear(); seenErrors.clear(); editor = bridge; captureTarget = bridge
         active = true; finishing = false; update("Starting microphone and realtime connection…")
         app.crashJournal.mark("service.start-requested")
@@ -138,6 +139,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     private fun followFocusedTarget() {
         val previous = editor ?: captureTarget
         if (previous != null && !previous.sameTarget()) {
+            waitingAfterInputEpoch = previous.bindingInputEpoch
             previous.invalidate()
             editor = null; captureTarget = null
             writing = false; writeRetryScheduled = false
@@ -149,6 +151,11 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         }
         if (!waitingForTarget || !active || finishing) return
         val bridge = service?.bridge ?: return
+        val currentService = service ?: return
+        // A new accessibility focus can precede onStartInput. The old connection
+        // must never be bound to a second field in the same package.
+        if (currentService.inputMethod?.currentInputConnection != null &&
+            (currentService.inputMethod?.currentInputStarted != true || currentService.inputEpoch <= waitingAfterInputEpoch)) return
         if (bridge.focused() == null || !bridge.begin()) return
         editorEpoch++; transport?.switchEditor(editorEpoch)
         editor = bridge; captureTarget = bridge; waitingForTarget = false
