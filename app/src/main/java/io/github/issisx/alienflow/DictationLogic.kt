@@ -40,6 +40,11 @@ class TranscriptLedger {
     private val polished = mutableMapOf<Long, Polished>()
     fun stableFor(epoch: Long): String = completedPrefix(epoch).mapNotNull { it.final }.filter { it.isNotBlank() }.joinToString(" ")
     private fun completedPrefix(epoch: Long) = ordered().filter { it.editorEpoch == epoch }.takeWhile { it.final != null }
+    fun fullyPolished(epoch: Long): Boolean {
+        val edit = polished[epoch] ?: return false
+        val prefix = completedPrefix(epoch)
+        return prefix.map { it.id } == edit.ids && prefix.map { it.final } == edit.sources
+    }
     fun polish(epoch: Long, source: String, output: String): Boolean {
         if (stableFor(epoch) != source) return false
         val prefix = completedPrefix(epoch)

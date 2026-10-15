@@ -345,7 +345,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         if (!endCleanupDone) {
             endCleanupDone = true
             app.crashJournal.mark("dictation.transcript-ready")
-            if (!cleanLive && correctionMode != "A" && (if (switchedTargets) desired else original).isNotBlank() && !interrupted) {
+            if ((!cleanLive || !ledger.fullyPolished(editorEpoch)) && correctionMode != "A" && (if (switchedTargets) desired else original).isNotBlank() && !interrupted) {
                 polishAfterStop(); return
             }
         }
@@ -359,10 +359,10 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         }
         finish(transport?.hasPendingCoverage == true)
     }
-    /** The explicit after-stop preference gets one lossless, cancellable budget. */
+    /** One bounded final pass covers the last phrase even when live cleanup was enabled. */
     private fun polishAfterStop() {
         val token = session; val targetToken = editorEpoch; val sessionOriginal = original
-        val source = if (switchedTargets) desired else original; val mode = correctionMode; val fillers = fillersEnabled
+        val source = if (switchedTargets) ledger.stableFor(editorEpoch) else original; val mode = correctionMode; val fillers = fillersEnabled
         val context = if (editor?.hasUserInteraction == true) WritingContext() else editor?.writingContext ?: WritingContext()
         val memo = cleanupMemo
         val job = io.launch(start = CoroutineStart.LAZY) {

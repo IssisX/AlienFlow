@@ -52,10 +52,13 @@ class StopDeliveryTest {
         assertFalse("Stop stayed blocked: ${coordinator.status}", coordinator.finishing)
         assertEquals("phrase 0 phrase 1 phrase 2", coordinator.result)
     }
-    @Test fun stopCancelsTheActualLiveCleanupAndDoesNotDrainQueuedPhraseRequests() = exercise(true) { coordinator, server, canceled ->
+    @Test fun stopCancelsLiveCleanupThenPolishesTheCompleteFinalTranscriptOnce() = exercise(true) { coordinator, server, canceled ->
         assertNotNull(server.takeRequest(5, TimeUnit.SECONDS))
-        coordinator.stop(); awaitComplete(coordinator, 1_000)
-        assertTrue(canceled.get()); assertEquals(1, server.requestCount)
+        server.enqueue(MockResponse().setBody("""{"status":"completed","output":[{"content":[{"type":"output_text","text":"phrase 0 phrase 1 phrase 2"}]}]}"""))
+        coordinator.stop(); awaitComplete(coordinator, 3_500)
+        assertTrue(canceled.get()); assertEquals(2, server.requestCount)
+        val finalRequest = server.takeRequest(1, TimeUnit.SECONDS)!!
+        assertEquals("phrase 0 phrase 1 phrase 2", JSONObject(finalRequest.body.readUtf8()).getString("input"))
     }
     @Test fun afterStopPolishUsesOneWholeTranscriptRequestAndCancelsAtItsBudget() = exercise(false) { coordinator, server, canceled ->
         assertEquals(0, server.requestCount)
