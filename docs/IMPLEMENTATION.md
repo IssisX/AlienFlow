@@ -62,10 +62,38 @@ It can compare recognition delay, commit silence and a transcription prompt with
 - **UNVERIFIED:** pre-commit deltas use the `item_id` that `input_audio_buffer.committed` later reports. This was also the assumption of every build before 0.1.24. If a real session ever shows provisional words that are never finalized (the Stop timeout reports "Final transcription timed out"), this assumption is false.
 - Each 850 ms pause still finalizes a separate transcript. Polish now repairs casing and breaks across turns, but whether a longer commit silence or a different delay improves recognition is unmeasured. Use the evaluation variants before changing defaults.
 - Live cleanup resends the whole completed field text after each turn, within a 4 s budget, plus one 2.5 s pass after Stop. Long dictations may exceed these budgets and keep recognized text unpolished; the evaluation reports cleanup time.
-- **Android 13 emulator, built-in browser engine 109:** the first live words reached a rich browser editor, but the live revision never applied. No editor error was recorded, and the evidence logcat starts after that test. The cause is unknown. The Termux and native-field tests on the same emulator passed. Real Android 13 devices normally receive browser-engine updates through Play; this is **UNVERIFIED** for every device.
+- **Revisions in browser text boxes can stop while the keyboard has a word marked as composing.** Gboard on the Android 13/14 images (2022–23 builds) marks the word before the cursor as composing after every outside insertion. In browser editors that report an unknown offset, AlienFlow can only revise by deleting before the cursor, and Android then counts the deletion from the start of the composing region (a unit test reproduced "Browspeech"). So AlienFlow keeps the earlier words exactly as written and continues with new speech. Fields with known offsets revise normally under such a mark. The Android 15 and 16 images do not show the re-marking. Whether current Gboard on real phones does is **UNVERIFIED**.
 - The owner's Gboard microphone report has a supported mechanism (the keyboard overlap above), but it isn't confirmed on the phone. If it recurs, check whether the alien sits on or next to the keyboard, and whether turning AlienFlow off under Accessibility brings the microphone back.
 - No physical microphone, paid provider request, Fold6 update, Note10+ install, or real-app switching was tested in this work.
 
 ## Verification
 
-Recorded after CI completes, below.
+Compiled source `2b1cd79f9ca98d19dc5cfe280c5d803a6c6098e3`. [Actions run 38798611692](https://github.com/IssisX/AlienFlow/actions/runs/38798611692) passed every job:
+
+- **Release job:**
+  - Shipped-source replays reproduce exactly their expected failures:
+    - 0.1.17 Termux;
+    - 0.1.23 app switch and stale cursor;
+    - 0.1.24 writing;
+    - 0.1.25 live ownership and light polish.
+  - 256 unit tests, with no failures, errors or skips.
+  - Release lint: 0 errors, 48 warnings.
+  - Release, debug and instrumentation assembly.
+  - Android 16 emulator (Pixel 6): real Chromium editor, the official installed Termux 0.118.3, and active app switching.
+  - Packaging checks, giving an unsigned bundle.
+- **Device matrix, real-editor emulator tests:**
+  - Android 11, medium phone: empty-field live dictation; existing text refused (AF-E17).
+  - Android 12, Pixel 6 profile: the same.
+  - Android 13, small phone: browser, Termux and app switching. The browser revision was kept as written under a keyboard composing mark (the specified, text-intact outcome).
+  - Android 14, 7.6-inch foldable: the same as Android 13.
+  - Android 15, Pixel tablet: browser revision applied, plus Termux and app switching.
+- **Tap checks:** every emulator tap requires the alien to be topmost and clear of any visible keyboard window.
+
+**Delivered file:** the unsigned APK from the release bundle (artifact 12002944410, digest `sha256:83fc539141ee1c418d00970ec37d8a0ca35bc419e61ed32f2d9736d0a683dfc7`).
+- APK SHA-256 `8868f33349be5adde812d5d12438b7400a471ca57131dfc4aff884dc0ffcaa95`.
+- Package `io.github.issisx.alienflow`, version 0.1.26-claude.1 (27), minSdk 30, targetSdk 36.
+
+**Not done here:**
+- No signed APK: the private signing key is not available to this environment.
+- No physical device, real microphone or paid provider request was used.
+- Speech events in every test are fixtures.
