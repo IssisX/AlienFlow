@@ -188,7 +188,8 @@ suspend fun cleanChunks(source: String, mode: String, fillers: Boolean, request:
         val edited = if (chunk.isBlank() || chunk.length > 3500) chunk else request(chunk)
         currentCoroutineContext().ensureActive()
         val trailing = chunk.takeLastWhile { it.isWhitespace() }
-        output.append(if (CorrectionGuard.accepts(chunk, edited, mode, fillers)) edited.trimEnd() + trailing else chunk)
+        val merged = PolishMerge.merge(chunk, edited, mode, fillers)
+        output.append(if (merged == chunk) chunk else merged.trimEnd() + trailing)
     }
     return output.toString()
 }

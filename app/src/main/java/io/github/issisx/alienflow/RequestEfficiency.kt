@@ -45,19 +45,21 @@ internal class CleanupMemo(private val maxEntries: Int = 32, private val maxChar
             consumed += chunk.length
             val local = WritingContext(before, source.drop(consumed).take(256).ifEmpty { context.after }).bounded()
             val result = find(chunk, mode, fillers, local) ?: request(chunk, local).also { remember(chunk, it, mode, fillers, local) }
-            val accepted = if (CorrectionGuard.accepts(chunk, result, mode, fillers))
-                result.trimEnd() + chunk.takeLastWhile { it.isWhitespace() } else chunk
+            val merged = PolishMerge.merge(chunk, result, mode, fillers)
+            val accepted = if (merged == chunk) chunk else merged.trimEnd() + chunk.takeLastWhile { it.isWhitespace() }
             before = (before + accepted).takeLast(512)
             result
         }
     }
     fun find(source: String, mode: String, fillers: Boolean, context: WritingContext = WritingContext()): String? = entries[Key(source, mode, fillers, context.bounded())]
     fun remember(source: String, result: String, mode: String, fillers: Boolean, context: WritingContext = WritingContext()) {
-        if (!CorrectionGuard.accepts(source, result, mode, fillers)) return
-        val size = source.length + result.length
+        // Only the usable part of an answer is reused; an answer with nothing usable is requested again.
+        val usable = PolishMerge.merge(source, result, mode, fillers)
+        if (usable == source) return
+        val size = source.length + usable.length
         if (size > maxCharacters) return
         val key = Key(source, mode, fillers, context.bounded())
-        entries.put(key, result)?.let { characters -= source.length + it.length }
+        entries.put(key, usable)?.let { characters -= source.length + it.length }
         characters += size
         while (entries.size > maxEntries || characters > maxCharacters) {
             val first = entries.entries.iterator().next()
