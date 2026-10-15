@@ -119,7 +119,8 @@ class AlienAccessibilityService : AccessibilityService() {
                 val system = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()); safeTop = system.top; safeBottom = system.bottom
                 clamp(); insets
             }
-            wm.addView(view, p)
+            wm.addView(view, p); appliedY = p.y
+            view.viewTreeObserver.addOnGlobalLayoutListener { measureScreenOffset(view) }
         }
         restorePosition()
     }
@@ -219,26 +220,33 @@ class AlienAccessibilityService : AccessibilityService() {
         p.x = p.x.coerceIn(0, (bounds().width() - p.width).coerceAtLeast(0))
         p.y = p.y.coerceIn(safeTop, (safeTop + usableHeight() - p.height).coerceAtLeast(safeTop))
         keyboardRect?.let { keyboard ->
-            if (Rect.intersects(keyboard, Rect(p.x, p.y, p.x + p.width, p.y + p.height)))
-                p.y = (keyboard.top - p.height).coerceAtLeast(safeTop)
+            // Overlay coordinates can start below the status bar (Android 11: 63 px); compare in
+            // screen coordinates using the offset measured at the alien's last layout.
+            if (Rect.intersects(keyboard, Rect(p.x, p.y + screenOffsetY, p.x + p.width, p.y + screenOffsetY + p.height)))
+                p.y = (keyboard.top - p.height - screenOffsetY).coerceAtLeast(safeTop)
         }
-        if (view.isAttachedToWindow) wm.updateViewLayout(view, p)
+        if (view.isAttachedToWindow) { wm.updateViewLayout(view, p); appliedY = p.y }
     }
-    /** Keys, not the keyboard's window frame: Gboard's window can span the whole screen with only
-     * its keys touchable (Android 12 emulator: touchable 1470..2211 of 2400). Android 13+ reports the
-     * touchable region; before that, a frame taller than most of the screen is not a key area. */
+    private var appliedY: Int? = null
+    /** Screen y minus layout y, measured after the window has been laid out with [appliedY]. */
+    private var screenOffsetY = 0
+    private fun measureScreenOffset(view: View) {
+        val applied = appliedY ?: return
+        val xy = IntArray(2); view.getLocationOnScreen(xy)
+        screenOffsetY = xy[1] - applied
+    }
+    /** The keyboard's window bounds. Its touchable region is not used: on Android 16 it omits the
+     * top toolbar strip, where Gboard's microphone is. A window taller than three fifths of the
+     * display is a frame around an unknown key area, never moved for. */
     private fun readKeyboardWindow() {
         keyboardRect = try {
             val display = bounds()
             windows.filter { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD }
-                .map { window -> if (Build.VERSION.SDK_INT >= 33) keyRegion(window) else Rect().also(window::getBoundsInScreen) }
+                .map { Rect().also(it::getBoundsInScreen) }
                 .filter { !it.isEmpty && it.height() < display.height() * 3 / 5 }
                 .reduceOrNull { all, next -> Rect(all).apply { union(next) } }
         } catch (_: RuntimeException) { null }
     }
-    @TargetApi(33)
-    private fun keyRegion(window: android.view.accessibility.AccessibilityWindowInfo): Rect =
-        Region().also(window::getRegionInScreen).bounds
     private fun remember() { val p = params ?: return; app.store.prefs.edit().putFloat("x_$layoutKey", p.x.toFloat() / max(1, bounds().width() - p.width)).putFloat("y_$layoutKey", (p.y - safeTop).toFloat() / max(1, usableHeight() - p.height)).apply() }
     private fun openMenu() {
         if (menu != null) return
