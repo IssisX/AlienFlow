@@ -144,7 +144,7 @@ class EditorBridgeNodeRouteTest {
         inputStartedOverride = null
         committedTexts.clear()
     }
-    private fun withField(text: String = "", hint: String = "", keyboard: Boolean = false, block: (AlienAccessibilityService) -> Unit) {
+    internal fun withField(text: String = "", hint: String = "", keyboard: Boolean = false, block: (AlienAccessibilityService) -> Unit) {
         Robolectric.buildActivity(Activity::class.java).setup().use { activity ->
             field = EditText(activity.get()).apply { this.hint = hint; setText(text); setSelection(text.length) }
             activity.get().setContentView(field); field!!.requestFocus()
@@ -197,7 +197,7 @@ class EditorBridgeNodeRouteTest {
             val initial = field!!.text.toString(); val cursor = field!!.selectionStart
             inputMethod!!.onUpdateSelection(-1, -1, cursor - 1, cursor, -1, -1)
             assertEquals(EditorWriteResult.APPLIED, write(service, "spoken"))
-            assertEquals(initial + "spoken", field!!.text.toString()); assertEquals(listOf("spoken"), committedTexts); assertTrue(selections.isEmpty())
+            assertEquals(initial + " spoken", field!!.text.toString()); assertEquals(listOf(" spoken"), committedTexts); assertTrue(selections.isEmpty())
         }
     @Test fun defaultWindowConfirmsActualTextWhenAbsoluteCallbackStaysAtZero() = withField(keyboard = true) { service ->
         useAndroidDefaultSurroundingText(); suppressSelectionUpdates = true
@@ -253,11 +253,11 @@ class EditorBridgeNodeRouteTest {
         }
         coordinator.cancel()
     }
-    private fun activate(service: AlienAccessibilityService) {
+    internal fun activate(service: AlienAccessibilityService) {
         val app = service.application as AlienApp
         app.coordinator.javaClass.getDeclaredField("active").apply { isAccessible = true }.setBoolean(app.coordinator, true)
     }
-    private fun write(service: AlienAccessibilityService, value: String): EditorWriteResult? {
+    internal fun write(service: AlienAccessibilityService, value: String): EditorWriteResult? {
         var result: EditorWriteResult? = null
         service.bridge.write(value) { result = it }
         val until = System.currentTimeMillis() + 10_000
@@ -276,8 +276,8 @@ class EditorBridgeNodeRouteTest {
             assertTrue(service.bridge.begin()); activate(service)
             assertEquals(EditorWriteResult.APPLIED, write(service, "hello"))
             assertEquals(EditorWriteResult.APPLIED, write(service, "Hello."))
-            assertEquals(original.take(25) + "Hello.XY", field!!.text.toString())
-            assertEquals(31, field!!.selectionStart)
+            assertEquals(original.take(25) + " Hello.XY", field!!.text.toString())
+            assertEquals(32, field!!.selectionStart)
             var canceled: Boolean? = null
             service.bridge.cancel { canceled = it }
             val until = System.currentTimeMillis() + 5_000
@@ -302,8 +302,8 @@ class EditorBridgeNodeRouteTest {
             unexposedSuffix = "XY"; conflictingPresentation = true; field!!.setSelection(25)
             assertTrue(service.bridge.begin()); activate(service)
             assertEquals(EditorWriteResult.APPLIED, write(service, "hello"))
-            assertEquals("abcdefghijklmnopqrstuvwxyhelloXY", field!!.text.toString())
-            assertEquals(listOf("hello"), committedTexts); assertEquals(0, mutations)
+            assertEquals("abcdefghijklmnopqrstuvwxy hello XY", field!!.text.toString())
+            assertEquals(listOf(" hello "), committedTexts); assertEquals(0, mutations)
         }
     @Test fun typingBetweenSpeechUpdatesWithAnUnexposedSuffixRemainsUserOwned() =
         withField("draft XY", keyboard = true) { service ->
@@ -313,11 +313,11 @@ class EditorBridgeNodeRouteTest {
             val cursor = field!!.selectionStart
             field!!.text.insert(cursor, " typed"); field!!.setSelection(cursor + 6)
             assertEquals(EditorWriteResult.APPLIED, write(service, "hello there"))
-            assertEquals("draft hello typed thereXY", field!!.text.toString())
+            assertEquals("draft hello  typed there XY", field!!.text.toString())
             assertTrue(service.bridge.hasUserInteraction); assertTrue(service.bridge.sameTarget())
             var canceled: Boolean? = null; service.bridge.cancel { canceled = it }
             assertEquals(false, canceled)
-            assertEquals("draft hello typed thereXY", field!!.text.toString()); assertEquals(0, mutations)
+            assertEquals("draft hello  typed there XY", field!!.text.toString()); assertEquals(0, mutations)
         }
     @Test fun boundedKeyboardWindowInALongExistingDraftInsertsAndRevisesOnlyTheOwnedRange() =
         withField("older line 🛸\n".repeat(100) + "left  right", keyboard = true) { service ->

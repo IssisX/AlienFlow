@@ -21,7 +21,7 @@ class RealtimeCapturePolicyTest {
         assertTrue(input.isNull("turn_detection"))
         val transcription = input.getJSONObject("transcription")
         assertEquals("gpt-live-transcribe", transcription.getString("model"))
-        assertEquals("minimal", transcription.getString("delay"))
+        assertEquals("medium", transcription.getString("delay"))
         assertEquals("en", transcription.getJSONArray("languages").getString(0))
         assertFalse(transcription.has("prompt"))
         assertEquals("ScraperX AC-42", transcription.getJSONArray("keywords").getString(0))

@@ -32,6 +32,7 @@ internal class KeyboardEditorOwnership(initial: KeyboardWindow, generation: Long
     private val owner = EditorOwnership(initialSnapshot, replaceSelection)
     var first = true; private set
     val owned: String get() = owner.owned
+    val writingContext get() = owner.writingContext
     fun originalSelection() = owner.originalSelection()
     fun separateFromTypedWord(value: String) = owner.separateFromTypedWord(value)
     fun replacement(value: String): EditorReplacement {

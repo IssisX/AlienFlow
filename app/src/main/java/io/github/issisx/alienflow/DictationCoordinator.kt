@@ -37,7 +37,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     private var cleanupMemo = CleanupMemo()
     private var endCleanupDone = false
     private val corrections = mutableMapOf<String, String>()
-    private val cleaned = mutableSetOf<String>()
+    private val cleaned = mutableMapOf<Long, Pair<String, WritingContext>>()
     private var interrupted = false
     private var finalizing = false
     private var audioClosing = false
@@ -276,16 +276,19 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                     }
                 }
                 EditorWriteResult.FAILED -> { liveFailed = true; update(editor?.lastError ?: "[AF-E14] Insertion unconfirmed; see Diagnostics"); editor = null }
-                EditorWriteResult.APPLIED -> { lastWritten = proposed; pumpWrite() }
+                EditorWriteResult.APPLIED -> { lastWritten = proposed; pumpWrite(); scheduleCleanup() }
             }
             if (finishing && outcome != EditorWriteResult.RETRY) tryFinish()
         }
     }
     private fun scheduleCleanup() {
         if (!active || finalizing || correctionMode == "A" || !cleanLive || interrupted) return
-        if (cleanup?.isActive == true) return
-        val next = ledger.finals().firstOrNull { it.first !in cleaned } ?: return
-        val (item, source) = next; cleaned.add(item)
+        if (cleanup?.isActive == true || writing) return
+        val targetToken = editorEpoch
+        val source = ledger.stableFor(targetToken)
+        val context = if (editor?.hasUserInteraction == true) WritingContext() else editor?.writingContext ?: WritingContext()
+        if (source.isBlank() || cleaned[targetToken] == (source to context)) return
+        cleaned[targetToken] = source to context
         val token = session; val mode = correctionMode; val fillers = fillersEnabled
         val memo = cleanupMemo
         val job = io.launch(start = CoroutineStart.LAZY) {
@@ -293,13 +296,14 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
             try {
                 val key = keyProvider() ?: return@launch
                 val output = withTimeoutOrNull(4_000L) {
-                    memo.clean(source, mode, fillers) { chunk -> api.cleanup(key, chunk, mode, fillers) }
+                    memo.cleanWithContext(source, mode, fillers, context) { chunk, local -> api.cleanup(key, chunk, mode, fillers, local) }
                 } ?: return@launch
                 withContext(Dispatchers.Main) {
                     // A later turn may arrive; the exact completed item, session and ownership
                     // still must match. A completion never doubles an earlier provisional span.
-                    if (session == token && active && !finalizing && ledger.finals().any { it.first == item && it.second == source }) {
-                        corrections[item] = output; result = ledger.displayed(corrections); desired = ledger.displayedFor(corrections, editorEpoch)
+                    if (session == token && editorEpoch == targetToken && active && !finalizing &&
+                        context == (if (editor?.hasUserInteraction == true) WritingContext() else editor?.writingContext ?: WritingContext()) &&
+                        ledger.polish(targetToken, source, output)) { result = ledger.displayed(corrections); desired = ledger.displayedFor(corrections, editorEpoch)
                         if (displayLive || (finishing && !terminalTarget)) pumpWrite()
                         update()
                     }
@@ -359,6 +363,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     private fun polishAfterStop() {
         val token = session; val targetToken = editorEpoch; val sessionOriginal = original
         val source = if (switchedTargets) desired else original; val mode = correctionMode; val fillers = fillersEnabled
+        val context = if (editor?.hasUserInteraction == true) WritingContext() else editor?.writingContext ?: WritingContext()
         val memo = cleanupMemo
         val job = io.launch(start = CoroutineStart.LAZY) {
             val ownJob = currentCoroutineContext().job
@@ -366,7 +371,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                 app.crashJournal.mark("cleanup.after-stop")
                 val key = keyProvider() ?: return@launch
                 val output = withTimeoutOrNull(2_500L) {
-                    memo.clean(source, mode, fillers) { api.cleanup(key, it, mode, fillers) }
+                    memo.cleanWithContext(source, mode, fillers, context) { chunk, local -> api.cleanup(key, chunk, mode, fillers, local) }
                 }
                 withContext(Dispatchers.Main) {
                     if (session == token && editorEpoch == targetToken && finishing && !finalizing && original == sessionOriginal && output != null) {

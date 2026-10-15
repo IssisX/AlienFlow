@@ -90,7 +90,8 @@ class RequestEfficiencyTest {
             assertEquals("Bearer fixture-not-a-key", sent.getHeader("Authorization"))
             assertEquals(source, body.getString("input")); assertFalse(body.has("previous_response_id"))
             assertEquals("none", body.getJSONObject("reasoning").getString("effort"))
-            assertTrue(body.getString("instructions").length < 230)
+            assertTrue(body.getString("instructions").contains("sentence case"))
+            assertTrue(body.getString("instructions").contains("without copying context"))
         } finally {
             http.dispatcher.cancelAll(); http.connectionPool.evictAll(); http.dispatcher.executorService.shutdownNow(); server.shutdown()
         }

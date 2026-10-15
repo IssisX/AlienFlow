@@ -11,6 +11,7 @@ internal class RelativeKeyboardOwnership(initial: EditorEvidence.KeyboardText,
     private val owner = EditorOwnership(initialSnapshot, replaceSelection)
     var first = true; private set
     data class Edit(val deleteBefore: Int, val text: String, val confirmationLength: Int)
+    val writingContext get() = owner.writingContext
     fun originalSelection() = owner.originalSelection()
     fun separateFromTypedWord(value: String) = owner.separateFromTypedWord(value)
     private fun before() = if (first) initialSnapshot else owner.proposedSnapshot(owner.owned)

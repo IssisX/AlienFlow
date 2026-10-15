@@ -36,6 +36,29 @@ class TranscriptLedger {
                     var editorEpoch: Long? = null)
     private val turns = linkedMapOf<String, Turn>()
     private val seenEvents = mutableSetOf<String>()
+    private data class Polished(val ids: List<String>, val sources: List<String>, val output: String)
+    private val polished = mutableMapOf<Long, Polished>()
+    fun stableFor(epoch: Long): String = completedPrefix(epoch).mapNotNull { it.final }.filter { it.isNotBlank() }.joinToString(" ")
+    private fun completedPrefix(epoch: Long) = ordered().filter { it.editorEpoch == epoch }.takeWhile { it.final != null }
+    fun polish(epoch: Long, source: String, output: String): Boolean {
+        if (stableFor(epoch) != source) return false
+        val prefix = completedPrefix(epoch)
+        polished[epoch] = Polished(prefix.map { it.id }, prefix.map { it.final!! }, output)
+        return true
+    }
+    private fun rendered(corrections: Map<String, String>): List<Pair<Turn, String>> {
+        val usable = polished.filter { (epoch, edit) ->
+            val prefix = completedPrefix(epoch).take(edit.ids.size)
+            prefix.map { it.id } == edit.ids && prefix.map { it.final } == edit.sources
+        }
+        return ordered().map { turn ->
+            val edit = usable[turn.editorEpoch]
+            val text = if (edit != null && turn.id in edit.ids) {
+                if (turn.id == edit.ids.firstOrNull()) edit.output else ""
+            } else corrections[turn.id] ?: turn.final ?: turn.provisional
+            turn to text
+        }
+    }
     var revision = 0L; private set
     fun event(eventId: String?, id: String, previous: String? = null, delta: String? = null, final: String? = null,
               editorEpoch: Long? = null): Boolean {
@@ -61,15 +84,15 @@ class TranscriptLedger {
     fun text() = ordered().map { it.final ?: it.provisional }.filter { it.isNotBlank() }.joinToString(" ")
     fun stable() = ordered().mapNotNull { it.final }.filter { it.isNotBlank() }.joinToString(" ")
     fun finals() = ordered().mapNotNull { t -> t.final?.let { t.id to it } }
-    fun displayed(corrections: Map<String, String>) = ordered().map { corrections[it.id] ?: it.final ?: it.provisional }.filter { it.isNotBlank() }.joinToString(" ")
-    fun displayedFor(corrections: Map<String, String>, editorEpoch: Long) = ordered().filter { it.editorEpoch == editorEpoch }
-        .map { corrections[it.id] ?: it.final ?: it.provisional }.filter { it.isNotBlank() }.joinToString(" ")
+    fun displayed(corrections: Map<String, String>) = rendered(corrections).map { it.second }.filter { it.isNotBlank() }.joinToString(" ")
+    fun displayedFor(corrections: Map<String, String>, editorEpoch: Long) = rendered(corrections).filter { it.first.editorEpoch == editorEpoch }
+        .map { it.second }.filter { it.isNotBlank() }.joinToString(" ")
     fun displayedReplacingSegment(corrections: Map<String, String>, editorEpoch: Long, replacement: String): String {
         var replaced = false
-        return ordered().map { turn ->
+        return rendered(corrections).map { (turn, text) ->
             if (turn.editorEpoch == editorEpoch) {
                 if (replaced) "" else replacement.also { replaced = true }
-            } else corrections[turn.id] ?: turn.final ?: turn.provisional
+            } else text
         }.filter { it.isNotBlank() }.joinToString(" ")
     }
     fun pending() = turns.values.any { it.final == null }
@@ -98,7 +121,12 @@ object CorrectionGuard {
             val names = Regex("\\b[A-Z][A-Za-z0-9]+\\b").findAll(source).map { it.value.lowercase() }.filter { it !in setOf("the", "this", "that", "it", "we", "you", "they", "he", "she", "a", "an") }.toSet()
             return protectedTokens(tokens(source)) == protectedTokens(tokens(result)) && names.all { name -> tokens(source).count { it == name || it.startsWith("$name'") } == tokens(result).count { it == name || it.startsWith("$name'") } }
         }
-        val a = tokens(source); val b = tokens(result)
+        if (tokens(source) == tokens(result)) return true
+        val spelling = mapOf("thet" to "that", "teh" to "the", "thier" to "their", "recieve" to "receive", "becuase" to "because")
+        // An explicitly capitalized name, identifier or path is never a spelling alias.
+        val protectedSpelling = Regex("\\b[A-Z][A-Za-z]*\\b").findAll(source).map { it.value.lowercase() }.toSet()
+        val a = tokens(source).map { if (it in protectedSpelling) it else spelling[it] ?: it }
+        val b = tokens(result)
         if (a == b) return true
         // Conservative explicit day correction; sincere apologies and arbitrary names
         // are not correction commands. More ambiguous corrections stay verbatim.
@@ -169,8 +197,13 @@ class EditorOwnership(private val initial: EditorSnapshot, private val replaceSe
     fun initialRange() = (if (replaceSelection) initial.start else initial.end) until initial.end
     fun preservesAnchors(snapshot: EditorSnapshot) = snapshot.text.startsWith(prefix) && snapshot.text.endsWith(suffix) &&
         snapshot.start == snapshot.end && snapshot.end == snapshot.text.length - suffix.length
-    fun separateFromTypedWord(value: String): String =
-        if (prefix.lastOrNull()?.isLetterOrDigit() == true && value.firstOrNull()?.isLetterOrDigit() == true) " $value" else value
+    internal val writingContext get() = WritingContext(prefix, suffix).bounded()
+    fun separateFromTypedWord(value: String): String {
+        if (value.isEmpty()) return value
+        val left = if (prefix.lastOrNull()?.isLetterOrDigit() == true && value.firstOrNull()?.isLetterOrDigit() == true) " " else ""
+        val right = if (suffix.firstOrNull()?.isLetterOrDigit() == true && value.lastOrNull()?.isLetterOrDigit() == true) " " else ""
+        return left + value + right
+    }
     fun ownsWholeField() = prefix.isEmpty() && suffix.isEmpty() && initial.text.isEmpty()
     fun confirm(snapshot: EditorSnapshot, proposed: String): Boolean {
         val old = owned; owned = proposed

@@ -21,7 +21,7 @@ object RealtimeProtocol {
     fun sessionConfig(language: String, vocabulary: String): JSONObject {
         val transcription = JSONObject()
             .put("model", MODEL)
-            .put("delay", "minimal")
+            .put("delay", "medium")
         if (language.isNotBlank()) {
             transcription.put("languages", JSONArray().put(language.trim()))
         }

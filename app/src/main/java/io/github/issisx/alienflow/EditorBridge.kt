@@ -32,6 +32,8 @@ class EditorBridge(private val service: AlienAccessibilityService) {
     private var bound = false
     val hasUserInteraction: Boolean get() = userInteracted
     val bindingInputEpoch: Long get() = inputEpoch
+    internal val writingContext: WritingContext get() = if (!sameTarget() || isTerminal) WritingContext()
+        else relativeOwnership?.writingContext ?: keyboardOwnership?.writingContext ?: ownership?.writingContext ?: WritingContext()
     var lastError = ""; private set
     private val app get() = service.application as AlienApp
 
@@ -268,7 +270,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                     }
                     val relativeWriter = checkNotNull(relative)
                     val tail = if (restoring) value else continuation.tail(value)
-                    val inserted = if (!restoring && userInteracted) relativeWriter.separateFromTypedWord(tail) else tail
+                    val inserted = if (!restoring) relativeWriter.separateFromTypedWord(tail) else tail
                     if (!restoring && relativeWriter.first && inserted.isEmpty()) {
                         continuation.dispatched(value); outcome = EditorWriteResult.APPLIED; return@launch
                     }
@@ -325,7 +327,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 }
                 val writer = owner
                 val tail = if (restoring) value else continuation.tail(value)
-                val inserted = if (!restoring && userInteracted) writer.separateFromTypedWord(tail) else tail
+                val inserted = if (!restoring) writer.separateFromTypedWord(tail) else tail
                 if (!restoring && writer.first && inserted.isEmpty()) {
                     continuation.dispatched(value); outcome = EditorWriteResult.APPLIED; return@launch
                 }
@@ -420,7 +422,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                     }
                 }
                 val tail = if (restoring) value else continuation.tail(value)
-                var inserted = if (!restoring && userInteracted) owner.separateFromTypedWord(tail) else tail
+                var inserted = if (!restoring) owner.separateFromTypedWord(tail) else tail
                 if (!restoring && first && inserted.isEmpty()) {
                     continuation.dispatched(value); outcome = EditorWriteResult.APPLIED; return@launch
                 }

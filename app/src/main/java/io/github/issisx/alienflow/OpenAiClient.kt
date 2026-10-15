@@ -72,8 +72,8 @@ class OpenAiClient internal constructor(private val socketFactory: WebSocket.Fac
         return (socketFactory ?: realtimeClient).newWebSocket(RealtimeHandshake.request(key), listener)
     }
 
-    suspend fun cleanup(key: String, source: String, mode: String, fillers: Boolean): String {
-        val body = CleanupRequest.body(source, mode, fillers)
+    internal suspend fun cleanup(key: String, source: String, mode: String, fillers: Boolean, context: WritingContext = WritingContext()): String {
+        val body = CleanupRequest.body(source, mode, fillers, context)
         val response = JSONObject(
             executeCleanup(key, body.toString().toRequestBody("application/json".toMediaType())),
         )

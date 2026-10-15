@@ -622,3 +622,16 @@ A real API 36 WebView rich editor reproduced the exact AF-E10 through an actual 
 The owner requires switching apps at will. This supersedes prior restrictions against adopting a new target during active capture: future audio follows the newly focused eligible field, with a transport-serialized audio commit separating field epochs. Earlier provisional/final results and cleanup retain their original epoch and do not mutate the newly focused app. A gap with no eligible field has its own non-delivery epoch. Capture and connection continue; lock, permission loss and service disconnection still stop capture. Finishing never retargets pending speech.
 
 The supplied AF-E14 report shows a valid local keyboard window with an unknown absolute offset and a stale absolute selection callback. An unknown offset does not prevent cursor-relative edits: authorize only the fresh selected region and observed owned suffix immediately before it; confirm deletion and insertion through the keyboard's actual local text and cursor. No inferred absolute cursor, placeholder blacklist, substring search, timeout increase or blind resend. Typed text, existing drafts and terminal final-only/no-Enter behavior remain protected. Cancellation restores only the current owned span, never text in apps visited earlier. API 36, original signing identity and APK-only development remain mandatory.
+
+
+## Owner amendment — 15 October 2026: public quality and contextual writing
+
+Keep recording active across text-field changes; new speech goes inline into the newly focused eligible field. This confirms the 14 October behavior. Older audio/results retain their original segment and must never land in another app.
+
+The intended paid public release requires measured device reliability and speech quality, not merely successful builds. This development client is not certified ready for paid public launch. Preserve API 36 and APK-only development until final store preparation.
+
+Use sentence case, preserve coherent phrasing across recognition pauses, and use bounded read-only surrounding editor text to fit a mid-sentence insertion. Do not rewrite existing user text, invent connective claims, remove negation/uncertainty, or silently enable Rewrite mode. Light polish may accept a small audited set of unambiguous common spelling substitutions when proposed by the model; names, paths and identifiers remain protected. Broader recognition improvement is evaluated using real audio, not asserted from prompt changes.
+
+The candidate uses the documented balanced transcription delay (`medium`) instead of `minimal`; live partial delivery remains enabled. Compare real microphone accuracy and latency before public release. Source: https://developers.openai.com/api/docs/guides/realtime-transcription#tune-latency-and-accuracy (reviewed 15 October 2026).
+
+Context is limited to up to 512 characters before and 256 after the insertion from the authoritative keyboard window. It is transient, sent only with an enabled cleanup request, excluded from diagnostic logs/history, and reset at binding changes. The privacy screen describes this use. No paid provider tests are authorized by this amendment.

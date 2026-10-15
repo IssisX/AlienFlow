@@ -1,3 +1,13 @@
+# Current work — 0.1.25-chat.1 candidate
+
+15 October 2026: writing-quality repair in progress, not release-verified yet. Last verified APK remains 0.1.24-chat.1; its original record follows below.
+
+Candidate changes: balanced streaming delay, connected finalized-prefix cleanup with independently preserved original text, bounded keyboard insertion context, context-sensitive in-session memoization, sentence-case prompt, conservative model-proposed typo acceptance, and initial insertion boundary spacing. Late cleanup is checked against session/editor epoch and exact source. Existing app switching and terminal delivery rules remain required gates.
+
+Real microphone accuracy, capitalization and semantic quality remain unmeasured. Automated model responses are fixtures; they establish request shape and guarded delivery, not model accuracy. Paid public readiness remains blocked on real audio/editor/device acceptance, latency/reliability measurements, and final distribution/business/privacy validation.
+
+---
+
 # AlienFlow(chat) — app switching and cursor confirmation, 0.1.24-chat.1 (25)
 
 Repository: IssisX/AlienFlow. Branch: AlienFlow(chat). Baseline f63ae375f00909a3bf5d7c4bce78ef7af23ba58d; installed baseline compiled from adda87cd9bc2e0f3cb491a35ab9a8d9877347c4f.

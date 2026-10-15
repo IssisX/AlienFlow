@@ -293,7 +293,7 @@ class MainActivity : Activity() {
         ui.text(writing, "Writing style", 18, bold = true)
         choose(writing, "correction", listOf(
             Choice("A", "As spoken", "Keep the recognized words, without an extra editing pass."),
-            Choice("B", "Light polish", "Tidy punctuation and capitals, and follow corrections you say aloud. Keeps your voice."),
+            Choice("B", "Light polish", "Tidy sentence case, punctuation and clear spelling errors. Connect phrases while keeping your voice."),
             Choice("C", "Clearer phrasing", "Allow wording changes for a more readable result.")), prefs.getString("correction", "B").orEmpty()) { prefs.edit().putString("correction", it).apply() }
         toggle(writing, "Polish while I speak", "Turn off to apply your writing style only when you finish.", "live_cleanup", true)
         toggle(writing, "Remove fillers & repeated words", "Remove obvious fillers such as “um” and accidental exact repetitions.", "fillers", false)
@@ -343,7 +343,7 @@ class MainActivity : Activity() {
         ui.text(connection, "Completed audio is deleted. Interrupted recordings can remain for up to 24 hours so you can recover your words in History, even when transcript saving is off. Recovery sends audio to OpenAI and never types into a new field.", 14, ui.muted)
         val data = ui.card(body)
         ui.text(data, "What leaves this phone", 18, bold = true)
-        ui.text(data, "Audio goes to OpenAI for transcription. Your dictated words may be sent for your chosen writing style. Vocabulary hints are sent only when enabled. Your full history is not used as a prompt.", 14, ui.muted)
+        ui.text(data, "Audio goes to OpenAI for transcription. Your dictated words and a short excerpt around the insertion point may be sent for your chosen writing style. Existing text is read-only context; password fields are excluded. Vocabulary hints are sent only when enabled. Your full history is not used as a prompt.", 14, ui.muted)
         ui.text(data, "Your API key is encrypted on this device. Keys, transcripts and recordings are excluded from Android backup.", 14, ui.muted)
         ui.button(body, "Delete all saved transcripts", destructive = true) { confirm("Delete all transcripts?", "This permanently removes saved text. Pending recordings and your account settings stay in place.") { app.store.deleteHistory(); notice("Saved transcripts deleted.") } }
     }
