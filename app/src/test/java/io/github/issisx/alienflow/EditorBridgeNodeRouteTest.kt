@@ -43,6 +43,7 @@ class EditorBridgeNodeRouteTest {
         var unexposedSuffix = ""
         var conflictingPresentation = false
         var suppressSelectionUpdates = false
+        var inputStartedOverride: Boolean? = null
         val committedTexts = mutableListOf<String>()
         fun publishSelection() {
             if (suppressSelectionUpdates) return
@@ -60,7 +61,7 @@ class EditorBridgeNodeRouteTest {
     class Ime {
         @Implementation fun getCurrentInputConnection() = connection
         @Implementation fun getCurrentInputEditorInfo() = info
-        @Implementation fun getCurrentInputStarted() = connection != null
+        @Implementation fun getCurrentInputStarted() = inputStartedOverride ?: (connection != null)
     }
     @Implements(InputMethod.AccessibilityInputConnection::class)
     class KeyboardIpc {
@@ -140,6 +141,7 @@ class EditorBridgeNodeRouteTest {
         keyboardWindow = Int.MAX_VALUE
         unexposedSuffix = ""; conflictingPresentation = false
         suppressSelectionUpdates = false
+        inputStartedOverride = null
         committedTexts.clear()
     }
     private fun withField(text: String = "", hint: String = "", keyboard: Boolean = false, block: (AlienAccessibilityService) -> Unit) {
@@ -235,9 +237,12 @@ class EditorBridgeNodeRouteTest {
             coordinator.targetEvent()
             assertFalse("The old input session must not bind to the new field", service.bridge.sameTarget())
             assertEquals("draft ", next.text.toString())
+            inputStartedOverride = false
             inputMethod!!.onFinishInput(); coordinator.targetEvent()
+            assertFalse("A finished input connection is not eligible", service.bridge.sameTarget())
             info = EditorInfo().apply { packageName = focused!!.packageName.toString(); fieldId = 43 + index; inputType = next.inputType; initialSelStart = 6; initialSelEnd = 6 }
             nativeKeyboard = next.onCreateInputConnection(EditorInfo())!!
+            inputStartedOverride = true
             inputMethod!!.onStartInput(info!!, false); coordinator.targetEvent()
             assertTrue(coordinator.active)
             speech("late-$index", index * 2L, "late old words")
