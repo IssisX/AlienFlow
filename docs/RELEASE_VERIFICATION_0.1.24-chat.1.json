@@ -1,0 +1,129 @@
+{
+  "application_id": "io.github.issisx.alienflow",
+  "version_name": "0.1.24-chat.1",
+  "version_code": 25,
+  "branch": "AlienFlow(chat)",
+  "source_sha": "0ffaf5c5d7a8227e447785f3b6fd561bc40dfabe",
+  "source_tree_sha": "b3cd4d1e09252862d9bc8ae2b2274822ac6595a2",
+  "workflow_run_url": "https://github.com/IssisX/AlienFlow/actions/runs/38664885029",
+  "workflow_conclusion": "success",
+  "artifact_id": 11940419354,
+  "bundle_sha256": "80892bbd4a71c9d0b8ac9e871fb2cbf1712bded083153793fe85930e9f5267f3",
+  "manifest_member_hashes_verified": 189,
+  "tests": {
+    "executed": 223,
+    "total": 223,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "device_tests": "Real Chromium and installed Termux on API36 emulator; transcript fixtures, no physical microphone/provider"
+  },
+  "lint": {
+    "issues": 39,
+    "errors": 0
+  },
+  "app_switch_baseline": {
+    "baseline_sha": "adda87cd9bc2e0f3cb491a35ab9a8d9877347c4f",
+    "candidate_sha": "0ffaf5c5d7a8227e447785f3b6fd561bc40dfabe",
+    "exit_code": 1,
+    "tests": 2,
+    "expected_failures": [
+      "defaultWindowConfirmsActualTextWhenAbsoluteCallbackStaysAtZero",
+      "repeatedNewFieldsAcceptSpeechWithoutRestartingTheCoordinator"
+    ],
+    "actual_failures": [
+      "defaultWindowConfirmsActualTextWhenAbsoluteCallbackStaysAtZero",
+      "repeatedNewFieldsAcceptSpeechWithoutRestartingTheCoordinator"
+    ],
+    "errors": 0,
+    "failure_types": {
+      "defaultWindowConfirmsActualTextWhenAbsoluteCallbackStaysAtZero": "java.lang.AssertionError",
+      "repeatedNewFieldsAcceptSpeechWithoutRestartingTheCoordinator": "org.junit.ComparisonFailure"
+    },
+    "scope": "Production coordinator/bridge and Android default window; broker and transcript fixtures"
+  },
+  "browser_editor": {
+    "source": "0ffaf5c5d7a8227e447785f3b6fd561bc40dfabe",
+    "api": 36,
+    "provider": "fixture; no microphone or API request",
+    "initial_node": {
+      "text": "Ask ChatGPT\n",
+      "selection": "1:1",
+      "hint": "",
+      "showing_hint": false
+    },
+    "initial_ime": {
+      "text": "\n",
+      "selection": "0:0",
+      "offset": -1
+    },
+    "initial_dom": "\"\\n\"",
+    "webview": "133.0.6943.137",
+    "real_bubble_tap": true,
+    "delivered": true,
+    "after_dom": "\"Browser fixture speech\"",
+    "editor_error": "",
+    "final_dom": "\"Browser final speech\"",
+    "status": "Complete \u2022 ready for another dictation",
+    "selected_replacement": true,
+    "typing_continues_dictation": true,
+    "typed_text_preserved": true,
+    "second_dom": "\"Browser SECOND typed tail speech\"",
+    "repeat_session": true,
+    "unicode_dom": "\"\ud83d\udef8 Again Browser SECOND typed tail speech\""
+  },
+  "installed_termux": {
+    "source": "0ffaf5c5d7a8227e447785f3b6fd561bc40dfabe",
+    "version": "0.1.24-chat.1",
+    "api": 36,
+    "termux": "official v0.118.3 x86_64",
+    "real_bubble_tap": true,
+    "real_accessibility_broker": true,
+    "real_terminal_echo": true,
+    "final_count": 1,
+    "repeat_session_count": 1,
+    "ordinary_live_after_termux": true,
+    "termux_visible_after_switch": true,
+    "premature_text": false,
+    "microphone_and_provider": "not exercised; transcript fixtures",
+    "active_app_switch": true,
+    "late_old_result_preserved": true,
+    "active_return_to_terminal": true
+  },
+  "signing": {
+    "certificate_sha256": "d79e74b3a4c24ee225d1220c2c374c6f958520d4f3257fcfb399ff09bf5c965f",
+    "scheme": "APK v3",
+    "payload_entries_unchanged": 25,
+    "signature_entries_added": [
+      "META-INF/ALIENFLO.RSA",
+      "META-INF/ALIENFLO.SF",
+      "META-INF/MANIFEST.MF"
+    ]
+  },
+  "signed_apk": {
+    "filename": "AlienFlow-0.1.24-chat.1.apk",
+    "size_bytes": 4597912,
+    "sha256": "69897e5e869a2e434da60d339c4d1cacfc54274a88a3a80b0d7e6b9317faa676"
+  },
+  "preserved": {
+    "target_sdk": 36,
+    "aab_built": false,
+    "paid_provider_tests": 0,
+    "keyboard": "existing selected keyboard",
+    "stored_data": "same package and signing identity; physical update not exercised"
+  },
+  "verification_boundary": "223 unit tests; API36 emulator with real Chromium and installed Termux input IPC including active app switching. Recognition/hardware events are fixtures. Physical Fold6 and microphone/provider acceptance of this APK remain unverified.",
+  "preliminary_failures": [
+    {
+      "run": 38663058552,
+      "classification": "introduced test harness setup",
+      "detail": "unattached replacement field had no package identity; corrected attachment and required baseline assertion failures"
+    },
+    {
+      "run": 38664225468,
+      "classification": "introduced test harness lifecycle",
+      "detail": "broker reported started during finished-input interval; corrected that interval without relaxing production generation guard"
+    }
+  ],
+  "limitations": "Protected or unsupported fields retain speech in history. Pending old-field speech is not backfilled into a newly focused field. Finishing does not retarget. Cancelling restores only the current owned span."
+}
