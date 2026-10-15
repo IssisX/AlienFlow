@@ -86,6 +86,43 @@ class KeyboardSessionRestartTest {
             coordinator.cancel()
         }
 
+    @Test fun theKeyboardRecomposingUnchangedDictationIsNotTheUserTyping() =
+        harness.withField("", keyboard = true) { service ->
+            assertTrue(service.bridge.begin()); harness.activate(service)
+            assertEquals(EditorWriteResult.APPLIED, harness.write(service, "Browser fixture speech"))
+            // Gboard marks the word before the cursor as composing after an outside insertion
+            // (Android 13/14 emulators: adopt-composing with text and cursor exactly ours).
+            EditorBridgeNodeRouteTest.nativeKeyboard!!.setComposingRegion(16, 22)
+            EditorBridgeNodeRouteTest.publishSelection()
+            assertTrue(service.composing)
+            assertEquals(EditorWriteResult.APPLIED, harness.write(service, "Browser final speech"))
+            assertEquals("Browser final speech", EditorBridgeNodeRouteTest.field!!.text.toString())
+            assertFalse(service.bridge.hasUserInteraction)
+        }
+    @Test fun theCursorRelativeRouteNeverDeletesAroundAComposingRegion() =
+        harness.withField("", keyboard = true) { service ->
+            assertTrue(service.bridge.begin()); harness.activate(service)
+            EditorBridgeNodeRouteTest.readFilter = { real -> SurroundingText(real.text, real.selectionStart, real.selectionEnd, -1) }
+            assertEquals(EditorWriteResult.APPLIED, harness.write(service, "Browser fixture speech"))
+            EditorBridgeNodeRouteTest.nativeKeyboard!!.setComposingRegion(16, 22)
+            EditorBridgeNodeRouteTest.publishSelection()
+            harness.write(service, "Browser final speech")
+            // Deleting before the cursor would count from the composing start ("Browspeech").
+            assertEquals("Browser fixture speech", EditorBridgeNodeRouteTest.field!!.text.toString())
+        }
+    @Test fun aComposingWordTheUserIsTypingIsStillTheirs() =
+        harness.withField("", keyboard = true) { service ->
+            assertTrue(service.bridge.begin()); harness.activate(service)
+            EditorBridgeNodeRouteTest.readFilter = { real -> SurroundingText(real.text, real.selectionStart, real.selectionEnd, -1) }
+            assertEquals(EditorWriteResult.APPLIED, harness.write(service, "Browser fixture"))
+            // The user types a new word: extra characters, composing.
+            EditorBridgeNodeRouteTest.nativeKeyboard!!.setComposingText(" hel", 1)
+            EditorBridgeNodeRouteTest.publishSelection()
+            harness.write(service, "Browser fixture speech")
+            assertTrue(service.bridge.hasUserInteraction)
+            assertTrue(EditorBridgeNodeRouteTest.field!!.text.toString().startsWith("Browser fixture hel"))
+        }
+
     @Test fun aHalfUpdatedEditorAfterInsertionIsNotMistakenForTheUserTyping() =
         harness.withField("", keyboard = true) { service ->
             assertTrue(service.bridge.begin()); harness.activate(service)

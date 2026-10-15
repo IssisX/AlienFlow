@@ -53,8 +53,9 @@ internal class KeyboardEditorOwnership(initial: KeyboardWindow, generation: Long
     fun proposedRange(value: String): IntRange =
         replacement(value).range.first until (base + owner.proposedSnapshot(value).end)
     fun proposedCursor(value: String) = base + owner.proposedSnapshot(value).end
+    /** Exact text and cursor confirm a write; a keyboard composing mark over them changes nothing. */
     fun confirm(window: KeyboardWindow, value: String): Boolean {
-        if (window.composing || !matches(window, value) || !covers(window, proposedRange(value))) return false
+        if (!matches(window, value) || !covers(window, proposedRange(value))) return false
         if (!owner.confirm(owner.proposedSnapshot(value), value)) return false
         first = false
         return true

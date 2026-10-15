@@ -269,6 +269,9 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                         continuation.protectDispatched(); userInteracted = true; keyboardOwnership = null
                     }
                     var relative = relativeOwnership
+                    // This route deletes before the cursor. With a composing region, Android deletes
+                    // before the region's start instead (unit test: "Browser fixture speech" became
+                    // "Browspeech"), so any composition still ends revision of earlier words here.
                     if (relative == null || readComposing || !relative.matches(rawInitial)) {
                         if (restoring) return@launch
                         if (relative != null || readComposing || bindingPresentation != presentation()) {
@@ -332,7 +335,9 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 val changedBeforeFirstRead = owner == null && (bindingPresentation != presentation() ||
                     (evidence?.offset == -1 && bindingSelection?.let { minOf(it.start, it.end) != initial.absoluteStart ||
                         maxOf(it.start, it.end) != initial.absoluteEnd } == true))
-                if (owner == null || initial.composing || !owner.matches(initial)) {
+                // This route selects the exact range and commits over it; Android finishes a composing
+                // region first, so a keyboard mark over text that is exactly ours is not user typing.
+                if (owner == null || !owner.matches(initial)) {
                     if (restoring) return@launch
                     if (owner != null || initial.composing || changedBeforeFirstRead) {
                         app.crashJournal.keyboardObservation(if (initial.composing) "adopt-composing"
