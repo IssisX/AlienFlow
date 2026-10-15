@@ -17,6 +17,25 @@ class DictationLogicTest {
         assertEquals(2L, coverage.editorEpochFor("new-item")); assertFalse(coverage.hasUnacknowledgedCommit)
         assertNull(coverage.editorEpochFor("unacknowledged"))
     }
+    @Test fun unacknowledgedSpeechHasAnOwnerOnlyWhenEveryCandidateCommitSharesTheCurrentField() {
+        val coverage = AudioCoverage()
+        assertEquals(0L, coverage.provisionalEpoch(0))
+        coverage.sent("same-field", 4800, 0)
+        assertEquals(0L, coverage.provisionalEpoch(0))
+        assertNull("An in-flight earlier-field commit makes ownership ambiguous", coverage.provisionalEpoch(2))
+        coverage.acknowledge("same-field-item")
+        assertEquals(2L, coverage.provisionalEpoch(2))
+    }
+    @Test fun acknowledgedCommitEpochIsAuthoritativeOverAProvisionalLiveOwner() {
+        val ledger = TranscriptLedger()
+        ledger.event("d1", "item", delta = "live words", editorEpoch = 0)
+        assertEquals("live words", ledger.displayedFor(emptyMap(), 0))
+        ledger.event("c1", "item", editorEpoch = 2, epochAcknowledged = true)
+        assertEquals("", ledger.displayedFor(emptyMap(), 0))
+        assertEquals("live words", ledger.displayedFor(emptyMap(), 2))
+        ledger.event("d2", "item", delta = " more", editorEpoch = 0)
+        assertEquals("A provisional owner never overrides an acknowledged one", "live words more", ledger.displayedFor(emptyMap(), 2))
+    }
     @Test fun lateFinalsAndCleanupStayInTheOriginalFieldSegment() {
         val ledger = TranscriptLedger()
         ledger.event("old", "old-item", delta = "old provisional", editorEpoch = 0)

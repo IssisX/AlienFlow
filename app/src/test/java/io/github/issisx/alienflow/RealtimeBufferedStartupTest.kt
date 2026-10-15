@@ -142,6 +142,23 @@ class RealtimeBufferedStartupTest {
             b.pumpUi(); assertEquals(listOf(0L, 2L), b.events.map { it.getLong("_editor_epoch") })
         }
     }
+    @Test fun liveSpeechBeforeCommitBelongsToTheFocusedFieldUnlessAnotherFieldsCommitIsInFlight() = runTest {
+        Boundary(this).use { b ->
+            fun delta(item: String) = b.network.onMessage(b.socket, JSONObject()
+                .put("type", "conversation.item.input_audio_transcription.delta").put("item_id", item).put("delta", "words").toString())
+            fun committed(item: String) = b.network.onMessage(b.socket,
+                JSONObject().put("type", "input_audio_buffer.committed").put("item_id", item).toString())
+            b.open(); b.ready(); b.input.speech(); runCurrent(); b.pumpUi()
+            // The live model streams a turn before its commit; no earlier field can own it.
+            delta("first"); b.pumpUi()
+            b.transport.switchEditor(2); b.input.speech(); advanceTimeBy(5); runCurrent(); b.pumpUi()
+            // The old field's commit is unacknowledged: either field could own these words.
+            delta("first"); delta("second"); b.pumpUi()
+            committed("first"); delta("second"); b.pumpUi()
+            assertEquals(listOf(0L, -1L, -1L, 0L, 2L), b.events.map { it.getLong("_editor_epoch") })
+            assertEquals(listOf(false, false, false, true, false), b.events.map { it.optBoolean("_editor_epoch_acknowledged") })
+        }
+    }
     @Test fun stopBeforeHandshakeStillFlushesTheFirstWordsExactlyOnce() = runTest {
         Boundary(this).use { b ->
             b.input.speech(); runCurrent(); b.pumpUi()

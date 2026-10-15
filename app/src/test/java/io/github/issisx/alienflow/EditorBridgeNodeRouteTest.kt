@@ -253,6 +253,34 @@ class EditorBridgeNodeRouteTest {
         }
         coordinator.cancel()
     }
+    @Test fun uncommittedLiveSpeechIsWrittenWhileAmbiguousOwnershipWaitsForItsCommit() = withField(keyboard = true) { service ->
+        val app = service.application as AlienApp
+        app.store.prefs.edit().putString("correction", "A").commit()
+        val coordinator = DictationCoordinator(app, app.store, keyProvider = { "fixture-not-a-key" })
+        org.robolectric.util.ReflectionHelpers.setField(app, "coordinator", coordinator)
+        coordinator.service = service
+        shadowOf(app).grantPermissions(android.Manifest.permission.RECORD_AUDIO)
+        coordinator.start(); assertTrue(coordinator.active)
+        fun deliver(event: org.json.JSONObject) {
+            coordinator.event(event)
+            val until = System.currentTimeMillis() + 3_000
+            do { shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(5) }
+            while (org.robolectric.util.ReflectionHelpers.getField<Boolean>(coordinator, "writing") && System.currentTimeMillis() < until)
+        }
+        fun delta(id: String, item: String, epoch: Long, words: String) = deliver(org.json.JSONObject()
+            .put("type", "conversation.item.input_audio_transcription.delta").put("event_id", id)
+            .put("item_id", item).put("_editor_epoch", epoch).put("delta", words))
+        delta("d1", "live", 0, "hello")
+        assertEquals("Live words appear before the turn is committed", "hello", field!!.text.toString())
+        delta("d2", "ambiguous", -1, " elsewhere")
+        assertEquals("hello", field!!.text.toString())
+        deliver(org.json.JSONObject().put("type", "input_audio_buffer.committed").put("event_id", "c1").put("item_id", "live")
+            .put("_editor_epoch", 0).put("_editor_epoch_acknowledged", true))
+        deliver(org.json.JSONObject().put("type", "conversation.item.input_audio_transcription.completed").put("event_id", "f1")
+            .put("item_id", "live").put("_editor_epoch", 0).put("_editor_epoch_acknowledged", true).put("transcript", "Hello there"))
+        assertEquals("Hello there", field!!.text.toString())
+        coordinator.cancel()
+    }
     internal fun activate(service: AlienAccessibilityService) {
         val app = service.application as AlienApp
         app.coordinator.javaClass.getDeclaredField("active").apply { isAccessible = true }.setBoolean(app.coordinator, true)

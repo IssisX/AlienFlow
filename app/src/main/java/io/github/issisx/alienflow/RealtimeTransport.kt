@@ -144,9 +144,13 @@ class RealtimeTransport internal constructor(
                                 synchronized(state) { coverage.acknowledge(value.optString("item_id")) }
                             }
                             val item = value.optString("item_id", value.optJSONObject("item")?.optString("id").orEmpty())
-                            if (item.isNotBlank()) value.put("_editor_epoch", synchronized(state) {
-                                coverage.editorEpochFor(item) ?: -1L
-                            })
+                            // The live model streams a turn before its commit. Such words belong to the
+                            // current field only when no other field's commit is still in flight.
+                            if (item.isNotBlank()) synchronized(state) {
+                                val acknowledged = coverage.editorEpochFor(item)
+                                value.put("_editor_epoch", acknowledged ?: coverage.provisionalEpoch(editorEpoch) ?: -1L)
+                                if (acknowledged != null) value.put("_editor_epoch_acknowledged", true)
+                            }
                             if (type == "error") app.crashJournal.liveConnectionFailure(LiveConnectionProblem.event(value))
                             listener.event(value.put("_connection_generation", generation))
                         }

@@ -220,13 +220,14 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         // Production attaches the epoch of the ACKNOWLEDGED audio commit. Missing
         // fixture metadata stays at the original epoch, never the current screen.
         val targetEpoch = if (value.has("_editor_epoch")) value.optLong("_editor_epoch", -1L) else 0L
+        val acknowledged = value.optBoolean("_editor_epoch_acknowledged")
         when (type) {
-            "conversation.item.created", "input_audio_buffer.committed" -> if (rawId.isNotBlank()) { if (type == "input_audio_buffer.committed") committedItems.add(id); ledger.event(value.optString("event_id"), id, previous, editorEpoch = targetEpoch); render(); tryFinish() }
+            "conversation.item.created", "input_audio_buffer.committed" -> if (rawId.isNotBlank()) { if (type == "input_audio_buffer.committed") committedItems.add(id); ledger.event(value.optString("event_id"), id, previous, editorEpoch = targetEpoch, epochAcknowledged = acknowledged); render(); tryFinish() }
             "conversation.item.input_audio_transcription.delta" -> if (rawId.isNotBlank()) {
-                ledger.event(value.optString("event_id"), id, previous, delta = value.optString("delta"), editorEpoch = targetEpoch); render()
+                ledger.event(value.optString("event_id"), id, previous, delta = value.optString("delta"), editorEpoch = targetEpoch, epochAcknowledged = acknowledged); render()
             }
             "conversation.item.input_audio_transcription.completed" -> if (rawId.isNotBlank()) {
-                ledger.event(value.optString("event_id"), id, previous, final = value.optString("transcript"), editorEpoch = targetEpoch); completeItems.add(id); render(); scheduleCleanup(); tryFinish()
+                ledger.event(value.optString("event_id"), id, previous, final = value.optString("transcript"), editorEpoch = targetEpoch, epochAcknowledged = acknowledged); completeItems.add(id); render(); scheduleCleanup(); tryFinish()
             }
             "conversation.item.input_audio_transcription.failed" -> failure("Recognition failed; pending audio preserved")
             "error" -> {

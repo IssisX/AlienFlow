@@ -28,6 +28,9 @@ class AudioCoverage {
     }
     fun bytesFor(id: String): Long? = outstanding[id]?.bytes
     fun editorEpochFor(item: String): Long? = acknowledged[item]
+    /** Speech without an acknowledged commit is either still streaming in the current field's
+     * buffer or one of the in-flight commits. It has an owner only when all candidates agree. */
+    fun provisionalEpoch(current: Long): Long? = current.takeIf { outstanding.values.all { it.editorEpoch == current } }
 }
 
 /** Transcripts are keyed by item identity; completion replaces provisional words. */
@@ -74,11 +77,16 @@ class TranscriptLedger {
         }
     }
     var revision = 0L; private set
+    private val acknowledgedEpochs = mutableSetOf<String>()
     fun event(eventId: String?, id: String, previous: String? = null, delta: String? = null, final: String? = null,
-              editorEpoch: Long? = null): Boolean {
+              editorEpoch: Long? = null, epochAcknowledged: Boolean = false): Boolean {
         if (eventId != null && !seenEvents.add(eventId)) return false
         val t = turns.getOrPut(id) { Turn(id, previous) }
-        if (t.editorEpoch == null || t.editorEpoch == -1L) t.editorEpoch = editorEpoch
+        // An acknowledged commit names the turn's field; a provisional owner never overrides it.
+        if (epochAcknowledged && editorEpoch != null && editorEpoch >= 0) {
+            if (t.editorEpoch != editorEpoch) revision++
+            t.editorEpoch = editorEpoch; acknowledgedEpochs.add(id)
+        } else if (id !in acknowledgedEpochs && (t.editorEpoch == null || t.editorEpoch == -1L)) t.editorEpoch = editorEpoch
         val reordered = previous != null && t.previous != previous
         if (previous != null) t.previous = previous
         if (t.final != null) { if (reordered) revision++; return reordered }
