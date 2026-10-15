@@ -272,6 +272,9 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                     if (relative == null || readComposing || !relative.matches(rawInitial)) {
                         if (restoring) return@launch
                         if (relative != null || readComposing || bindingPresentation != presentation()) {
+                            // Metadata only: why earlier dictated words stop being revisable here.
+                            app.crashJournal.keyboardObservation(if (readComposing) "adopt-composing"
+                                else if (relative != null) "adopt-mismatch" else "adopt-presentation", presentation(), evidence, "relative")
                             continuation.protectDispatched(); userInteracted = true
                         }
                         relative = RelativeKeyboardOwnership(rawInitial, writeGeneration, !userInteracted)
@@ -332,6 +335,8 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 if (owner == null || initial.composing || !owner.matches(initial)) {
                     if (restoring) return@launch
                     if (owner != null || initial.composing || changedBeforeFirstRead) {
+                        app.crashJournal.keyboardObservation(if (initial.composing) "adopt-composing"
+                            else if (owner != null) "adopt-mismatch" else "adopt-presentation", presentation(), evidence, "absolute")
                         userInteracted = true; continuation.protectDispatched()
                     }
                     owner = KeyboardEditorOwnership(initial, writeGeneration, replaceSelection = !userInteracted)
