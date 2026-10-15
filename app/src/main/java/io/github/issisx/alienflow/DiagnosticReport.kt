@@ -50,7 +50,7 @@ object DiagnosticReport {
                 if (exit.reason == ApplicationExitInfo.REASON_CRASH_NATIVE && !nativeInspected) {
                     nativeInspected = true
                     try {
-                        val native = exit.traceInputStream?.use { it.readNBytes(NativeCrashSummary.MAX_BYTES + 1) }
+                        val native = exit.traceInputStream?.use { BoundedRead.bytes(it, NativeCrashSummary.MAX_BYTES + 1) }
                         appendLine(if (native == null) "Native trace not retained by Android." else NativeCrashSummary.render(native))
                     } catch (_: Exception) { appendLine("Native trace could not be read.") }
                 }

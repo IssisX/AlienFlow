@@ -154,8 +154,8 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         val currentService = service ?: return
         // A new accessibility focus can precede onStartInput. The old connection
         // must never be bound to a second field in the same package.
-        if (currentService.inputMethod?.currentInputConnection != null &&
-            (currentService.inputMethod?.currentInputStarted != true || currentService.inputEpoch <= waitingAfterInputEpoch)) return
+        if (currentService.keyboardAttached &&
+            (!currentService.keyboardInputStarted || currentService.inputEpoch <= waitingAfterInputEpoch)) return
         if (bridge.focused() == null || !bridge.begin()) return
         editorEpoch++; transport?.switchEditor(editorEpoch)
         editor = bridge; captureTarget = bridge; waitingForTarget = false

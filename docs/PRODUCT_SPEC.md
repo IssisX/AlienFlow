@@ -654,3 +654,12 @@ Names, identifiers, numbers and paths keep the recognized spelling. Rewrite keep
 This is a bounded spelling repair, not general spelling correction. Recognition-level improvement must be measured with real audio (docs/EVALUATION.md).
 
 **Live text before a commit:** the live model streams a turn before its commit. Those words go into the current field only when no earlier field's commit is still unacknowledged. Ambiguous words wait for their commit, so they can never land in a newly focused app. An acknowledged commit always decides a turn's field.
+
+
+## Owner amendment — device support, 15 October 2026 / 0.1.26-claude.1
+
+Support as many Android devices as practical, explicitly including the Samsung Galaxy Note10+. Its last major update is Android 12 (One UI 4.1).
+
+- **Minimum version** is now Android 12 (API 31). Android 13 and newer keep the full behavior: the selected keyboard's session, live text anywhere, live polish and Termux.
+- **Android 12 has no accessibility keyboard session.** AlienFlow therefore dictates live only into positively empty fields, using the existing guarded node-action path with read-back confirmation. Fields with existing text and Termux are refused with an explicit AF-E17 reason, and nothing is written. It never overwrites a whole draft or pastes through the clipboard.
+- **Compatibility evidence:** CI runs the real-editor emulator tests on Android 12, 13, 14, 15 and 16 across phone, small-phone, foldable and tablet profiles. Emulators are not physical-device evidence.

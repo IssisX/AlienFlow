@@ -44,7 +44,7 @@ android {
 
     defaultConfig {
         applicationId = "io.github.issisx.alienflow"
-        minSdk = 33
+        minSdk = 31
         targetSdk = 36
         versionCode = 27
         versionName = "0.1.26-claude.1"

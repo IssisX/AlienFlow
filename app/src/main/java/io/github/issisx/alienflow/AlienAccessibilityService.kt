@@ -1,6 +1,8 @@
 package io.github.issisx.alienflow
 
 import android.accessibilityservice.AccessibilityService
+import android.annotation.TargetApi
+import android.os.Build
 import android.content.Intent
 import android.graphics.*
 import android.graphics.drawable.GradientDrawable
@@ -49,10 +51,18 @@ class AlienAccessibilityService : AccessibilityService() {
         if (!::bridge.isInitialized) return
         handler.removeCallbacks(availabilityRefresh)
         availabilityPass = 0
-        if (clearFocusCache) clearCache()
+        if (clearFocusCache && Build.VERSION.SDK_INT >= 33) clearCache()
         handler.post(availabilityRefresh)
     }
     fun confirmEmptyComposition() { composing = false }
+    /** Android 13 gives accessibility services the keyboard session. Earlier versions have none,
+     * so only positively empty fields can be edited, through node actions. */
+    val keyboardEditorInfo: android.view.inputmethod.EditorInfo? get() = if (Build.VERSION.SDK_INT >= 33) inputMethod?.currentInputEditorInfo else null
+    val keyboardInputStarted: Boolean get() = Build.VERSION.SDK_INT >= 33 && inputMethod?.currentInputStarted == true
+    val keyboardAttached: Boolean get() = Build.VERSION.SDK_INT >= 33 && inputMethod?.currentInputConnection != null
+    @TargetApi(33)
+    fun keyboardConnection(): android.accessibilityservice.InputMethod.AccessibilityInputConnection? = inputMethod?.currentInputConnection
+    @TargetApi(33)
     override fun onCreateInputMethod(): android.accessibilityservice.InputMethod = object : android.accessibilityservice.InputMethod(this) {
         override fun onStartInput(info: android.view.inputmethod.EditorInfo, restarting: Boolean) {
             inputEpoch++
@@ -183,7 +193,7 @@ class AlienAccessibilityService : AccessibilityService() {
         }
         view.visibility = if (active || (!hidden && (app.store.prefs.getBoolean("always", false) || available))) View.VISIBLE else View.GONE
         app.crashJournal.bubbleAvailability(available, view.visibility == View.VISIBLE, hidden,
-            inputMethod?.currentInputStarted == true, bridge.isTerminal)
+            keyboardInputStarted, bridge.isTerminal)
         val touch = dp(max(48, app.store.prefs.getInt("size", 32)))
         if (params?.width != touch) { params?.width = touch; params?.height = touch; clamp() }
         val key = if (bounds().width() / resources.displayMetrics.density > 600) "unfolded" else "folded"

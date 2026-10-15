@@ -1,6 +1,8 @@
 package io.github.issisx.alienflow
 
 import android.Manifest
+import android.annotation.TargetApi
+import android.os.Build
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.ClipData
@@ -17,6 +19,7 @@ import android.text.InputType
 import android.text.TextWatcher
 import android.text.TextUtils
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
@@ -62,7 +65,7 @@ class MainActivity : Activity() {
     private var setupCard: LinearLayout? = null
     private var microphoneState: TextView? = null
     private var accessibilityState: TextView? = null
-    private val back = OnBackInvokedCallback { goBack() }
+    private var unregisterBack: (() -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -98,9 +101,20 @@ class MainActivity : Activity() {
         }
         shell.requestApplyInsets()
         renderPage()
-        onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, back)
+        if (Build.VERSION.SDK_INT >= 33) unregisterBack = registerBack()
     }
-    override fun onDestroy() { onBackInvokedDispatcher.unregisterOnBackInvokedCallback(back); super.onDestroy() }
+    @TargetApi(33)
+    private fun registerBack(): () -> Unit {
+        val callback = OnBackInvokedCallback { goBack() }
+        onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, callback)
+        return { onBackInvokedDispatcher.unregisterOnBackInvokedCallback(callback) }
+    }
+    /** Android 12 has no back callback dispatcher: its Back gesture arrives as a tracked key. */
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (Build.VERSION.SDK_INT < 33 && keyCode == KeyEvent.KEYCODE_BACK && event.isTracking && !event.isCanceled) { goBack(); return true }
+        return super.onKeyUp(keyCode, event)
+    }
+    override fun onDestroy() { unregisterBack?.invoke(); unregisterBack = null; super.onDestroy() }
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent); setIntent(intent)
         if (intent.action == OPEN_SETTINGS) { backStack.clear(); open(Page.SETTINGS, push = false) }
