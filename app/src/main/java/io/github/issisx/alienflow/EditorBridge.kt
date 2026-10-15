@@ -303,6 +303,9 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                     connection.commitText(edit.text, 1, null)
                     if (!restoring) continuation.dispatched(value)
                     phase = "after"
+                    // An editor may report a half-applied commit (new text, cursor not yet moved; Chromium
+                    // 109/113). Only a state still unexplained when confirmation ends counts as the user's.
+                    var unexplained = false
                     outcome = withTimeoutOrNull(3_000L) {
                         repeat(16) {
                             if (!current()) return@withTimeoutOrNull EditorWriteResult.USER_EDIT
@@ -311,12 +314,12 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                             if (observed != null) {
                                 if (relativeWriter.confirm(observed, inserted, edit.confirmationLength, readComposing))
                                     return@withTimeoutOrNull EditorWriteResult.APPLIED
-                                if (!relativeWriter.matches(observed)) return@withTimeoutOrNull EditorWriteResult.RETRY
+                                unexplained = !relativeWriter.matches(observed)
                             }
                             if (it < 15) delay(50)
                         }
-                        EditorWriteResult.FAILED
-                    } ?: EditorWriteResult.FAILED
+                        if (unexplained) EditorWriteResult.RETRY else EditorWriteResult.FAILED
+                    } ?: if (unexplained) EditorWriteResult.RETRY else EditorWriteResult.FAILED
                     return@launch
                 }
                 val initial = KeyboardWindow.read(rawInitial, readComposing) ?: run {
@@ -358,6 +361,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 phase = "after"
                 // Confirm through the same API/coordinate system that performed the edit.
                 // No whole-field SET_TEXT, clipboard paste, or resend after a timeout.
+                var unexplained = false
                 outcome = withTimeoutOrNull(3_000L) {
                     repeat(16) {
                         if (!current()) return@withTimeoutOrNull EditorWriteResult.USER_EDIT
@@ -367,13 +371,12 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                             if (writer.confirm(observed, inserted)) return@withTimeoutOrNull EditorWriteResult.APPLIED
                             val staleSelection = evidence?.offset == -1 && evidence?.selection == selectionAtDispatch &&
                                 observed.absoluteEnd != writer.proposedCursor(inserted)
-                            if (!staleSelection && !writer.matches(observed))
-                                return@withTimeoutOrNull EditorWriteResult.RETRY
+                            unexplained = !staleSelection && !writer.matches(observed)
                         }
                         if (it < 15) delay(50)
                     }
-                    EditorWriteResult.FAILED
-                } ?: EditorWriteResult.FAILED
+                    if (unexplained) EditorWriteResult.RETRY else EditorWriteResult.FAILED
+                } ?: if (unexplained) EditorWriteResult.RETRY else EditorWriteResult.FAILED
             } catch (_: CancellationException) {
                 outcome = EditorWriteResult.USER_EDIT
             } catch (_: Exception) {
