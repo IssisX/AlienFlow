@@ -138,17 +138,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
      * eligible field has its own epoch and stays in history; it is not backfilled. */
     private fun followFocusedTarget() {
         val previous = editor ?: captureTarget
-        if (previous != null && !previous.sameTarget()) {
-            waitingAfterInputEpoch = previous.bindingInputEpoch
-            previous.invalidate()
-            editor = null; captureTarget = null
-            writing = false; writeRetryScheduled = false
-            waitingForTarget = true; switchedTargets = true
-            editorEpoch++; transport?.switchEditor(editorEpoch)
-            desired = ""; lastWritten = ""
-            app.crashJournal.mark("editor.detached")
-            update("Listening • select a text field for new speech")
-        }
+        if (previous != null && !previous.sameTarget()) releaseTarget(previous)
         if (!waitingForTarget || !active || finishing) return
         val bridge = service?.bridge ?: return
         val currentService = service ?: return
@@ -164,6 +154,18 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         desired = ""; lastWritten = ""
         app.crashJournal.mark("editor.ready")
         update(if (terminalTarget) "Listening • Termux text inserts when you stop" else "Listening • tap the alien to stop")
+    }
+    /** The field is gone; capture continues and the next eligible field gets a new segment. */
+    private fun releaseTarget(previous: EditorBridge) {
+        waitingAfterInputEpoch = previous.bindingInputEpoch
+        previous.invalidate()
+        editor = null; captureTarget = null
+        writing = false; writeRetryScheduled = false
+        waitingForTarget = true; switchedTargets = true
+        editorEpoch++; transport?.switchEditor(editorEpoch)
+        desired = ""; lastWritten = ""
+        app.crashJournal.mark("editor.detached")
+        update("Listening • select a text field for new speech")
     }
     private fun monitorTarget(token: Long) {
         main.postDelayed({
@@ -260,7 +262,13 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
             writing = false
             userEdited = userEdited || editor?.hasUserInteraction == true
             when (outcome) {
-                EditorWriteResult.USER_EDIT -> detachInlineEditor()
+                // A write that lost its field (the user switched apps mid-confirmation) is a field
+                // switch while recording, not the end of field following for this session.
+                EditorWriteResult.USER_EDIT -> {
+                    val lost = editor
+                    if (active && !finishing && !interrupted && lost != null) { releaseTarget(lost); followFocusedTarget() }
+                    else detachInlineEditor()
+                }
                 EditorWriteResult.RETRY -> {
                     userEdited = true
                     if (!writeRetryScheduled) {
