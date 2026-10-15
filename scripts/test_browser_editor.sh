@@ -24,7 +24,8 @@ mkdir -p "$ANDROID_AVD_HOME"
 # Retry setup only for interrupted SDK downloads, never a failing integration test.
 SDK_READY=false
 for attempt in 1 2 3; do
-  if timeout 360 "$SDKMANAGER" 'emulator' "system-images;android-${API};google_apis;x86_64"; then
+  # Older system images carry an SDK license prompt; answer it without a SIGPIPE'd `yes |` under pipefail.
+  if timeout 360 "$SDKMANAGER" 'emulator' "system-images;android-${API};google_apis;x86_64" < <(yes); then
     SDK_READY=true; break
   fi
   echo "SDK installation attempt $attempt failed; the actual integration test has not run."
