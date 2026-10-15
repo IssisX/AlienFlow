@@ -44,6 +44,8 @@ class EditorBridgeNodeRouteTest {
         var conflictingPresentation = false
         var suppressSelectionUpdates = false
         var inputStartedOverride: Boolean? = null
+        /** One-shot replacement for the next keyboard read, to model session changes mid-read. */
+        var interceptRead: (() -> SurroundingText?)? = null
         val committedTexts = mutableListOf<String>()
         fun publishSelection() {
             if (suppressSelectionUpdates) return
@@ -70,6 +72,7 @@ class EditorBridgeNodeRouteTest {
             publishSelection()
         }
         @Implementation fun getSurroundingText(before: Int, after: Int, flags: Int): SurroundingText? {
+            interceptRead?.let { hook -> interceptRead = null; return hook() }
             val read = nativeKeyboard?.getSurroundingText(minOf(before, keyboardWindow), minOf(after, keyboardWindow), flags) ?: return null
             return read
         }
@@ -142,6 +145,7 @@ class EditorBridgeNodeRouteTest {
         unexposedSuffix = ""; conflictingPresentation = false
         suppressSelectionUpdates = false
         inputStartedOverride = null
+        interceptRead = null
         committedTexts.clear()
     }
     internal fun withField(text: String = "", hint: String = "", keyboard: Boolean = false, block: (AlienAccessibilityService) -> Unit) {

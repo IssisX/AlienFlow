@@ -258,10 +258,11 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                     return evidence?.let { KeyboardWindow.read(it, readComposing) }
                         .also { evidenceCode = if (it != null) "none" else if (evidence == null) "04" else "11" }
                 }
-                val rawInitial = withTimeoutOrNull(3_000L) { readRaw() } ?: run {
-                    outcome = EditorWriteResult.FAILED; return@launch
-                }
+                val initialRead = withTimeoutOrNull(3_000L) { readRaw() }
+                // A superseded keyboard session answers nothing; that is not evidence about the
+                // current one. Currency decides first, as for every later read.
                 if (!current()) return@launch
+                val rawInitial = initialRead ?: run { outcome = EditorWriteResult.FAILED; return@launch }
                 if (rawInitial.offset == -1 || relativeOwnership != null) {
                     if (!RelativeKeyboardOwnership.usable(rawInitial)) { outcome = EditorWriteResult.FAILED; return@launch }
                     if (relativeOwnership == null && keyboardOwnership != null) {
