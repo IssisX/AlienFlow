@@ -30,6 +30,16 @@ class ContextualWritingTest {
         assertEquals("That works.", clean("")); assertEquals("that works", clean("I think "))
         assertEquals("that works", clean("I think ")); assertEquals(2, requests)
     }
+    @Test fun longCleanupKeepsChunkSeparatorsInBothTextAndContext() = runBlocking {
+        val contexts = mutableListOf<WritingContext>()
+        val source = "word ".repeat(900)
+        val output = CleanupMemo().cleanWithContext(source, "B", false, WritingContext("Prior. ")) { chunk, context ->
+            contexts += context; chunk.trim()
+        }
+        assertEquals(source, output)
+        assertTrue(contexts.size > 1)
+        assertTrue(contexts[1].before.endsWith(" "))
+    }
     @Test fun connectedFinalsPolishTogetherWithoutHidingNewSpeechOrCrossingFields() {
         val ledger = TranscriptLedger()
         ledger.event("1", "a", final = "I Think.", editorEpoch = 0)
@@ -42,7 +52,9 @@ class ContextualWritingTest {
         assertEquals("New field", ledger.displayedFor(emptyMap(), 2))
         assertFalse(ledger.polish(2, "I Think. That Works.", "wrong field"))
         ledger.event("5", "c", final = "And another thought.", editorEpoch = 0)
-        assertFalse(ledger.polish(0, "I Think. That Works.", "stale"))
+        assertTrue(ledger.polish(0, "I Think. That Works.", "I think that works."))
+        assertFalse(ledger.fullyPolished(0))
+        assertFalse(ledger.polish(0, "changed source", "stale"))
         assertEquals("I think that works. And another thought. New field", ledger.displayed(emptyMap()))
         assertEquals("I Think. That Works. And another thought. New field", ledger.stable())
     }

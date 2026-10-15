@@ -276,8 +276,8 @@ class EditorBridgeNodeRouteTest {
             assertTrue(service.bridge.begin()); activate(service)
             assertEquals(EditorWriteResult.APPLIED, write(service, "hello"))
             assertEquals(EditorWriteResult.APPLIED, write(service, "Hello."))
-            assertEquals(original.take(25) + " Hello.XY", field!!.text.toString())
-            assertEquals(32, field!!.selectionStart)
+            assertEquals(original.take(25) + " Hello. XY", field!!.text.toString())
+            assertEquals(33, field!!.selectionStart)
             var canceled: Boolean? = null
             service.bridge.cancel { canceled = it }
             val until = System.currentTimeMillis() + 5_000

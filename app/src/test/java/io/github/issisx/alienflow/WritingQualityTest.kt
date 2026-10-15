@@ -13,6 +13,7 @@ class WritingQualityTest {
     @Test fun insertingInsideSentenceSeparatesBothUnownedAnchors() {
         val owner = EditorOwnership(EditorSnapshot(1, "I thinktoday", 7, 7))
         assertEquals(" that works ", owner.separateFromTypedWord("that works"))
+        assertEquals(" that works. ", owner.separateFromTypedWord("that works."))
         assertEquals("I think that works today", owner.proposedSnapshot(owner.separateFromTypedWord("that works")).text)
     }
 }

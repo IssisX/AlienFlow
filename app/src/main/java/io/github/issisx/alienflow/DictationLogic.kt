@@ -46,8 +46,17 @@ class TranscriptLedger {
         return prefix.map { it.id } == edit.ids && prefix.map { it.final } == edit.sources
     }
     fun polish(epoch: Long, source: String, output: String): Boolean {
-        if (stableFor(epoch) != source) return false
-        val prefix = completedPrefix(epoch)
+        // New final turns may arrive during cleanup. An unchanged completed prefix
+        // is still editable; never consume a partial turn or hide the newly arrived tail.
+        if (source.isBlank()) return false
+        val completed = completedPrefix(epoch)
+        val parts = mutableListOf<String>()
+        val last = completed.indexOfFirst { turn ->
+            turn.final?.takeIf { it.isNotBlank() }?.let(parts::add)
+            parts.joinToString(" ") == source
+        }
+        if (last < 0) return false
+        val prefix = completed.take(last + 1)
         polished[epoch] = Polished(prefix.map { it.id }, prefix.map { it.final!! }, output)
         return true
     }
@@ -205,8 +214,8 @@ class EditorOwnership(private val initial: EditorSnapshot, private val replaceSe
     internal val writingContext get() = WritingContext(prefix, suffix).bounded()
     fun separateFromTypedWord(value: String): String {
         if (value.isEmpty()) return value
-        val left = if (prefix.lastOrNull()?.isLetterOrDigit() == true && value.firstOrNull()?.isLetterOrDigit() == true) " " else ""
-        val right = if (suffix.firstOrNull()?.isLetterOrDigit() == true && value.lastOrNull()?.isLetterOrDigit() == true) " " else ""
+        val left = if ((prefix.lastOrNull()?.isLetterOrDigit() == true || prefix.lastOrNull() in listOf('.', '!', '?', ',', ';', ':')) && value.firstOrNull()?.isLetterOrDigit() == true) " " else ""
+        val right = if (suffix.firstOrNull()?.isLetterOrDigit() == true && (value.lastOrNull()?.isLetterOrDigit() == true || value.lastOrNull() in listOf('.', '!', '?', ',', ';', ':'))) " " else ""
         return left + value + right
     }
     fun ownsWholeField() = prefix.isEmpty() && suffix.isEmpty() && initial.text.isEmpty()

@@ -45,7 +45,9 @@ internal class CleanupMemo(private val maxEntries: Int = 32, private val maxChar
             consumed += chunk.length
             val local = WritingContext(before, source.drop(consumed).take(256).ifEmpty { context.after }).bounded()
             val result = find(chunk, mode, fillers, local) ?: request(chunk, local).also { remember(chunk, it, mode, fillers, local) }
-            before = (before + if (CorrectionGuard.accepts(chunk, result, mode, fillers)) result else chunk).takeLast(512)
+            val accepted = if (CorrectionGuard.accepts(chunk, result, mode, fillers))
+                result.trimEnd() + chunk.takeLastWhile { it.isWhitespace() } else chunk
+            before = (before + accepted).takeLast(512)
             result
         }
     }
