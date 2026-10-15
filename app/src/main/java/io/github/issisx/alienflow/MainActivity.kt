@@ -343,7 +343,7 @@ class MainActivity : Activity() {
         ui.text(connection, "Completed audio is deleted. Interrupted recordings can remain for up to 24 hours so you can recover your words in History, even when transcript saving is off. Recovery sends audio to OpenAI and never types into a new field.", 14, ui.muted)
         val data = ui.card(body)
         ui.text(data, "What leaves this phone", 18, bold = true)
-        ui.text(data, "Audio goes to OpenAI for transcription. Your dictated words and a short excerpt around the insertion point may be sent for your chosen writing style. Existing text is read-only context; password fields are excluded. Vocabulary hints are sent only when enabled. Your full history is not used as a prompt.", 14, ui.muted)
+        ui.text(data, "Audio goes to OpenAI for transcription. With Light polish or Rewrite, your dictated words and up to 512 characters before and 256 after the cursor in the same field are also sent, as read-only context to fit the insertion. Recognition only sends no field text. Password fields are excluded. Vocabulary hints are sent only when enabled. Your full history is not used as a prompt.", 14, ui.muted)
         ui.text(data, "Your API key is encrypted on this device. Keys, transcripts and recordings are excluded from Android backup.", 14, ui.muted)
         ui.button(body, "Delete all saved transcripts", destructive = true) { confirm("Delete all transcripts?", "This permanently removes saved text. Pending recordings and your account settings stay in place.") { app.store.deleteHistory(); notice("Saved transcripts deleted.") } }
     }
@@ -366,7 +366,7 @@ class MainActivity : Activity() {
         microphoneState = ui.text(permissions, if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) "Microphone allowed" else "Microphone access needed", 14, ui.accent)
         ui.button(permissions, "Allow microphone & notifications") { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS), 1) }
         accessibilityState = ui.text(permissions, if (app.coordinator.service != null) "Accessibility connected" else "Accessibility needs to be enabled", 14, ui.accent)
-        ui.text(permissions, "Accessibility lets the alien place text while keeping your keyboard. Typing continues to work during dictation. Password fields are excluded. Switching to another field keeps the recording out of that new field; your result remains in AlienFlow.", 14, ui.muted)
+        ui.text(permissions, "Accessibility lets the alien place text while keeping your keyboard. Typing continues to work during dictation. Password fields are excluded. If you switch to another text field while recording, new speech goes into that field; earlier speech stays in its original field and in History.", 14, ui.muted)
         ui.text(permissions, "AlienFlow stays ready in the background with a notification while accessibility is connected. You do not need to keep its screen open. The microphone starts only when you tap the alien. Hide alien pauses background readiness; Reset position brings it back.", 14, ui.muted)
         ui.button(permissions, "Open accessibility settings") { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
     }
