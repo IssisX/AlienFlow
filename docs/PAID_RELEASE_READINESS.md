@@ -21,3 +21,32 @@ The 15 October download failure was addressed by restoring the stored 0.1.24 sig
 | Distribution | Perform the final Play-specific review and distribution setup when store preparation is authorized. APK-only/API 36 development continues until then. No publication, paid trial provisioning or AAB has been performed in this repair. |
 
 Any observed dropped speech, wrong-field write, duplicated insertion, unintended submission, meaning inversion or lost user draft blocks release. Recognition quality and natural phrasing must be evaluated against actual audio; a prompt or a narrow spelling substitution list is not proof of general accuracy.
+
+## Owner decisions — paid service model (15 October 2026)
+
+**Status:** decided, not started. Nothing below is implemented yet. Work begins after the owner and a second tester accept a CI-green APK using the owner's own OpenAI key.
+
+**Business model**
+- Sell a Google Play subscription.
+- Customers never enter an OpenAI key.
+- The tester-only "use my own OpenAI key" option remains, as an advanced setting.
+
+**Hosting:** Google Cloud.
+- **Firebase Auth** for sign-in.
+- **A small server on Cloud Functions or Cloud Run** holding the only OpenAI key, as a secret. It:
+  - verifies the Play subscription and Play Integrity;
+  - enforces a per-user usage limit;
+  - issues a short-lived single-session credential for live transcription;
+  - proxies the light-polish text request.
+- **Firestore** for per-user usage counts.
+
+Audio is never sent through the server.
+
+**Verify before building**
+- **UNVERIFIED:** OpenAI short-lived credentials for the live-transcription WebSocket.
+- **VOLATILE:** current per-minute transcription pricing, which determines the subscription price and usage limit.
+
+**Owner prerequisites (not yet created)**
+- Google Play Console developer account.
+- Google Cloud / Firebase project with billing.
+- A dedicated server-side OpenAI key with a monthly spending limit.
