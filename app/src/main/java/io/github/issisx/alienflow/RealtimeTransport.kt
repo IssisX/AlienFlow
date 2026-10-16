@@ -40,7 +40,9 @@ class RealtimeTransport internal constructor(
     private val state = Any()
     private val controlScope = CoroutineScope(SupervisorJob() + controlDispatcher)
     private val captureScope = CoroutineScope(SupervisorJob() + captureDispatcher)
+    // One transport per dictation session: both start fresh with each session.
     private val vad = ClientSideVad()
+    private val gate = SilenceGate()
     private val coverage = AudioCoverage()
 
     @Volatile private var closed = false
@@ -239,8 +241,11 @@ class RealtimeTransport internal constructor(
                         firstSample = false
                         main.post { if (!closed && capturing) listener.captured() }
                     }
-                    sendAudio(pcm)
+                    // The WAV above stays complete. Long silence is held before sendAudio, so
+                    // startup buffering and commit coverage count only audio actually sent.
+                    // Audio for a turn is always sent before that turn's commit.
                     val decision = vad.inspect(pcm, System.currentTimeMillis(), silenceStopSeconds)
+                    for (frame in gate.offer(pcm, decision.voiced, RealtimeProtocol.durationMs(pcm.size))) sendAudio(frame)
                     if (decision.commit) sendCommit()
                     if (decision.silenceStop) main.post { if (!closed && capturing) onSilenceStop?.invoke() }
                 } else if (count < 0) {

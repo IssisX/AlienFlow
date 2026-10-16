@@ -301,8 +301,8 @@ class MainActivity : Activity() {
         heading(body, "Dictation & writing", "Choose how your speech becomes text.")
         val delivery = ui.card(body)
         toggle(delivery, "Show words as I speak", "Turn off to place the finished text after you stop. Termux always receives text after you stop.", "live_display", true)
-        slider(delivery, "Stop after a quiet pause", "silence_stop", 0, 0, 30) { if (it == 0) "Off" else "$it seconds" }
-        ui.text(delivery, "Off keeps recording until you stop it yourself.", 14, ui.muted)
+        slider(delivery, "Stop after a quiet pause", "silence_stop", DictationCoordinator.DEFAULT_SILENCE_STOP_SECONDS, 0, 30) { if (it == 0) "Off" else "$it seconds" }
+        ui.text(delivery, "Off keeps recording until you stop it yourself, up to 15 minutes per dictation.", 14, ui.muted)
         val writing = ui.card(body)
         ui.text(writing, "Writing style", 18, bold = true)
         choose(writing, "correction", listOf(

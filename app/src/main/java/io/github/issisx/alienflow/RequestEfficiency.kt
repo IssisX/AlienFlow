@@ -53,9 +53,11 @@ internal class CleanupMemo(private val maxEntries: Int = 32, private val maxChar
     }
     fun find(source: String, mode: String, fillers: Boolean, context: WritingContext = WritingContext()): String? = entries[Key(source, mode, fillers, context.bounded())]
     fun remember(source: String, result: String, mode: String, fillers: Boolean, context: WritingContext = WritingContext()) {
-        // Only the usable part of an answer is reused; an answer with nothing usable is requested again.
+        // Only the usable part of an answer is reused. "No edits needed" (merged == source) is a
+        // valid answer too and is remembered, so each live turn does not re-request unchanged chunks.
+        // A blank answer carries no decision and is requested again.
+        if (result.isBlank()) return
         val usable = PolishMerge.merge(source, result, mode, fillers)
-        if (usable == source) return
         val size = source.length + usable.length
         if (size > maxCharacters) return
         val key = Key(source, mode, fillers, context.bounded())

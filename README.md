@@ -2,7 +2,11 @@
 
 Repository: IssisX/AlienFlow. Working branch: `claude/alienflow`, created from `AlienFlow(chat)` at `2b3455d` (0.1.25-chat.1). This branch writes only itself. `AlienFlow(chat)`, `AlienFlow2`, `build/first-apk` and `main` are untouched.
 
-## Development update: 0.1.26-claude.1 (27)
+## Development update: 0.1.27-claude.1 (28)
+
+- **Lower OpenAI cost:** long silences are no longer uploaded, dictation stops after 30 seconds of quiet by default and after 15 minutes at most, and polish no longer re-sends text that needed no change. AlienFlow only calls OpenAI while a dictation is running, when you tap Check connection, or when recovering a saved recording.
+
+### 0.1.26-claude.1 (27)
 
 - **Live text during speech:** words now reach the focused field while you speak. Since 0.1.24 they waited for each pause. When you switch fields, words that could belong to the previous field still wait for their own commit, so they never enter the new app.
 - **Light polish:** casing and punctuation are applied even when the model also proposes a word change that isn't allowed. Only that word keeps its recognized form. Near-miss misspellings of ordinary words can be corrected. Names, numbers, negation, uncertainty and other meaning words keep the recognized spelling.

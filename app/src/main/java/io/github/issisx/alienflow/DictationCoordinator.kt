@@ -2,6 +2,7 @@ package io.github.issisx.alienflow
 
 import android.Manifest
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
@@ -13,6 +14,14 @@ import java.io.File
 class DictationCoordinator(private val app: AlienApp, private val store: LocalStore,
                            private val api: OpenAiClient = OpenAiClient(),
                            private val keyProvider: () -> String? = store::apiKey) : RealtimeTransport.Listener {
+    companion object {
+        /** Users who never chose a quiet-pause stop get one, so a forgotten session stops billing. Off stays selectable. */
+        const val DEFAULT_SILENCE_STOP_SECONDS = 30
+        /** Hard bound on one session's realtime audio, independent of the quiet-pause setting. */
+        const val SESSION_CAP_MS = 15 * 60 * 1_000L
+        const val SESSION_CAP_STATUS = "Stopped after 15 minutes to limit cost"
+        fun silenceStopSeconds(prefs: SharedPreferences): Int = prefs.getInt("silence_stop", DEFAULT_SILENCE_STOP_SECONDS)
+    }
     private val main = Handler(Looper.getMainLooper())
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     var service: AlienAccessibilityService? = null
@@ -69,6 +78,8 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     private var waitingForTarget = false
     private var waitingAfterInputEpoch = -1L
     private var switchedTargets = false
+    /** Why this session stopped itself; kept visible through the finishing and final statuses. */
+    private var stopNotice: String? = null
     private fun update(value: String? = null) {
         val changed = value != null && value != status
         if (value != null) status = value
@@ -96,7 +107,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         terminalTarget = bridge.isTerminal
         displayLive = store.prefs.getBoolean("live_display", true) && !terminalTarget; cleanLive = store.prefs.getBoolean("live_cleanup", true); correctionMode = store.mode(); fillersEnabled = store.prefs.getBoolean("fillers", false); continueLocal = store.prefs.getBoolean("continue_local", true)
         session++; ledger = TranscriptLedger(); cleanupMemo = CleanupMemo(); endCleanupDone = false; original = ""; result = ""; desired = ""; lastWritten = ""
-        editorEpoch = 0; waitingForTarget = false; waitingAfterInputEpoch = -1; switchedTargets = false
+        editorEpoch = 0; waitingForTarget = false; waitingAfterInputEpoch = -1; switchedTargets = false; stopNotice = null
         saved = false; liveFailed = false; userEdited = false; terminalReason = null; microphoneConfirmed = false; serverConnected = false; interrupted = false; finalizing = false; audioClosing = false; corrections.clear(); cleaned.clear(); writing = false; writeRetryScheduled = false; commits = 0; completeItems.clear(); committedItems.clear(); seenErrors.clear(); editor = bridge; captureTarget = bridge
         active = true; finishing = false; update("Starting microphone and realtime connection…")
         app.crashJournal.mark("service.start-requested")
@@ -111,14 +122,23 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
             audio = PendingAudio(File(store.audioDir, "${System.currentTimeMillis()}.wav"))
             app.crashJournal.mark("transport.start")
             transport = RealtimeTransport(app, audio!!, this).also {
-                it.silenceStopSeconds = store.prefs.getInt("silence_stop", 0)
+                it.silenceStopSeconds = silenceStopSeconds(store.prefs)
                 it.onSilenceStop = { stop() }
                 it.connect(api, key, store.language(), store.vocabularyForSession())
             }
             val token = session
             main.postDelayed({ if (session == token && active && !microphoneConfirmed) failure("Microphone/realtime startup timed out") }, 30000)
+            scheduleSessionCap(token)
             monitorTarget(token)
         } catch (e: Exception) { failure(e.message ?: "Microphone setup failed") }
+    }
+    /** A normal Stop at the cap: captured speech is still finished, delivered and saved. */
+    private fun scheduleSessionCap(token: Long) {
+        main.postDelayed({
+            if (session != token || !active) return@postDelayed
+            stopNotice = SESSION_CAP_STATUS
+            stop()
+        }, SESSION_CAP_MS)
     }
     /**
      * A field losing focus is NOT a reason to shut off the microphone.
@@ -344,7 +364,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         try { val current = transport; if (current != null) current.finishCapture { closeAudio() } else closeAudio() }
         catch (_: Exception) { failure("Could not finalize capture; pending audio preserved"); return }
         // Release hardware capture before refresh can remove the microphone FGS type.
-        update("Finishing captured speech…")
+        update(stopNotice?.let { "$it • finishing captured speech…" } ?: "Finishing captured speech…")
         main.postDelayed({ if (session == token && finishing) { if (transport?.hasUnacknowledgedCommit == true || commits > completeItems.size || commits > committedItems.size || ledger.pending()) failure("Final transcription timed out; pending audio preserved") else tryFinish() } }, 15000)
     }
     private fun tryFinish() {
@@ -431,6 +451,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                     audio = null; cleanupMemo = CleanupMemo(); saved = storageOk; finalizing = false; finishing = false
                     val hasSpeechFile = captured?.file?.let { it.exists() && it.length() > 44 } == true
                     val recoveryLabel = if (hasSpeechFile) "Audio saved for recovery" else "No microphone audio captured"
+                    val notice = stopNotice
                     update(when {
                         !storageOk -> "Storage failed; audio retained if available. Copy the visible result"
                         reason != null -> "$reason • $recoveryLabel"
@@ -441,7 +462,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                         terminalTarget && delivered -> "Sent to Termux • press Enter yourself"
                         switchedTargets -> "Complete • text saved across apps"
                         else -> "Complete • ready for another dictation"
-                    })
+                    }.let { if (notice != null && storageOk && reason == null) "$notice • $it" else it })
                     if (storageOk && keepAudio && interrupted && captured != null && continueLocal) recover(captured.file)
                 }
             } finally {

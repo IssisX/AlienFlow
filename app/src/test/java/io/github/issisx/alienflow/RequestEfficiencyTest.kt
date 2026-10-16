@@ -58,8 +58,30 @@ class RequestEfficiencyTest {
         assertEquals("Hello world.", clean()); assertEquals("Hello world.", clean()); assertEquals(1, requests)
         assertNull(memo.find("hello world", "C", false)); assertNull(memo.find("hello world", "B", true))
         assertNull(CleanupMemo().find("hello world", "B", false))
+        // A rejected unsafe answer is remembered only as "no edits needed": the source, never "$50".
         memo.remember("not $15", "$50", "B", false)
-        assertNull(memo.find("not $15", "B", false))
+        assertEquals("not $15", memo.find("not $15", "B", false))
+        memo.remember("keep this", "   ", "B", false)
+        assertNull("A blank answer carries no decision and is requested again", memo.find("keep this", "B", false))
+    }
+    @Test fun anUnchangedAnswerIsRequestedOnceAcrossRepeatedLiveTurns() = runBlocking {
+        val memo = CleanupMemo(); var requests = 0
+        val source = "Already fine, thanks."
+        repeat(2) {
+            val output = memo.cleanWithContext(source, "B", false, WritingContext()) { chunk, _ -> requests++; chunk }
+            assertEquals(source, output)
+        }
+        assertEquals(1, requests)
+        assertEquals(source, memo.find(source, "B", false))
+    }
+    @Test fun quietPauseStopDefaultsToThirtySecondsAndOffRemainsSelectable() {
+        val store = LocalStore(org.robolectric.RuntimeEnvironment.getApplication())
+        store.prefs.edit().clear().commit()
+        assertEquals(30, DictationCoordinator.silenceStopSeconds(store.prefs))
+        store.prefs.edit().putInt("silence_stop", 0).commit()
+        assertEquals(0, DictationCoordinator.silenceStopSeconds(store.prefs))
+        store.prefs.edit().putInt("silence_stop", 12).commit()
+        assertEquals(12, DictationCoordinator.silenceStopSeconds(store.prefs))
     }
     @Test fun memoBoundsAndEvictionDoNotChangeTheTranscript() {
         val memo = CleanupMemo(maxEntries = 2, maxCharacters = 100)

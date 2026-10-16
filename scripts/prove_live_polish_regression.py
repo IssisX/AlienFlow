@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replay the live-ownership and light-polish cases against the shipped 0.1.26-claude.1 source.
+"""Replay the live-ownership and light-polish cases against the shipped 0.1.25-chat.1 source.
 Exactly these two cases must fail by assertion there; any other outcome blocks the release."""
 from pathlib import Path
 import json, os, shutil, subprocess, xml.etree.ElementTree as ET

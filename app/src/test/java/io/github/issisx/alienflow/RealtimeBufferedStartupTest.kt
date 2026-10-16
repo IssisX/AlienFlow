@@ -42,6 +42,7 @@ class RealtimeBufferedStartupTest {
         override fun stop() { stopped = true }
         override fun release() { released = true }
         fun speech(count: Int = 5) { repeat(count) { frames.addLast(ShortArray(RealtimeProtocol.CHUNK_SAMPLES) { (1_000 + it).toShort() }) } }
+        fun silence(count: Int) { repeat(count) { frames.addLast(ShortArray(RealtimeProtocol.CHUNK_SAMPLES)) } }
     }
     private class Socket(private val req: Request) : WebSocket {
         val sent = mutableListOf<JSONObject>()
@@ -105,6 +106,25 @@ class RealtimeBufferedStartupTest {
             advanceTimeBy(5); runCurrent(); b.pumpUi(); assertTrue(finished); b.audio.close()
             assertArrayEquals(uploaded, b.file.readBytes().drop(44).toByteArray())
             assertEquals(1, b.commits); assertFalse(b.transport.hasPendingCoverage)
+        }
+    }
+    @Test fun longSilenceIsHeldOffTheSocketWhileTheRecoveryWavStaysComplete() = runTest {
+        Boundary(this).use { b ->
+            b.open(); b.ready()
+            b.input.speech(10); b.input.silence(150); b.input.speech(10)
+            runCurrent(); b.pumpUi()
+            val append = "input_audio_buffer.append"; val commit = "input_audio_buffer.commit"
+            // 10 speech + 43 silence, VAD commit, rest of the 2 s idle period, then 25 pre-roll + 10 speech.
+            assertEquals(listOf("session.update") + List(53) { append } + listOf(commit) + List(57 + 25 + 10) { append },
+                b.socket.sent.map { it.getString("type") })
+            var finished = false; b.transport.finishCapture { finished = true }
+            advanceTimeBy(5); runCurrent(); b.pumpUi(); assertTrue(finished); b.audio.close()
+            assertEquals(commit, b.socket.sent.last().getString("type")); assertEquals(2, b.commits)
+            val frame = RealtimeProtocol.CHUNK_BYTES
+            val wav = b.file.readBytes().drop(44).toByteArray()
+            assertEquals(170 * frame, wav.size)
+            assertArrayEquals(wav.copyOfRange(0, 110 * frame) + wav.copyOfRange(135 * frame, 170 * frame), b.uploadedAudio())
+            assertFalse(b.transport.hasPendingCoverage); assertEquals(0, b.failures.size)
         }
     }
     @Test fun switchingBeforeHandshakePreservesAudioBoundariesAndLateResultDestinations() = runTest {
