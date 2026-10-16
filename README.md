@@ -2,9 +2,10 @@
 
 Repository: IssisX/AlienFlow. Working branch: `claude/alienflow`, created from `AlienFlow(chat)` at `2b3455d` (0.1.25-chat.1). This branch writes only itself. `AlienFlow(chat)`, `AlienFlow2`, `build/first-apk` and `main` are untouched.
 
-## Development update: 0.1.27-claude.1 (28)
+## Development update: 0.1.28-claude.1 (29)
 
-- **Lower OpenAI cost:** long silences are no longer uploaded, dictation stops after 30 seconds of quiet by default and after 15 minutes at most, and polish no longer re-sends text that needed no change. AlienFlow only calls OpenAI while a dictation is running, when you tap Check connection, or when recovering a saved recording.
+- **Cleaner interface:** one neutral dark palette, a single blue accent, tighter spacing and plain wording.
+- **Lower OpenAI cost:** long silences are no longer uploaded, dictation stops after 15 seconds of quiet by default (Off to 60 seconds) and after a maximum length (default 15 minutes, 1 to 30), and polish no longer re-sends text that needed no change. AlienFlow only calls OpenAI while a dictation is running, when you tap Check connection, or when recovering a saved recording.
 
 ### 0.1.26-claude.1 (27)
 

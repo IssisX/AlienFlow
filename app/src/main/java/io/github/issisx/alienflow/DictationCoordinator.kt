@@ -16,11 +16,19 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                            private val keyProvider: () -> String? = store::apiKey) : RealtimeTransport.Listener {
     companion object {
         /** Users who never chose a quiet-pause stop get one, so a forgotten session stops billing. Off stays selectable. */
-        const val DEFAULT_SILENCE_STOP_SECONDS = 30
-        /** Hard bound on one session's realtime audio, independent of the quiet-pause setting. */
-        const val SESSION_CAP_MS = 15 * 60 * 1_000L
-        const val SESSION_CAP_STATUS = "Stopped after 15 minutes to limit cost"
-        fun silenceStopSeconds(prefs: SharedPreferences): Int = prefs.getInt("silence_stop", DEFAULT_SILENCE_STOP_SECONDS)
+        const val DEFAULT_SILENCE_STOP_SECONDS = 15
+        const val MAX_SILENCE_STOP_SECONDS = 60
+        /** Hard bound on one session's realtime audio, independent of the quiet-pause setting. Never Off. */
+        const val DEFAULT_SESSION_MINUTES = 15
+        const val MIN_SESSION_MINUTES = 1
+        const val MAX_SESSION_MINUTES = 30
+        const val SESSION_CAP_MS = DEFAULT_SESSION_MINUTES * 60 * 1_000L
+        const val SESSION_CAP_STATUS = "Stopped after $DEFAULT_SESSION_MINUTES minutes to limit cost"
+        fun silenceStopSeconds(prefs: SharedPreferences): Int =
+            prefs.getInt("silence_stop", DEFAULT_SILENCE_STOP_SECONDS).coerceIn(0, MAX_SILENCE_STOP_SECONDS)
+        fun sessionMinutes(prefs: SharedPreferences): Int =
+            prefs.getInt("session_minutes", DEFAULT_SESSION_MINUTES).coerceIn(MIN_SESSION_MINUTES, MAX_SESSION_MINUTES)
+        fun sessionCapStatus(minutes: Int) = "Stopped after $minutes ${if (minutes == 1) "minute" else "minutes"} to limit cost"
     }
     private val main = Handler(Looper.getMainLooper())
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -134,11 +142,12 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     }
     /** A normal Stop at the cap: captured speech is still finished, delivered and saved. */
     private fun scheduleSessionCap(token: Long) {
+        val minutes = sessionMinutes(store.prefs)
         main.postDelayed({
             if (session != token || !active) return@postDelayed
-            stopNotice = SESSION_CAP_STATUS
+            stopNotice = sessionCapStatus(minutes)
             stop()
-        }, SESSION_CAP_MS)
+        }, minutes * 60_000L)
     }
     /**
      * A field losing focus is NOT a reason to shut off the microphone.

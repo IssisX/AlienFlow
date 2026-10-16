@@ -1,17 +1,21 @@
-# AlienFlow implementation — 0.1.27-claude.1 (28), branch `claude/alienflow`
+# AlienFlow implementation — 0.1.28-claude.1 (29), branch `claude/alienflow`
 
-This is a development APK built from `claude/alienflow`. 0.1.27-claude.1 adds the cost controls below to 0.1.26-claude.1; everything else in this document is unchanged from 0.1.26-claude.1. The branch was created from `AlienFlow(chat)` at `2b3455d` (0.1.25-chat.1). It is **not signed off for a paid public launch**. [Paid release readiness](PAID_RELEASE_READINESS.md) lists the acceptance evidence still required. Previous checkpoint: [0.1.25-chat.1](history/IMPLEMENTATION_CHAT_0.1.25-chat.1.md).
+This is a development APK built from `claude/alienflow`. 0.1.27-claude.1 and 0.1.28-claude.1 add the cost controls and interface changes below to 0.1.26-claude.1; everything else in this document is unchanged from 0.1.26-claude.1. The branch was created from `AlienFlow(chat)` at `2b3455d` (0.1.25-chat.1). It is **not signed off for a paid public launch**. [Paid release readiness](PAID_RELEASE_READINESS.md) lists the acceptance evidence still required. Previous checkpoint: [0.1.25-chat.1](history/IMPLEMENTATION_CHAT_0.1.25-chat.1.md).
 
-## Cost controls (0.1.27-claude.1)
+## Cost controls (0.1.27–0.1.28)
 
 The owner reported unexpected OpenAI charges. The app calls OpenAI only during an active dictation, a Check connection, or a recovery of saved audio; nothing runs in the background. Within a dictation it spent more than needed:
 
 1. **Silence was streamed and billed.** Every microphone chunk was sent, including silence. A forgotten session, with the quiet-pause stop Off by default, streamed until someone stopped it. Now `SilenceGate` sends speech and the first 2 s of each pause, then holds silence locally. The next speech sends the most recent 0.5 s first so the first word is not clipped. Voiced audio is never held or dropped, every 850 ms commit still follows its speech, and the local recovery recording stays complete.
-2. **No default stop.** "Stop after a quiet pause" now defaults to 30 seconds; Off remains selectable.
-3. **No session limit.** A dictation stops after 15 minutes, through the normal Stop path, so captured speech is still finished and saved. The status says why it stopped.
+2. **No default stop.** "Stop after a quiet pause" now defaults to 15 seconds (0.1.27 used 30), adjustable from Off to 60 seconds.
+3. **No session limit.** A dictation stops after "Maximum dictation length" (default 15 minutes, adjustable from 1 to 30, never Off), through the normal Stop path, so captured speech is still finished and saved. The status says why it stopped.
 4. **Polish re-requested unchanged text.** The per-recording cleanup memo now remembers "no edits needed" answers, so each pause no longer re-sends earlier text that needed no change.
 
-Limits: speech quieter than the voice threshold for more than 2 s is sent only from its last 0.5 s and otherwise stays in the local recording, where recovery can still transcribe it. The 30 s quiet stop also applies before the first word. The actual billing reduction has not been measured.
+Limits: speech quieter than the voice threshold for more than 2 s is sent only from its last 0.5 s and otherwise stays in the local recording, where recovery can still transcribe it. The quiet stop also applies before the first word. The actual billing reduction has not been measured.
+
+## Interface (0.1.28-claude.1)
+
+The owner asked for a crisper, more professional look. The app screens now use one neutral dark palette with a single blue accent, smaller corner radii, tighter spacing and a consistent type scale. The home screen drops the marketing tagline for a plain "Dictation" heading, and screen descriptions say what each page contains. Option descriptions are shown in secondary text. Button labels, navigation and the floating alien artwork are unchanged.
 
 ## Defects repaired (0.1.26-claude.1)
 
@@ -65,7 +69,7 @@ It can compare recognition delay, commit silence and a transcription prompt with
 - The selected keyboard and the nonfocusable bubble with its 75% default opacity and approved artwork.
 - Live in-field text, light polish by default, the final cleanup pass after Stop, bounded context, editor-generation and segment ownership, unknown-offset keyboard handling.
 - Termux final-only insertion without Enter.
-- The provider models and prompts, `medium` delay, 850 ms commit silence, history and encrypted key. Settings are unchanged except the quiet-pause default above.
+- The provider models and prompts, `medium` delay, 850 ms commit silence, history and encrypted key. Settings are unchanged except the quiet-pause default and the dictation length limit above.
 - API 36, APK-only development, application ID and signing identity. No AAB was built.
 
 ## Known limits and unknowns

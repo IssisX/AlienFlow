@@ -91,6 +91,7 @@ class MainActivity : Activity() {
         host = FrameLayout(this)
         content.addView(host, LinearLayout.LayoutParams(-1, 0, 1f))
         navigation = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(ui.dp(12), ui.dp(8), ui.dp(12), ui.dp(8)) }
+        content.addView(View(this).apply { setBackgroundColor(ui.border) }, LinearLayout.LayoutParams(-1, ui.dp(1)))
         content.addView(navigation)
         setContentView(shell)
         shell.setOnApplyWindowInsetsListener { view, insets ->
@@ -198,7 +199,7 @@ class MainActivity : Activity() {
                 text = label; textSize = 14f; isAllCaps = false; minHeight = ui.dp(52)
                 setPadding(ui.dp(4), ui.dp(8), ui.dp(4), ui.dp(8))
                 setTextColor(if (selected == destination) ui.accent else ui.muted)
-                background = ui.ripple(if (selected == destination) ui.surface else ui.background, 14)
+                background = ui.ripple(if (selected == destination) ui.surface else ui.background, 10)
                 isSelected = selected == destination
                 contentDescription = if (isSelected) "$label, selected" else label
                 tag = "nav-${destination.name}"
@@ -208,40 +209,40 @@ class MainActivity : Activity() {
     }
     private fun heading(body: LinearLayout, title: String, subtitle: String, leaf: Boolean = true) {
         if (leaf) ui.button(body, "‹ Back") { goBack() }.apply { tag = "back"; gravity = Gravity.START or Gravity.CENTER_VERTICAL; background = ui.ripple(ui.background); setPadding(0, ui.dp(8), 0, ui.dp(8)) }
-        ui.text(body, title, 30, bold = true).apply { isAccessibilityHeading = true; setPadding(0, ui.dp(6), 0, 0) }
-        ui.text(body, subtitle, 15, ui.muted).apply { setPadding(0, 0, 0, ui.dp(14)) }
+        ui.text(body, title, 26, bold = true).apply { isAccessibilityHeading = true; setPadding(0, ui.dp(6), 0, 0) }
+        ui.text(body, subtitle, 14, ui.muted).apply { setPadding(0, 0, 0, ui.dp(12)) }
     }
     private fun ready() = prefs.contains("api_key") && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED && app.coordinator.service != null
     private fun home(body: LinearLayout) {
         val brand = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        brand.addView(ImageView(this).apply { setImageResource(R.drawable.alien_approved); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, LinearLayout.LayoutParams(ui.dp(56), ui.dp(56)))
-        brand.addView(ui.text("AlienFlow", 25, bold = true), LinearLayout.LayoutParams(-2, -2).apply { marginStart = ui.dp(12) })
-        body.addView(brand, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = ui.dp(24) })
-        ui.text(body, "Make room for\nyour words.", 32, bold = true)
-        ui.text(body, "Speak naturally. Keep your keyboard.", 16, ui.muted).apply { setPadding(0, 0, 0, ui.dp(14)) }
+        brand.addView(ImageView(this).apply { setImageResource(R.drawable.alien_approved); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, LinearLayout.LayoutParams(ui.dp(36), ui.dp(36)))
+        brand.addView(ui.text("AlienFlow", 20, bold = true), LinearLayout.LayoutParams(-2, -2).apply { marginStart = ui.dp(10) })
+        body.addView(brand, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = ui.dp(20) })
+        ui.text(body, "Dictation", 26, bold = true).apply { isAccessibilityHeading = true }
+        ui.text(body, "Speak into any text field while keeping your keyboard.", 14, ui.muted).apply { setPadding(0, 0, 0, ui.dp(12)) }
         run {
             val setup = ui.card(body).also { setupCard = it; it.visibility = if (ready()) View.GONE else View.VISIBLE }
-            ui.text(setup, "A little setup. Then just speak.", 18, bold = true)
-            ui.text(setup, "Connect your account and allow AlienFlow to hear you and place your words in a text field.", color = ui.muted)
+            ui.text(setup, "Setup required", 16, bold = true)
+            ui.text(setup, "Add your OpenAI API key, then allow microphone and accessibility access.", 14, ui.muted)
             ui.button(setup, "Finish setup", primary = true) { open(Page.ACCOUNT) }
         }
         val practice = ui.card(body)
-        ui.text(practice, "Try it here", 18, bold = true)
-        ui.text(practice, "Tap the field, then start. The green dot on the alien means you can speak.", 14, ui.muted)
+        ui.text(practice, "Test dictation", 16, bold = true)
+        ui.text(practice, "Select the field below and start. Speak when the alien shows a green dot.", 14, ui.muted)
         test = edit(practice, "Your words will appear here…", testDraft, multi = true).apply { tag = "practice"; minLines = 3 }
         status = ui.text(practice, "", 14, ui.accent).apply { tag = "session-status"; accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }
         record = ui.button(practice, "Start dictation", primary = true) { test?.requestFocus(); app.coordinator.toggle() }
         cancel = ui.button(practice, "Cancel dictation") { app.coordinator.cancel() }
         val latest = ui.card(body)
-        ui.text(latest, "Latest result", 18, bold = true)
+        ui.text(latest, "Latest result", 16, bold = true)
         resultPreview = ui.text(latest, "", 15, ui.muted).apply { maxLines = 3; ellipsize = TextUtils.TruncateAt.END; tag = "latest-preview" }
         ui.button(latest, "Open latest result") { open(Page.RESULT) }
-        ui.text(body, "Your history has its own home. Find, copy or delete a transcript in History.", 14, ui.muted)
+        ui.text(body, "Saved transcripts are in History.", 13, ui.muted)
     }
     private fun renderStatus() {
         val coordinator = app.coordinator
         status?.text = if (coordinator.status == "Set up your key, microphone and accessibility") {
-            if (ready()) "Ready when you are." else "Finish setup to start dictating."
+            if (ready()) "Ready." else "Finish setup to start dictating."
         } else coordinator.status
         resultPreview?.text = coordinator.result.ifBlank { "Your most recent dictation will appear here." }
         record?.text = when { coordinator.active -> "Stop & finish"; coordinator.finishing -> "Finishing…"; else -> "Start dictation" }
@@ -254,7 +255,7 @@ class MainActivity : Activity() {
         accessibilityState?.text = if (app.coordinator.service != null) "Accessibility connected" else "Accessibility needs to be enabled"
     }
     private fun settings(body: LinearLayout) {
-        heading(body, "Settings", "Make AlienFlow feel like you.", leaf = false)
+        heading(body, "Settings", "Dictation, privacy and account preferences.", leaf = false)
         ui.row(body, "Floating alien", "Size, visibility and how you start dictation") { open(Page.BUBBLE) }
         ui.row(body, "Dictation & writing", "Live words, punctuation and writing style") { open(Page.DICTATION) }
         ui.row(body, "Language & vocabulary", "Your language, names and specialist words") { open(Page.LANGUAGE) }
@@ -273,14 +274,14 @@ class MainActivity : Activity() {
         header.addView(ui.text("Floating alien", 22, bold = true).apply { isAccessibilityHeading = true }, LinearLayout.LayoutParams(0, -2, 1f))
         body.addView(header, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = ui.dp(12) })
         val previewCard = ui.card(body)
-        ui.text(previewCard, "Live preview", 18, bold = true)
+        ui.text(previewCard, "Live preview", 16, bold = true)
         ui.text(previewCard, "Your icon on light and dark backgrounds.", 14, ui.muted)
         previewCard.addView(BubblePreview(this, app.store.prefs).apply { tag = "bubble-preview" }, LinearLayout.LayoutParams(-1, ui.dp(120)))
         val controls = ui.column()
         scroll = ScrollView(this).apply { addView(controls); isFillViewport = true }
         body.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         val appearance = ui.card(controls)
-        ui.text(appearance, "Appearance", 18, bold = true)
+        ui.text(appearance, "Appearance", 16, bold = true)
         slider(appearance, "Size", "size", 32, 24, 64) { "${it * 100 / 32}%" }
         slider(appearance, "Visibility when idle", "opacity", BubbleOpacity.DEFAULT_IDLE_PERCENT, 10, 100) { "$it%" }
         slider(appearance, "Visibility while dictating", "active_opacity", 100, 50, 100) { "$it%" }
@@ -301,10 +302,12 @@ class MainActivity : Activity() {
         heading(body, "Dictation & writing", "Choose how your speech becomes text.")
         val delivery = ui.card(body)
         toggle(delivery, "Show words as I speak", "Turn off to place the finished text after you stop. Termux always receives text after you stop.", "live_display", true)
-        slider(delivery, "Stop after a quiet pause", "silence_stop", DictationCoordinator.DEFAULT_SILENCE_STOP_SECONDS, 0, 30) { if (it == 0) "Off" else "$it seconds" }
-        ui.text(delivery, "Off keeps recording until you stop it yourself, up to 15 minutes per dictation.", 14, ui.muted)
+        slider(delivery, "Stop after a quiet pause", "silence_stop", DictationCoordinator.DEFAULT_SILENCE_STOP_SECONDS, 0, DictationCoordinator.MAX_SILENCE_STOP_SECONDS) { if (it == 0) "Off" else "$it seconds" }
+        ui.text(delivery, "Ends the dictation after this much silence. Off keeps recording until you stop it or the time limit is reached.", 14, ui.muted)
+        slider(delivery, "Maximum dictation length", "session_minutes", DictationCoordinator.DEFAULT_SESSION_MINUTES, DictationCoordinator.MIN_SESSION_MINUTES, DictationCoordinator.MAX_SESSION_MINUTES) { if (it == 1) "1 minute" else "$it minutes" }
+        ui.text(delivery, "Always on. Limits what one forgotten dictation can cost.", 14, ui.muted)
         val writing = ui.card(body)
-        ui.text(writing, "Writing style", 18, bold = true)
+        ui.text(writing, "Writing style", 16, bold = true)
         choose(writing, "correction", listOf(
             Choice("A", "As spoken", "Keep the recognized words, without an extra editing pass."),
             Choice("B", "Light polish", "Tidy sentence case, punctuation and clear spelling errors. Connect phrases while keeping your voice."),
@@ -314,10 +317,10 @@ class MainActivity : Activity() {
     }
     private data class Choice(val value: String, val title: String, val explanation: String)
     private fun language(body: LinearLayout) {
-        heading(body, "Language & vocabulary", "Help AlienFlow hear the words you use.")
+        heading(body, "Language & vocabulary", "Recognition language and custom vocabulary.")
         val languages = listOf("" to "Detect automatically", "en" to "English", "es" to "Spanish", "fr" to "French", "de" to "German", "it" to "Italian", "pt" to "Portuguese", "ja" to "Japanese", "ko" to "Korean", "zh" to "Chinese", "ar" to "Arabic", "hi" to "Hindi")
         val settings = ui.card(body)
-        ui.text(settings, "Spoken language", 18, bold = true)
+        ui.text(settings, "Spoken language", 16, bold = true)
         val selected = languages.firstOrNull { it.first == app.store.language() }?.second ?: "Other: ${app.store.language()}"
         ui.button(settings, selected) {
             val labels = languages.map { it.second } + "Another language…"
@@ -329,7 +332,7 @@ class MainActivity : Activity() {
         }.apply { tag = "spoken-language" }
         ui.text(settings, "Choosing a language helps recognition. Automatic detection is useful when you switch languages.", 14, ui.muted)
         val vocabulary = ui.card(body)
-        ui.text(vocabulary, "Personal vocabulary", 18, bold = true)
+        ui.text(vocabulary, "Personal vocabulary", 16, bold = true)
         toggle(vocabulary, "Use my vocabulary", "Optional. Turn on only for names or terms AlienFlow often mishears. Off sends no vocabulary.", "use_vocabulary", false)
         ui.text(vocabulary, "Keep a short list of names or specialist terms, separated by commas or new lines. Duplicate entries are sent once. Your saved list stays here when switched off.", 14, ui.muted)
         val words = edit(vocabulary, "For example: Siobhan, Kubernetes, AlienFlow", prefs.getString("vocabulary", "").orEmpty(), multi = true).apply { tag = "vocabulary"; minLines = 4; filters = arrayOf(InputFilter.LengthFilter(4000)) }
@@ -347,24 +350,24 @@ class MainActivity : Activity() {
         } }; dialog.show()
     }
     private fun privacy(body: LinearLayout) {
-        heading(body, "Privacy & saving", "You decide what stays on this phone.")
+        heading(body, "Privacy & saving", "What is kept on this phone and for how long.")
         val saving = ui.card(body)
-        ui.text(saving, "Keep transcripts", 18, bold = true)
+        ui.text(saving, "Keep transcripts", 16, bold = true)
         ui.text(saving, "Find saved text in History. Choosing a shorter period removes older entries when history is refreshed. Off removes saved history on refresh.", 14, ui.muted)
         choose(saving, "retention", listOf(Choice("-1", "Off", "Do not keep completed transcripts."), Choice("1", "1 day", "For a little room to revisit your words."), Choice("7", "7 days", "A week of recent dictations."), Choice("30", "30 days", "Keep a month of transcripts."), Choice("0", "Until I delete them", "Keep transcripts until you remove them.")), prefs.getInt("retention", 7).toString()) { prefs.edit().putInt("retention", it.toInt()).apply() }
         val connection = ui.card(body)
         toggle(connection, "Keep recording if the connection drops", "Save audio privately on this phone while reconnecting. Turn off to stop when the connection is lost.", "continue_local", true)
         ui.text(connection, "Completed audio is deleted. Interrupted recordings can remain for up to 24 hours so you can recover your words in History, even when transcript saving is off. Recovery sends audio to OpenAI and never types into a new field.", 14, ui.muted)
         val data = ui.card(body)
-        ui.text(data, "What leaves this phone", 18, bold = true)
+        ui.text(data, "What leaves this phone", 16, bold = true)
         ui.text(data, "Audio goes to OpenAI for transcription. With Light polish or Rewrite, your dictated words and up to 512 characters before and 256 after the cursor in the same field are also sent, as read-only context to fit the insertion. Recognition only sends no field text. Password fields are excluded. Vocabulary hints are sent only when enabled. Your full history is not used as a prompt.", 14, ui.muted)
         ui.text(data, "Your API key is encrypted on this device. Keys, transcripts and recordings are excluded from Android backup.", 14, ui.muted)
         ui.button(body, "Delete all saved transcripts", destructive = true) { confirm("Delete all transcripts?", "This permanently removes saved text. Pending recordings and your account settings stay in place.") { app.store.deleteHistory(); notice("Saved transcripts deleted.") } }
     }
     private fun account(body: LinearLayout) {
-        heading(body, "Account & setup", "Connect once. Dictate wherever you write.")
+        heading(body, "Account & setup", "OpenAI connection and required permissions.")
         val connection = ui.card(body)
-        ui.text(connection, "Your OpenAI connection", 18, bold = true)
+        ui.text(connection, "Your OpenAI connection", 16, bold = true)
         ui.text(connection, "This version uses your own OpenAI API account. API usage is billed by OpenAI separately; a ChatGPT subscription does not include API usage.", 14, ui.muted)
         accountKeyState = ui.text(connection, if (prefs.contains("api_key")) "API key saved on this phone" else "No API key saved", 14, ui.accent)
         val key = edit(connection, "Paste your OpenAI API key", "", password = true).apply { tag = "api-key"; isSaveEnabled = false; importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS }
@@ -376,7 +379,7 @@ class MainActivity : Activity() {
         status = ui.text(connection, "", 14, ui.muted).apply { accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }
         ui.button(connection, "Remove saved key", destructive = true) { confirm("Remove your API key?", "You will need to add a key again to dictate. Saved transcripts stay on this phone.") { app.store.saveKey(""); accountKeyState?.text = "No API key saved"; key.setText("") } }
         val permissions = ui.card(body)
-        ui.text(permissions, "Phone permissions", 18, bold = true)
+        ui.text(permissions, "Phone permissions", 16, bold = true)
         microphoneState = ui.text(permissions, if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) "Microphone allowed" else "Microphone access needed", 14, ui.accent)
         ui.button(permissions, "Allow microphone & notifications") { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS), 1) }
         accessibilityState = ui.text(permissions, if (app.coordinator.service != null) "Accessibility connected" else "Accessibility needs to be enabled", 14, ui.accent)
@@ -389,13 +392,13 @@ class MainActivity : Activity() {
         refreshSetup(); renderStatus()
     }
     private fun help(body: LinearLayout) {
-        heading(body, "Help & about", "A few things worth knowing.")
+        heading(body, "Help & about", "How dictation works, troubleshooting and version.")
         val guide = ui.card(body)
-        ui.text(guide, "Everyday dictation", 18, bold = true)
+        ui.text(guide, "Everyday dictation", 16, bold = true)
         ui.text(guide, "1. Select a text field in your app.\n2. Tap the alien to start. Speak when its green dot appears.\n3. Tap again to finish. In Termux, your words arrive after you stop. AlienFlow never presses Enter for you.")
         ui.text(guide, "Drag the alien to move it. Open its menu to hide it or reach Settings. The cyan rim shows a live connection; amber means local recording or finishing.", 14, ui.muted)
         val troubleshooting = ui.card(body)
-        ui.text(troubleshooting, "Troubleshooting", 18, bold = true)
+        ui.text(troubleshooting, "Troubleshooting", 16, bold = true)
         ui.text(troubleshooting, "Alien missing? Select a supported text field, check accessibility in Account & setup, or use “Bring the alien back” in Floating alien.", 14, ui.muted)
         toggle(troubleshooting, "Show error details beside the alien", "Helpful while reporting a problem. Turn off for a quieter experience. Routine completion messages never appear there.", "diagnostic_bubble_errors", true)
         ui.button(troubleshooting, "Diagnostics / share report") { startActivity(Intent(this, DiagnosticsActivity::class.java)) }
@@ -405,7 +408,7 @@ class MainActivity : Activity() {
     }
 
     private fun historyPage(body: LinearLayout) {
-        heading(body, "History", "Your words, easy to find.", leaf = false)
+        heading(body, "History", "Saved transcripts on this phone.", leaf = false)
         historySummary = ui.text(body, "", 14, ui.muted)
         ui.row(body, "Interrupted recordings", "Recover or discard audio saved on this phone") { open(Page.RECOVERY) }
             .apply { tag = "recovery-link"; recoveryRow = getChildAt(0).let { (it as LinearLayout).getChildAt(1) as TextView } }
@@ -484,7 +487,7 @@ class MainActivity : Activity() {
         ui.button(body, "Copy latest result", primary = true) { copy(app.coordinator.result) }
     }
     private fun recovery(body: LinearLayout) {
-        heading(body, "Interrupted recordings", "Recover your words without restarting the microphone.")
+        heading(body, "Interrupted recordings", "Recordings saved after a lost connection.")
         ui.text(body, "These recordings stay privately on this phone for up to 24 hours. Recovery sends audio to OpenAI using your account, and never inserts it into another app.", 14, ui.muted)
         status = ui.text(body, "", 14, ui.accent)
         val pending = app.store.pending()
@@ -537,7 +540,7 @@ class MainActivity : Activity() {
     }
     private fun slider(parent: LinearLayout, label: String, key: String, default: Int, low: Int, high: Int, format: (Int) -> String) {
         val current = prefs.getInt(key, default).coerceIn(low, high)
-        val caption = ui.text(parent, "$label · ${format(current)}", 16, bold = true)
+        val caption = ui.text(parent, "$label · ${format(current)}", 15, bold = true).apply { setPadding(0, ui.dp(8), 0, 0) }
         parent.addView(SeekBar(this).apply {
             tag = key; contentDescription = label; max = high - low; progress = current - low
             progressTintList = ColorStateList.valueOf(ui.accent); thumbTintList = ColorStateList.valueOf(ui.accent)
@@ -554,7 +557,12 @@ class MainActivity : Activity() {
         choices.forEach { choice ->
             group.addView(RadioButton(this).apply {
                 id = View.generateViewId(); this.tag = choice.value
-                text = "${choice.title}\n${choice.explanation}"; textSize = 15f; setTextColor(ui.ink)
+                text = android.text.SpannableStringBuilder(choice.title).append("\n").also { line ->
+                    val start = line.length
+                    line.append(choice.explanation)
+                    line.setSpan(android.text.style.ForegroundColorSpan(ui.muted), start, line.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    line.setSpan(android.text.style.RelativeSizeSpan(13f / 15f), start, line.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                }; textSize = 15f; setTextColor(ui.ink)
                 minHeight = ui.dp(64); setPadding(ui.dp(8), ui.dp(12), ui.dp(8), ui.dp(12))
                 buttonTintList = ColorStateList.valueOf(ui.accent)
                 isChecked = choice.value == selected

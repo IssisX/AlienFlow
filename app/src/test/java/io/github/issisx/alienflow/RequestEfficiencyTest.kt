@@ -74,14 +74,28 @@ class RequestEfficiencyTest {
         assertEquals(1, requests)
         assertEquals(source, memo.find(source, "B", false))
     }
-    @Test fun quietPauseStopDefaultsToThirtySecondsAndOffRemainsSelectable() {
+    @Test fun quietPauseStopDefaultsToFifteenSecondsAndOffRemainsSelectable() {
         val store = LocalStore(org.robolectric.RuntimeEnvironment.getApplication())
         store.prefs.edit().clear().commit()
-        assertEquals(30, DictationCoordinator.silenceStopSeconds(store.prefs))
+        assertEquals(15, DictationCoordinator.silenceStopSeconds(store.prefs))
         store.prefs.edit().putInt("silence_stop", 0).commit()
         assertEquals(0, DictationCoordinator.silenceStopSeconds(store.prefs))
-        store.prefs.edit().putInt("silence_stop", 12).commit()
-        assertEquals(12, DictationCoordinator.silenceStopSeconds(store.prefs))
+        store.prefs.edit().putInt("silence_stop", 45).commit()
+        assertEquals(45, DictationCoordinator.silenceStopSeconds(store.prefs))
+        store.prefs.edit().putInt("silence_stop", 600).commit()
+        assertEquals(60, DictationCoordinator.silenceStopSeconds(store.prefs))
+    }
+    @Test fun dictationLengthLimitDefaultsToFifteenMinutesAndCannotBeTurnedOff() {
+        val store = LocalStore(org.robolectric.RuntimeEnvironment.getApplication())
+        store.prefs.edit().clear().commit()
+        assertEquals(15, DictationCoordinator.sessionMinutes(store.prefs))
+        store.prefs.edit().putInt("session_minutes", 5).commit()
+        assertEquals(5, DictationCoordinator.sessionMinutes(store.prefs))
+        store.prefs.edit().putInt("session_minutes", 0).commit()
+        assertEquals(1, DictationCoordinator.sessionMinutes(store.prefs))
+        store.prefs.edit().putInt("session_minutes", 500).commit()
+        assertEquals(30, DictationCoordinator.sessionMinutes(store.prefs))
+        assertEquals("Stopped after 1 minute to limit cost", DictationCoordinator.sessionCapStatus(1))
     }
     @Test fun memoBoundsAndEvictionDoNotChangeTheTranscript() {
         val memo = CleanupMemo(maxEntries = 2, maxCharacters = 100)
