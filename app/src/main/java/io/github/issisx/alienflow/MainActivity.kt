@@ -114,7 +114,7 @@ class MainActivity : Activity() {
         }
         renderStatus(); refreshHistory(); refreshRecovery(); refreshSetup()
     }
-    override fun onPause() { app.coordinator.listener = null; super.onPause() }
+    override fun onPause() { app.coordinator.listener = null; app.coordinator.cancelAuxiliaryRequests(); super.onPause() }
     override fun onSaveInstanceState(outState: Bundle) {
         rememberPage()
         outState.putString("page", page.name); outState.putString("transcript", selectedId)
@@ -130,6 +130,7 @@ class MainActivity : Activity() {
         historyList?.let { listPosition = it.firstVisiblePosition; listOffset = it.getChildAt(0)?.top ?: 0 }
     }
     private fun open(next: Page, push: Boolean = true) {
+        if (next != page && (page == Page.RECOVERY || page == Page.ACCOUNT)) app.coordinator.cancelAuxiliaryRequests()
         rememberPage()
         getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(host.windowToken, 0)
         if (push) backStack.addLast(page)
@@ -197,7 +198,7 @@ class MainActivity : Activity() {
         ui.text(body, title, 30, bold = true).apply { isAccessibilityHeading = true; setPadding(0, ui.dp(6), 0, 0) }
         ui.text(body, subtitle, 15, ui.muted).apply { setPadding(0, 0, 0, ui.dp(14)) }
     }
-    private fun ready() = prefs.contains("api_key") && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED && app.coordinator.service != null
+    private fun ready() = app.coordinator.paidApiEnabled && prefs.contains("api_key") && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED && app.coordinator.service != null
     private fun home(body: LinearLayout) {
         val brand = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         brand.addView(ImageView(this).apply { setImageResource(R.drawable.alien_approved); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, LinearLayout.LayoutParams(ui.dp(56), ui.dp(56)))
@@ -218,6 +219,7 @@ class MainActivity : Activity() {
         status = ui.text(practice, "", 14, ui.accent).apply { tag = "session-status"; accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }
         record = ui.button(practice, "Start dictation", primary = true) { test?.requestFocus(); app.coordinator.toggle() }
         cancel = ui.button(practice, "Cancel dictation") { app.coordinator.cancel() }
+        ui.button(practice, "Pause all API activity", destructive = true) { app.coordinator.pausePaidApi() }
         val latest = ui.card(body)
         ui.text(latest, "Latest result", 18, bold = true)
         resultPreview = ui.text(latest, "", 15, ui.muted).apply { maxLines = 3; ellipsize = TextUtils.TruncateAt.END; tag = "latest-preview" }
@@ -287,7 +289,8 @@ class MainActivity : Activity() {
         heading(body, "Dictation & writing", "Choose how your speech becomes text.")
         val delivery = ui.card(body)
         toggle(delivery, "Show words as I speak", "Turn off to place the finished text after you stop. Termux always receives text after you stop.", "live_display", true)
-        slider(delivery, "Stop after a quiet pause", "silence_stop", 0, 0, 30) { if (it == 0) "Off" else "$it seconds" }
+        slider(delivery, "Stop after a quiet pause", "silence_stop", 30, 1, 30) { "$it seconds" }
+        ui.text(delivery, "Spending safeguard: recording stops after at most 30 seconds of quiet or five minutes per start. Tap again to begin another session. Switching apps keeps the current session active.", 14, ui.muted)
         ui.text(delivery, "Off keeps recording until you stop it yourself.", 14, ui.muted)
         val writing = ui.card(body)
         ui.text(writing, "Writing style", 18, bold = true)
@@ -339,8 +342,8 @@ class MainActivity : Activity() {
         ui.text(saving, "Find saved text in History. Choosing a shorter period removes older entries when history is refreshed. Off removes saved history on refresh.", 14, ui.muted)
         choose(saving, "retention", listOf(Choice("-1", "Off", "Do not keep completed transcripts."), Choice("1", "1 day", "For a little room to revisit your words."), Choice("7", "7 days", "A week of recent dictations."), Choice("30", "30 days", "Keep a month of transcripts."), Choice("0", "Until I delete them", "Keep transcripts until you remove them.")), prefs.getInt("retention", 7).toString()) { prefs.edit().putInt("retention", it.toInt()).apply() }
         val connection = ui.card(body)
-        toggle(connection, "Keep recording if the connection drops", "Save audio privately on this phone while reconnecting. Turn off to stop when the connection is lost.", "continue_local", true)
-        ui.text(connection, "Completed audio is deleted. Interrupted recordings can remain for up to 24 hours so you can recover your words in History, even when transcript saving is off. Recovery sends audio to OpenAI and never types into a new field.", 14, ui.muted)
+        toggle(connection, "Keep recording if the connection drops", "Save audio privately on this phone without reconnecting or uploading it automatically. Turn off to stop when the connection is lost.", "continue_local", true)
+        ui.text(connection, "Completed audio is deleted. Interrupted recordings can remain for up to 24 hours, even when transcript saving is off. Recovery is a separate paid upload that starts only when you choose it in History; it never types into a new field.", 14, ui.muted)
         val data = ui.card(body)
         ui.text(data, "What leaves this phone", 18, bold = true)
         ui.text(data, "Audio goes to OpenAI for transcription. Your dictated words and a short excerpt around the insertion point may be sent for your chosen writing style. Existing text is read-only context; password fields are excluded. Vocabulary hints are sent only when enabled. Your full history is not used as a prompt.", 14, ui.muted)
@@ -352,6 +355,8 @@ class MainActivity : Activity() {
         val connection = ui.card(body)
         ui.text(connection, "Your OpenAI connection", 18, bold = true)
         ui.text(connection, "This version uses your own OpenAI API account. API usage is billed by OpenAI separately; a ChatGPT subscription does not include API usage.", 14, ui.muted)
+        toggle(connection, "Allow paid API requests", "Off pauses all API activity. This safety update starts paused, including on existing installations. Turning it on permits requests only when you start dictation, check the connection, or request recovery.", "paid_api_enabled", false)
+        ui.button(connection, "Pause all API activity", destructive = true) { app.coordinator.pausePaidApi(); rememberPage(); renderPage() }
         accountKeyState = ui.text(connection, if (prefs.contains("api_key")) "API key saved on this phone" else "No API key saved", 14, ui.accent)
         val key = edit(connection, "Paste your OpenAI API key", "", password = true).apply { tag = "api-key"; isSaveEnabled = false; importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS }
         ui.button(connection, "Save API key", primary = true) {
@@ -360,7 +365,7 @@ class MainActivity : Activity() {
         }
         ui.button(connection, "Check connection") { app.coordinator.testKey() }
         status = ui.text(connection, "", 14, ui.muted).apply { accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }
-        ui.button(connection, "Remove saved key", destructive = true) { confirm("Remove your API key?", "You will need to add a key again to dictate. Saved transcripts stay on this phone.") { app.store.saveKey(""); accountKeyState?.text = "No API key saved"; key.setText("") } }
+        ui.button(connection, "Remove saved key", destructive = true) { confirm("Remove your API key?", "You will need to add a key again to dictate. Saved transcripts stay on this phone.") { app.coordinator.pausePaidApi(); app.store.saveKey(""); accountKeyState?.text = "No API key saved"; key.setText("") } }
         val permissions = ui.card(body)
         ui.text(permissions, "Phone permissions", 18, bold = true)
         microphoneState = ui.text(permissions, if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) "Microphone allowed" else "Microphone access needed", 14, ui.accent)
@@ -471,8 +476,9 @@ class MainActivity : Activity() {
     }
     private fun recovery(body: LinearLayout) {
         heading(body, "Interrupted recordings", "Recover your words without restarting the microphone.")
-        ui.text(body, "These recordings stay privately on this phone for up to 24 hours. Recovery sends audio to OpenAI using your account, and never inserts it into another app.", 14, ui.muted)
+        ui.text(body, "These recordings stay privately on this phone for up to 24 hours. Recovery is a paid upload using your API account. It never starts automatically. Leaving AlienFlow or tapping Cancel upload stops the request; already processed audio may still be billed. Each attempt stops after two minutes.", 14, ui.muted)
         status = ui.text(body, "", 14, ui.accent)
+        ui.button(body, "Cancel upload") { app.coordinator.cancelAuxiliaryRequests() }
         val pending = app.store.pending()
         recoverySignature = pending.joinToString { it.name }
         if (pending.isEmpty()) ui.text(body, "All caught up. No recordings are waiting.", 18)
@@ -480,7 +486,7 @@ class MainActivity : Activity() {
             val card = ui.card(body)
             ui.text(card, date(file.lastModified()), 17, bold = true)
             ui.text(card, "${file.length() / 1024} KB · saved on this phone", 14, ui.muted)
-            ui.button(card, "Recover transcript") { app.coordinator.recover(file) }
+            ui.button(card, "Recover transcript (uses API credit)") { app.coordinator.recover(file) }
             ui.button(card, "Discard recording", destructive = true) { confirm("Discard this recording?", "The audio will be permanently deleted.") { if (!app.coordinator.ownsAudio(file)) file.delete(); rememberPage(); renderPage() } }
         }
         ui.button(body, "Open latest result") { open(Page.RESULT) }
@@ -517,7 +523,11 @@ class MainActivity : Activity() {
             switchMinWidth = ui.dp(48); switchPadding = ui.dp(12)
             thumbTintList = ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()), intArrayOf(ui.accent, ui.muted))
             isChecked = prefs.getBoolean(key, default); tag = key
-            setOnCheckedChangeListener { _, checked -> prefs.edit().putBoolean(key, checked).apply(); app.coordinator.service?.refreshBubble() }
+            setOnCheckedChangeListener { _, checked ->
+                prefs.edit().putBoolean(key, checked).apply()
+                if (key == "paid_api_enabled" && !checked) app.coordinator.pausePaidApi()
+                app.coordinator.service?.refreshBubble()
+            }
         }, LinearLayout.LayoutParams(-1, -2))
         ui.text(parent, explanation, 14, ui.muted).apply { setPadding(0, 0, 0, ui.dp(8)) }
     }

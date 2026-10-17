@@ -3,6 +3,7 @@ package io.github.issisx.alienflow
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import kotlinx.coroutines.*
 import okhttp3.Response
 import okhttp3.WebSocket
@@ -24,6 +25,7 @@ class RealtimeTransport internal constructor(
     private val microphoneFactory: () -> MicrophoneInput = { AndroidMicrophoneInput(context) },
     captureDispatcher: CoroutineDispatcher = Dispatchers.IO,
     controlDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
+    private val elapsedMillis: () -> Long = SystemClock::elapsedRealtime,
 ) {
     interface Listener {
         fun event(value: JSONObject)
@@ -69,7 +71,9 @@ class RealtimeTransport internal constructor(
 
     val hasPendingCoverage: Boolean get() = synchronized(state) { coverage.uncertain }
     val hasUnacknowledgedCommit: Boolean get() = synchronized(state) { coverage.hasUnacknowledgedCommit }
-    var silenceStopSeconds = 0
+    // Old installs may have 0 (off). Never allow indefinite quiet capture.
+    var silenceStopSeconds = 30
+        set(value) { field = if (value <= 0) 30 else value.coerceAtMost(30) }
     var onSilenceStop: (() -> Unit)? = null
 
     fun connect(api: OpenAiClient, key: String, language: String, vocabulary: String) {
@@ -225,8 +229,14 @@ class RealtimeTransport internal constructor(
             current.start()
             if (!capturing || closed) return
             app.crashJournal.mark("audiorecord.started")
+            val captureStartedAt = elapsedMillis()
             val samples = ShortArray(RealtimeProtocol.CHUNK_SAMPLES)
             while (capturing && currentCoroutineContext().isActive) {
+                // The network cutoff must not depend solely on a responsive UI looper.
+                if (elapsedMillis() - captureStartedAt >= 300_000L) {
+                    postFailure("Five-minute safety limit reached; recording stopped and audio saved")
+                    break
+                }
                 val count = current.read(samples)
                 if (count > 0) {
                     val pcm = RealtimeProtocol.pcm16LittleEndian(samples, count)
@@ -236,9 +246,13 @@ class RealtimeTransport internal constructor(
                         main.post { if (!closed && capturing) listener.captured() }
                     }
                     sendAudio(pcm)
-                    val decision = vad.inspect(pcm, System.currentTimeMillis(), silenceStopSeconds)
+                    val decision = vad.inspect(pcm, elapsedMillis(), silenceStopSeconds)
                     if (decision.commit) sendCommit()
-                    if (decision.silenceStop) main.post { if (!closed && capturing) onSilenceStop?.invoke() }
+                    if (decision.silenceStop) {
+                        capturing = false
+                        stopRecorder()
+                        main.post { if (!closed) onSilenceStop?.invoke() }
+                    }
                 } else if (count < 0) {
                     if (!capturing || closed) break
                     throw IOException("AudioRecord read failed ($count)")
@@ -388,23 +402,9 @@ class RealtimeTransport internal constructor(
 
     fun continueLocally() {
         if (closed || !capturing) return
-        synchronized(state) {
-            coverage.markUncertain()
-            localOnly = true
-            sessionReady = false
-            startup.clear()
-            firstConnection.complete(false)
-        }
-        scheduleReconnect()
-    }
-
-    private fun scheduleReconnect() {
-        if (closed || !capturing) return
+        val old = synchronized(state) { breakStreamLocked() }
+        old?.cancel()
         reconnectJob?.cancel()
-        reconnectJob = controlScope.launch {
-            delay(3_000)
-            if (!closed && capturing) openSocket(reconnect = true)
-        }
     }
 
     private fun transportLost(

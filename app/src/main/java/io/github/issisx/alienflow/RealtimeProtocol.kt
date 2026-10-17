@@ -78,10 +78,11 @@ class ClientSideVad(
     private var voiced = false
     private var speechMs = 0L
     private var silenceMs = 0L
-    private var lastVoiceMs = System.currentTimeMillis()
+    private var lastVoiceMs: Long? = null
 
     fun inspect(pcm16: ByteArray, nowMs: Long, silenceStopSeconds: Int): Decision {
         if (pcm16.isEmpty() || pcm16.size % 2 != 0) return Decision(false, false)
+        if (lastVoiceMs == null) lastVoiceMs = nowMs
         var sum = 0.0
         var count = 0
         for (index in 0 until pcm16.size - 1 step 2) {
@@ -106,7 +107,7 @@ class ClientSideVad(
             speechMs = 0
             silenceMs = 0
         }
-        val shouldStop = silenceStopSeconds > 0 && nowMs - lastVoiceMs >= silenceStopSeconds * 1_000L
+        val shouldStop = silenceStopSeconds > 0 && nowMs - lastVoiceMs!! >= silenceStopSeconds * 1_000L
         if (shouldStop) lastVoiceMs = nowMs
         return Decision(shouldCommit, shouldStop)
     }

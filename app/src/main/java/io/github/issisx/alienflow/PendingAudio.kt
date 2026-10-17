@@ -221,7 +221,7 @@ class PendingAudio internal constructor(
             throw IOException("Recording is already in use", e)
         }
 
-        private fun <T> withRecording(file: File, block: (FileChannel) -> T): T =
+        private inline fun <T> withRecording(file: File, block: (FileChannel) -> T): T =
             // No CREATE: a missing source must never silently become an empty recording.
             FileChannel.open(file.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE).use { input ->
                 exclusiveLock(input).use { block(input) }
@@ -243,10 +243,10 @@ class PendingAudio internal constructor(
          * Every part is deleted in finally, including upload failure/cancellation. This method
          * never deletes the source; its owner must first durably save the complete result.
          */
-        fun forEachUploadChunk(
+        suspend fun forEachUploadChunk(
             file: File,
             maxPayloadBytes: Long = DEFAULT_UPLOAD_PAYLOAD_BYTES,
-            block: (File) -> Unit,
+            block: suspend (File) -> Unit,
         ) {
             require(maxPayloadBytes > 0 && maxPayloadBytes < PROVIDER_FILE_LIMIT_BYTES - HEADER_BYTES) {
                 "Upload payload plus WAV header must be smaller than 25 MB"

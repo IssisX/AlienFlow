@@ -11,7 +11,7 @@ import org.json.JSONObject
 import java.io.File
 
 class DictationCoordinator(private val app: AlienApp, private val store: LocalStore,
-                           private val api: OpenAiClient = OpenAiClient(),
+                           private val api: OpenAiClient = OpenAiClient(allowed = { store.prefs.getBoolean("paid_api_enabled", false) }),
                            private val keyProvider: () -> String? = store::apiKey) : RealtimeTransport.Listener {
     private val main = Handler(Looper.getMainLooper())
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -69,6 +69,27 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     private var waitingForTarget = false
     private var waitingAfterInputEpoch = -1L
     private var switchedTargets = false
+    val paidApiEnabled: Boolean get() = store.prefs.getBoolean("paid_api_enabled", false)
+    val auxiliaryWork: Boolean get() = recoveryJob != null || keyTestJob != null
+    private var captureStartedAt = 0L
+    val captureElapsedSeconds: Long get() = if (active) (SystemClock.elapsedRealtime() - captureStartedAt).coerceAtLeast(0L) / 1000 else 0
+    private fun allowPaidRequest(): Boolean {
+        if (paidApiEnabled) return true
+        update("Paid API access paused • enable it in Account & setup only when you want to dictate")
+        return false
+    }
+    fun pausePaidApi() {
+        store.prefs.edit().putBoolean("paid_api_enabled", false).commit()
+        cancelAuxiliaryRequests()
+        if (active || finishing) failure("Paid API access paused; recording stopped and unfinished words preserved")
+        else update("Paid API access paused • no new requests")
+    }
+    /** Auxiliary requests have a lifetime even when active/finishing are both false. */
+    fun cancelAuxiliaryRequests() {
+        val pending = auxiliaryWork
+        recoveryJob?.cancel(); keyTestJob?.cancel()
+        if (pending) update("API work canceled • saved recordings retained")
+    }
     private fun update(value: String? = null) {
         val changed = value != null && value != status
         if (value != null) status = value
@@ -81,7 +102,8 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     fun toggle() { if (active || finishing) stop() else start() }
     fun start() {
         if (active || finishing) return
-        if (keyTestJob?.isActive == true) { update("Wait for the live connection check to finish"); return }
+        if (!allowPaidRequest()) return
+        if (auxiliaryWork) { update("Wait for the current API operation to stop"); return }
         startupTimings.begin(SystemClock.elapsedRealtime())
         app.crashJournal.mark("tap.received")
         if (!app.screenReady()) { update("Unlock the screen before starting dictation"); return }
@@ -99,6 +121,11 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         editorEpoch = 0; waitingForTarget = false; waitingAfterInputEpoch = -1; switchedTargets = false
         saved = false; liveFailed = false; userEdited = false; terminalReason = null; microphoneConfirmed = false; serverConnected = false; interrupted = false; finalizing = false; audioClosing = false; corrections.clear(); cleaned.clear(); writing = false; writeRetryScheduled = false; commits = 0; completeItems.clear(); committedItems.clear(); seenErrors.clear(); editor = bridge; captureTarget = bridge
         active = true; finishing = false; update("Starting microphone and realtime connection…")
+        captureStartedAt = SystemClock.elapsedRealtime()
+        val captureToken = session
+        main.postDelayed({
+            if (session == captureToken && active) failure("Five-minute safety limit reached; microphone stopped and unfinished audio saved. Tap again for a new session")
+        }, 300_000L)
         app.crashJournal.mark("service.start-requested")
         try { app.startForegroundService(Intent(app, CaptureService::class.java).setAction(CaptureService.START)); app.crashJournal.mark("service.start-returned") }
         catch (e: Exception) { app.crashJournal.recordFailure("service.failure", e); active = false; editor = null; update("Android denied background microphone start. Open AlienFlow and start a test; bubble start is not available in this permission state") }
@@ -111,7 +138,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
             audio = PendingAudio(File(store.audioDir, "${System.currentTimeMillis()}.wav"))
             app.crashJournal.mark("transport.start")
             transport = RealtimeTransport(app, audio!!, this).also {
-                it.silenceStopSeconds = store.prefs.getInt("silence_stop", 0)
+                it.silenceStopSeconds = store.prefs.getInt("silence_stop", 30)
                 it.onSilenceStop = { stop() }
                 it.connect(api, key, store.language(), store.vocabularyForSession())
             }
@@ -317,6 +344,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         cleanup = job; job.start()
     }
     fun stop() {
+        cancelAuxiliaryRequests()
         if (!active) return
         app.crashJournal.mark("dictation.stopping")
         // Completed recognition is the deliverable. Optional live polish cannot
@@ -433,7 +461,8 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                         switchedTargets -> "Complete • text saved across apps"
                         else -> "Complete • ready for another dictation"
                     })
-                    if (storageOk && keepAudio && interrupted && captured != null && continueLocal) recover(captured.file)
+                    // Recovery is a separate paid upload, never an automatic consequence
+                    // of Stop, failure, reconnect, service loss, or opening the app.
                 }
             } finally {
                 val rollbackId = checkpointId
@@ -451,7 +480,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         interrupted = true; cleanup?.cancel(); editor?.detachForCapture(); editor = null; liveFailed = true
         if (continueLocal) {
             transport?.continueLocally()
-            update("Connection lost • recording continues locally while realtime reconnects. Tap stop to recover the complete recording")
+            update("Connection lost • recording continues on this phone only. Stop, then choose paid recovery in History if needed")
         } else failure("Connection lost; recording stopped and audio saved")
     }
     override fun reconnected() { if (active && interrupted) update("Realtime reconnected • recording continues. Full recording will recover after stop") }
@@ -463,6 +492,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         finish(true); update(message)
     }
     fun cancel() {
+        cancelAuxiliaryRequests()
         if (!active && !finishing) return
         terminalReason = null
         finalizationJob?.cancel(); cleanup?.cancel(); transport?.close(); transport = null
@@ -482,40 +512,55 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         else update("Canceled • in-flight edit cannot be undone safely")
     }
     fun serviceLost() {
+        cancelAuxiliaryRequests()
         app.crashJournal.mark("accessibility.disconnected")
         service = null
         CaptureService.instance?.stopSelf()
         if (active || finishing) failure("Accessibility disconnected; recording stopped and audio preserved")
     }
-    fun screenUnavailable() { if (active || finishing) failure("Screen locked or turned off; microphone stopped and unfinished work preserved") }
-    fun captureServiceLost() { if (active) failure("Microphone service stopped unexpectedly; audio retained") }
+    fun screenUnavailable() { cancelAuxiliaryRequests(); if (active || finishing) failure("Screen locked or turned off; microphone stopped and unfinished work preserved") }
+    fun captureServiceLost() { cancelAuxiliaryRequests(); if (active) failure("Microphone service stopped unexpectedly; audio retained") }
     fun ownsAudio(file: File) = audio?.file == file || recoveryFile == file
     fun recover(file: File) {
-        if (active || finishing || recoveryJob?.isActive == true || ownsAudio(file)) { update("Stop current work before recovering another recording"); return }
-        val token = session; recoveryFile = file
-        update("Recovering saved audio; no field will be edited")
-        recoveryJob = io.launch {
+        if (!allowPaidRequest()) return
+        if (!app.screenReady()) { update("Unlock the screen before uploading a saved recording"); return }
+        if (active || finishing || auxiliaryWork || ownsAudio(file)) { update("Stop current work before recovering another recording"); return }
+        val token = session
+        val job = io.launch(start = CoroutineStart.LAZY) {
+            val ownJob = currentCoroutineContext().job
             try {
                 val key = keyProvider() ?: error("Save an API key first")
                 val complete = StringBuilder()
-                PendingAudio.forEachUploadChunk(file) { chunk ->
-                    ensureActive()
-                    val part = api.recover(key, chunk, store.language())
-                    ensureActive()
-                    if (complete.isNotEmpty()) complete.append(' ')
-                    complete.append(part)
+                withTimeout(120_000L) {
+                    PendingAudio.forEachUploadChunk(file) { chunk ->
+                        ensureActive()
+                        val part = api.recover(key, chunk, store.language())
+                        ensureActive()
+                        if (complete.isNotEmpty()) complete.append(' ')
+                        complete.append(part)
+                    }
                 }
+                ensureActive()
                 val text = complete.toString()
                 check(text.isNotBlank()) { "Empty recovery response" }
                 val savedId = store.saveResult(text, text, "Recovered • copy manually")
                 val deleted = savedId == null || !file.exists() || file.delete()
                 withContext(Dispatchers.Main) { if (session == token && !active && !finishing) { result = text; original = text; update(if (savedId != null && !deleted) "Recovered to history, but audio deletion failed; discard it in pending recovery" else if (savedId != null) "Recovered to history • no field was edited" else "Recovered • history off. Copy the result; audio retained until you discard it") } }
-            } catch (e: Exception) { withContext(Dispatchers.Main) { if (session == token && !active) update(if (e is SafeApiException) "${e.message} · recording retained" else "Audio recovery failed; saved recording retained") } }
-            finally { withContext(NonCancellable + Dispatchers.Main) { recoveryFile = null; recoveryJob = null } }
+            } catch (_: TimeoutCancellationException) {
+                withContext(Dispatchers.Main) { if (session == token) update("Recovery timed out; upload stopped and saved recording retained") }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { withContext(Dispatchers.Main) { if (session == token && !active) update(if (e is SafeApiException) "${e.message} · recording retained" else "Audio recovery failed; saved recording retained") } }
+            finally { withContext(NonCancellable + Dispatchers.Main) {
+                if (recoveryJob === ownJob) { recoveryFile = null; recoveryJob = null; update() }
+            } }
         }
+        recoveryFile = file; recoveryJob = job
+        update("Paid recovery upload in progress • stay on this screen or cancel")
+        job.start()
     }
     fun testKey() {
-        if (keyTestJob?.isActive == true || active || finishing) return
+        if (!allowPaidRequest()) return
+        if (auxiliaryWork || active || finishing) return
         val token = session
         app.crashJournal.beginConnectionCheck()
         update("Checking the live connection and transcription session…")

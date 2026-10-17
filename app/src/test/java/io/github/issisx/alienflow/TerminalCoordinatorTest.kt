@@ -37,7 +37,7 @@ class TerminalCoordinatorTest {
     }
     private fun withTerminal(check: (DictationCoordinator, AlienAccessibilityService, StringBuilder, () -> Int) -> Unit) {
         val app = org.robolectric.RuntimeEnvironment.getApplication() as AlienApp
-        app.store.prefs.edit().clear().putString("correction", "A").commit()
+        app.store.prefs.edit().clear().putBoolean("paid_api_enabled", true).putString("correction", "A").commit()
         val coordinator = DictationCoordinator(app, app.store, keyProvider = { "fixture-not-a-key" })
         ReflectionHelpers.setField(app, "coordinator", coordinator)
         shadowOf(app).grantPermissions(Manifest.permission.RECORD_AUDIO)
@@ -95,6 +95,13 @@ class TerminalCoordinatorTest {
         val until = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
         while (coordinator.finishing && System.nanoTime() < until) { shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(5) }
         assertFalse(coordinator.status, coordinator.finishing)
+    }
+    @Test fun fiveMinuteWatchdogStopsEvenWithoutAnotherAudioOrNetworkCallback() = withTerminal { coordinator, _, terminal, commits ->
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMinutes(5))
+        assertFalse(coordinator.active)
+        complete(coordinator)
+        assertTrue(coordinator.status.contains("Five-minute safety limit"))
+        assertEquals("existing draft ", terminal.toString()); assertEquals(0, commits())
     }
     @Test fun accessibilityEventsDuringSpeechKeepTheTerminalBoundAndFinalTextCommitsOnce() = withTerminal { coordinator, service, terminal, commits ->
         coordinator.turnCommitted()

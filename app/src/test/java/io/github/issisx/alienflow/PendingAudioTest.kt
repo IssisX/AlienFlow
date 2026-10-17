@@ -83,7 +83,7 @@ class PendingAudioTest {
             assertHeader(file, 44100, 1, 4)
             assertThrows(IOException::class.java) { PendingAudio.repair(file) }
             assertThrows(IOException::class.java) {
-                PendingAudio.forEachUploadChunk(file) { fail("Active audio must not be uploaded") }
+                uploadChunks(file) { fail("Active audio must not be uploaded") }
             }
             assertArrayEquals(byteArrayOf(1, 2, 3, 4), payload(file))
         } finally { audio.close() }
@@ -230,7 +230,7 @@ class PendingAudioTest {
         val empty = fixture("empty.wav", byteArrayOf())
         assertEquals(0L, PendingAudio.repair(empty).dataBytes)
         assertThrows(IOException::class.java) {
-            PendingAudio.forEachUploadChunk(empty) { fail("Empty audio must not be uploaded") }
+            uploadChunks(empty) { fail("Empty audio must not be uploaded") }
         }
         assertEquals(44L, empty.length())
     }
@@ -365,7 +365,7 @@ class PendingAudioTest {
         val collected = ByteArrayOutputStream()
         val parts = mutableListOf<File>()
         val lengths = mutableListOf<Long>()
-        PendingAudio.forEachUploadChunk(file, maxPayloadBytes = 13) { part ->
+        uploadChunks(file, maxPayloadBytes = 13) { part ->
             assertTrue(parts.all { !it.exists() })
             assertTrue(file.exists())
             assertEquals("upload", part.extension)
@@ -389,7 +389,7 @@ class PendingAudioTest {
         val parts = mutableListOf<File>()
         val error = IOException("Provider upload failed")
         val thrown = assertThrows(IOException::class.java) {
-            PendingAudio.forEachUploadChunk(file, 8) { part ->
+            uploadChunks(file, 8) { part ->
                 parts.add(part)
                 if (parts.size == 2) throw error
             }
@@ -405,7 +405,7 @@ class PendingAudioTest {
         val bytes = byteArrayOf(1, 2, 3, 4, 5, 6)
         val file = fixture("crashed.wav", bytes, declared = 0)
         val collected = ByteArrayOutputStream()
-        PendingAudio.forEachUploadChunk(file, 4) { part -> collected.write(payload(part)) }
+        uploadChunks(file, 4) { part -> collected.write(payload(part)) }
         assertArrayEquals(bytes, collected.toByteArray())
         assertHeader(file, 16000, 1, 6)
         assertTrue(file.exists())
@@ -417,7 +417,7 @@ class PendingAudioTest {
         val file = fixture("silence.wav", data.array(), rate = 8000)
         val collected = ByteArrayOutputStream()
         val lengths = mutableListOf<Long>()
-        PendingAudio.forEachUploadChunk(file, 20000) { part ->
+        uploadChunks(file, 20000) { part ->
             lengths.add(part.length() - 44)
             collected.write(payload(part))
         }
@@ -434,7 +434,7 @@ class PendingAudioTest {
         val file = fixture("speech.wav", data.array(), rate = 8000, channels = 2)
         val lengths = mutableListOf<Long>()
         val collected = ByteArrayOutputStream()
-        PendingAudio.forEachUploadChunk(file, 40003) { part ->
+        uploadChunks(file, 40003) { part ->
             lengths.add(part.length() - 44)
             collected.write(payload(part))
         }
@@ -450,7 +450,7 @@ class PendingAudioTest {
         val original = digest(file)
         var parts = 0
         var total = 0L
-        PendingAudio.forEachUploadChunk(file) { part ->
+        uploadChunks(file) { part ->
             parts++
             assertTrue(part.length() < 25_000_000L)
             val info = PendingAudio.repair(part)
@@ -469,10 +469,15 @@ class PendingAudioTest {
         val original = file.readBytes()
         for (limit in listOf(0L, -1L, 3L, 25_000_000L - 44, Long.MAX_VALUE)) {
             assertThrows(IllegalArgumentException::class.java) {
-                PendingAudio.forEachUploadChunk(file, limit) { fail("Invalid limit must not produce an upload") }
+                uploadChunks(file, limit) { fail("Invalid limit must not produce an upload") }
             }
         }
         assertArrayEquals(original, file.readBytes())
+    }
+
+    private fun uploadChunks(file: File, maxPayloadBytes: Long = PendingAudio.DEFAULT_UPLOAD_PAYLOAD_BYTES,
+                             block: (File) -> Unit) = kotlinx.coroutines.runBlocking {
+        PendingAudio.forEachUploadChunk(file, maxPayloadBytes) { block(it) }
     }
 
     private fun path(name: String) = File(temporary.root, name)

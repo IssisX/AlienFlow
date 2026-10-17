@@ -635,3 +635,13 @@ Use sentence case, preserve coherent phrasing across recognition pauses, and use
 The candidate uses the documented balanced transcription delay (`medium`) instead of `minimal`; live partial delivery remains enabled. Compare real microphone accuracy and latency before public release. Source: https://developers.openai.com/api/docs/guides/realtime-transcription#tune-latency-and-accuracy (reviewed 15 October 2026).
 
 Context is limited to up to 512 characters before and 256 after the insertion from the authoritative keyboard window. It is transient, sent only with an enabled cleanup request, excluded from diagnostic logs/history, and reset at binding changes. The privacy screen describes this use. No paid provider tests are authorized by this amendment.
+
+## Owner incident — 17 October 2026: unintended background spending
+
+The owner reports three API balance drains totaling approximately $25 while the app appeared idle. Preventing further unintended spending takes priority over optional recovery automation. See [incident and repair contract](BILLING_INCIDENT_2026-10-17.md).
+
+The safety update begins with paid API access paused on new and existing installations. No saved audio is uploaded automatically after Stop, interruption, failure, opening the app or topping up an external account. Recovery is explicitly requested, labeled as paid and cancelable. Pause all API activity must persist across process restarts and cancel every owned network operation. Removing a saved key also cancels ongoing work.
+
+This incident supersedes indefinite capture and automatic network recovery: quiet auto-stop cannot exceed 30 seconds; each active session has a five-minute safety deadline, including in continuous noise. Another intentional tap starts a new session. No word quota is introduced. Active app/field switching continues to work within a session. Connection loss may continue local recording but cannot automatically reconnect or upload the recording later. Paid recovery has a two-minute operation deadline and is canceled when the user leaves its screen or locks the phone.
+
+These controls are local request/lifetime safeguards, not a verified dollar-denominated account cap or a refund mechanism. Do not spend the owner’s API credit on validation. Do not certify public paid readiness from simulations.

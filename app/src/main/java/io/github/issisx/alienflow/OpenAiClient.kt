@@ -12,6 +12,8 @@ import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.Response
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
@@ -22,23 +24,43 @@ import kotlin.coroutines.resumeWithException
 class SafeApiException(val httpCode: Int, message: String) : IllegalStateException(message)
 
 class OpenAiClient internal constructor(private val socketFactory: WebSocket.Factory? = null,
-                                       private val callFactory: okhttp3.Call.Factory? = null) {
+                                       private val callFactory: okhttp3.Call.Factory? = null,
+                                       private val allowed: () -> Boolean = { true }) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(45, TimeUnit.SECONDS)
+        .callTimeout(45, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(false)
         .build()
     private val realtimeClient = client.newBuilder()
         .readTimeout(0, TimeUnit.MILLISECONDS)
+        .callTimeout(0, TimeUnit.MILLISECONDS)
         .pingInterval(20, TimeUnit.SECONDS)
         .build()
 
-    private fun execute(path: String, key: String, body: okhttp3.RequestBody): String {
+    private suspend fun execute(path: String, key: String, body: okhttp3.RequestBody): String {
+        currentCoroutineContext().ensureActive()
+        check(allowed()) { "Paid API access paused" }
         val request = Request.Builder()
             .url("https://api.openai.com/v1/$path")
             .header("Authorization", "Bearer $key")
             .post(body)
             .build()
-        (callFactory ?: client).newCall(request).execute().use { response ->
+        return suspendCancellableCoroutine { continuation ->
+            val call = (callFactory ?: client).newCall(request)
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    continuation.resumeWithException(SafeApiException(0, "API connection unavailable"))
+                }
+                override fun onResponse(call: Call, response: Response) {
+                    try { continuation.resume(readResponse(response)) }
+                    catch (e: Exception) { continuation.resumeWithException(e) }
+                }
+            })
+        }
+    }
+    private fun readResponse(response: Response): String = response.use {
             if (!response.isSuccessful) {
                 val message = when (response.code) {
                     401 -> "API key rejected"
@@ -64,18 +86,18 @@ class OpenAiClient internal constructor(private val socketFactory: WebSocket.Fac
                     "$message (HTTP ${response.code})${if (details.isEmpty()) "" else " · ${details.joinToString(" · ")}"}",
                 )
             }
-            return response.body?.string() ?: error("OpenAI returned an empty response")
-        }
+            response.body?.string() ?: error("OpenAI returned an empty response")
     }
 
     fun realtimeWebSocket(key: String, listener: WebSocketListener): WebSocket {
+        check(allowed()) { "Paid API access paused" }
         return (socketFactory ?: realtimeClient).newWebSocket(RealtimeHandshake.request(key), listener)
     }
 
     internal suspend fun cleanup(key: String, source: String, mode: String, fillers: Boolean, context: WritingContext = WritingContext()): String {
         val body = CleanupRequest.body(source, mode, fillers, context)
         val response = JSONObject(
-            executeCleanup(key, body.toString().toRequestBody("application/json".toMediaType())),
+            execute("responses", key, body.toString().toRequestBody("application/json".toMediaType())),
         )
         check(response.optString("status") == "completed") { "Cleanup response incomplete" }
         val output = response.getJSONArray("output")
@@ -90,29 +112,7 @@ class OpenAiClient internal constructor(private val socketFactory: WebSocket.Fac
         return text.toString().trim()
     }
 
-    /** Cancelling polishing must cancel its actual HTTP call, not leave a 45s IO worker. */
-    private suspend fun executeCleanup(key: String, body: okhttp3.RequestBody): String = suspendCancellableCoroutine { continuation ->
-        val request = Request.Builder().url("https://api.openai.com/v1/responses")
-            .header("Authorization", "Bearer $key").post(body).build()
-        val call = (callFactory ?: client).newCall(request)
-        continuation.invokeOnCancellation { call.cancel() }
-        call.enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                continuation.resumeWithException(SafeApiException(0, "Cleanup connection unavailable"))
-            }
-            override fun onResponse(call: Call, response: Response) {
-                try {
-                    val text = response.use {
-                        if (!it.isSuccessful) throw SafeApiException(it.code, "Cleanup unavailable (HTTP ${it.code})")
-                        it.body?.string() ?: error("Empty cleanup response")
-                    }
-                    continuation.resume(text)
-                } catch (e: Exception) { continuation.resumeWithException(e) }
-            }
-        })
-    }
-
-    fun recover(key: String, audio: File, language: String): String {
+    suspend fun recover(key: String, audio: File, language: String): String {
         val body = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart(

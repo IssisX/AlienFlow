@@ -19,7 +19,10 @@ subprocess.run(['git','worktree','add','--detach',str(WORK),BASE],cwd=ROOT,check
 shutil.copy2(ROOT/TEST, WORK/TEST)
 with (REPORT/'gradle.log').open('w') as out:
     rc=subprocess.run(['bash','gradlew','--no-daemon','--no-configuration-cache','--console=plain',
-                      ':app:testDebugUnitTest','--tests','*.TerminalCoordinatorTest'],cwd=WORK,stdout=out,stderr=subprocess.STDOUT).returncode
+                      ':app:testDebugUnitTest',
+                      '--tests','*.TerminalCoordinatorTest.accessibilityEventsDuringSpeechKeepTheTerminalBoundAndFinalTextCommitsOnce',
+                      '--tests','*.TerminalCoordinatorTest.finishingEventsCannotSendPartialTerminalTextBeforeTheLastTranscript',
+                      '--tests','*.TerminalCoordinatorTest.terminalFocusLossPreservesTheTranscriptWithoutCommittingToAnotherField'],cwd=WORK,stdout=out,stderr=subprocess.STDOUT).returncode
 xml=WORK/'app/build/test-results/testDebugUnitTest/TEST-io.github.issisx.alienflow.TerminalCoordinatorTest.xml'
 if not xml.exists():
     raise RuntimeError(f'No baseline JUnit report; baseline build failed before regression execution (rc={rc})')

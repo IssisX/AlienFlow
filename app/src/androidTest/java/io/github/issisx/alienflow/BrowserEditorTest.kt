@@ -128,7 +128,7 @@ class BrowserEditorTest {
         await("real accessibility service", 30_000) { main { app.coordinator.service != null } }
         val service = main { app.coordinator.service!! }
         val coordinator = main {
-            app.store.prefs.edit().clear().putString("correction", "A").commit()
+            app.store.prefs.edit().clear().putBoolean("paid_api_enabled", true).putString("correction", "A").commit()
             val c = DictationCoordinator(app, app.store, keyProvider = { "fixture-not-a-key" })
             setField(app, "coordinator", c); c.service = service; c
         }

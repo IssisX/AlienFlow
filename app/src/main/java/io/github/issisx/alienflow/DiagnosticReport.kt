@@ -33,6 +33,7 @@ object DiagnosticReport {
         appendLine("Accessibility bound: ${app.coordinator.service != null}")
         appendLine("Capture service alive: ${CaptureService.instance != null}")
         appendLine("Coordinator active=${app.coordinator.active}; finishing=${app.coordinator.finishing}")
+        appendLine("Paid API enabled=${app.coordinator.paidApiEnabled}; auxiliary work=${app.coordinator.auxiliaryWork}; capture_seconds=${app.coordinator.captureElapsedSeconds}; capture_limit_seconds=300")
         appendLine("Text contents and credentials are not included. No automatic upload.")
         appendLine()
         appendLine(app.crashJournal.diagnostic())

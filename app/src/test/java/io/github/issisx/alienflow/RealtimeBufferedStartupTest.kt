@@ -65,6 +65,7 @@ class RealtimeBufferedStartupTest {
         lateinit var socket: Socket
         lateinit var network: WebSocketListener
         var captured = 0; var connected = 0; var commits = 0; var interrupted = 0
+        var connections = 0
         val failures = mutableListOf<String>()
         val events = mutableListOf<JSONObject>()
         val dispatcher = StandardTestDispatcher(scope.testScheduler)
@@ -76,9 +77,10 @@ class RealtimeBufferedStartupTest {
             override fun interrupted() { interrupted++ }
             override fun reconnected() {}
             override fun failure(message: String) { failures += message }
-        }, { input }, dispatcher, dispatcher)
+        }, { input }, dispatcher, dispatcher, { scope.testScheduler.currentTime })
         init {
             val api = OpenAiClient(WebSocket.Factory { request, listener ->
+                connections++
                 network = listener; Socket(request).also { socket = it }
             })
             transport.connect(api, "test-placeholder-not-a-key", "en", "")
@@ -91,6 +93,47 @@ class RealtimeBufferedStartupTest {
         override fun close() { transport.close(); audio.close(); file.delete() }
     }
 
+    @Test fun connectionLossKeepsOnlyLocalAudioAndNeverAutomaticallyReconnects() = runTest {
+        Boundary(this).use { b ->
+            b.open(); b.ready(); b.input.speech(); runCurrent(); b.pumpUi()
+            b.network.onFailure(b.socket, IOException("fixture connection loss"), null); b.pumpUi()
+            b.transport.continueLocally()
+            val sent = b.socket.sent.size
+            b.input.speech(); advanceTimeBy(5_000); runCurrent(); b.pumpUi()
+            assertEquals(1, b.connections); assertTrue(b.socket.cancelled)
+            assertEquals(sent, b.socket.sent.size); assertFalse(b.input.stopped)
+            assertTrue(b.transport.hasPendingCoverage)
+        }
+    }
+    @Test fun quietMicrophoneActuallyStopsAtTheMandatoryIdleDeadline() = runTest {
+        Boundary(this).use { b ->
+            b.open(); b.ready()
+            var stopped = false
+            b.transport.silenceStopSeconds = 0 // Migrated "Off" setting still has a safety ceiling.
+            b.transport.onSilenceStop = { stopped = true; b.transport.finishCapture {} }
+            b.input.frames.addLast(ShortArray(RealtimeProtocol.CHUNK_SAMPLES)); runCurrent(); b.pumpUi()
+            repeat(30) {
+                advanceTimeBy(1_000); b.input.frames.addLast(ShortArray(RealtimeProtocol.CHUNK_SAMPLES))
+                runCurrent(); b.pumpUi()
+            }
+            assertTrue(stopped); assertTrue(b.input.stopped)
+            advanceTimeBy(10); runCurrent(); b.pumpUi()
+            val sent = b.socket.sent.size
+            b.input.speech(); advanceTimeBy(1_000); runCurrent(); b.pumpUi()
+            assertEquals(sent, b.socket.sent.size)
+        }
+    }
+    @Test fun captureThreadClosesTheSocketAtFiveMinutesWithoutPumpingUiCallbacks() = runTest {
+        Boundary(this).use { b ->
+            b.open(); b.ready(); b.input.speech(); runCurrent(); b.pumpUi()
+            advanceTimeBy(300_001); runCurrent()
+            assertTrue(b.input.stopped); assertTrue(b.socket.cancelled); assertTrue(b.input.released)
+            val count = b.socket.sent.size
+            b.input.speech(); advanceTimeBy(10); runCurrent()
+            assertEquals(count, b.socket.sent.size)
+            b.pumpUi(); assertTrue(b.failures.single().contains("Five-minute safety limit"))
+        }
+    }
     @Test fun microphoneAndRecoveryCaptureStartBeforeNetworkIsOpen() = runTest {
         Boundary(this).use { b ->
             b.input.speech(); runCurrent(); b.pumpUi()
