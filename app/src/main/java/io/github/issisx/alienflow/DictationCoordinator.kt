@@ -521,7 +521,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
             update("Connection lost • recording continues on this phone only. Stop, then choose paid recovery in History if needed")
         } else failure("Connection lost; recording stopped and audio saved")
     }
-    override fun reconnected() { if (active && interrupted) update("Realtime reconnected • recording continues. Full recording will recover after stop") }
+    override fun reconnected() { if (active && interrupted) update("Recording continues locally • saved audio can be recovered manually after Stop") }
     override fun failure(message: String) {
         if (!active && !finishing) { update(message); return }
         terminalReason = message
@@ -601,8 +601,8 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         if (auxiliaryWork || active || finishing) return
         val token = session
         app.crashJournal.beginConnectionCheck()
-        update("Checking the live connection and transcription session…")
-        keyTestJob = io.launch {
+        val job = io.launch(start = CoroutineStart.LAZY) {
+            val ownJob = currentCoroutineContext().job
             try {
                 RealtimeHandshake.check(api, keyProvider() ?: error("Save an API key first"),
                     store.language(), store.vocabularyForSession())
@@ -617,7 +617,12 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
             catch (_: Exception) {
                 withContext(Dispatchers.Main) { if (session == token && !active && !finishing) update("Live connection check failed; check key and network") }
             }
-            finally { withContext(NonCancellable + Dispatchers.Main) { keyTestJob = null } }
+            finally { withContext(NonCancellable + Dispatchers.Main) {
+                if (keyTestJob === ownJob) { keyTestJob = null; update() }
+            } }
         }
+        keyTestJob = job
+        update("Checking the live connection and transcription session…")
+        job.start()
     }
 }

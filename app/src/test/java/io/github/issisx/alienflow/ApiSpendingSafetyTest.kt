@@ -124,9 +124,14 @@ class ApiSpendingSafetyTest {
             object : WebSocket by socket { override fun cancel() { canceled.set(true); socket.cancel() } }
         })
         val coordinator = DictationCoordinator(app, app.store, api) { "fixture-not-a-key" }
+        val observedWork = mutableListOf<Boolean>()
+        coordinator.listener = { observedWork.add(coordinator.auxiliaryWork) }
         try {
-            coordinator.testKey(); assertNotNull(server.takeRequest(3, TimeUnit.SECONDS))
+            coordinator.testKey()
+            assertEquals("The first UI/notification update must expose the cancellable check", listOf(true), observedWork)
+            assertNotNull(server.takeRequest(3, TimeUnit.SECONDS))
             coordinator.stop(); await { canceled.get() && !coordinator.auxiliaryWork }
+            assertFalse("Completion must refresh the UI/notification after releasing the job", observedWork.last())
             assertEquals(1, server.requestCount)
         } finally {
             coordinator.cancel(); http.dispatcher.cancelAll(); http.connectionPool.evictAll()
