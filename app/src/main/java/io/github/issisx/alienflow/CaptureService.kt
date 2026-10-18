@@ -40,7 +40,7 @@ class CaptureService : Service() {
                 app.crashJournal.mark("service.promoted")
                 coordinator.microphoneServiceReady()
             } else if (!coordinator.active) {
-                promote(if (coordinator.finishing) coordinator.status else "Ready • tap the alien to dictate", readyType())
+                promote(if (coordinator.finishing || coordinator.auxiliaryWork) coordinator.status else idleText(), readyType())
             }
         } catch (e: Exception) {
             foreground = false
@@ -52,6 +52,7 @@ class CaptureService : Service() {
         return START_NOT_STICKY
     }
     private fun readyType() = if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
+    private fun idleText() = if (app.coordinator.paidApiEnabled) "Ready • tap the alien to dictate" else "Paid API access paused"
     private fun promote(text: String, type: Int) {
         startForeground(1, notification(text), type)
         currentType = type; foreground = true; lastText = text
@@ -59,8 +60,8 @@ class CaptureService : Service() {
     private fun notification(text: String): Notification {
         val coordinator = app.coordinator
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        val action = if (coordinator.active) STOP else if (coordinator.finishing) CANCEL else HIDE
-        val label = if (coordinator.active) "Stop" else if (coordinator.finishing) "Cancel" else "Hide alien"
+        val action = if (coordinator.active) STOP else if (coordinator.finishing || coordinator.auxiliaryWork) CANCEL else HIDE
+        val label = if (coordinator.active) "Stop" else if (coordinator.finishing || coordinator.auxiliaryWork) "Cancel" else "Hide alien"
         val control = PendingIntent.getService(this, 1, Intent(this, CaptureService::class.java).setAction(action), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         return Notification.Builder(this, "recording").setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle(if (coordinator.active) "AlienFlow microphone" else "AlienFlow")
@@ -71,7 +72,7 @@ class CaptureService : Service() {
         if (!foreground) return
         val coordinator = app.coordinator
         if (!coordinator.active && !coordinator.finishing && coordinator.service?.backgroundEnabled != true) { stopSelf(); return }
-        val visible = if (coordinator.active || coordinator.finishing) text else "Ready • tap the alien to dictate"
+        val visible = if (coordinator.active || coordinator.finishing || coordinator.auxiliaryWork) text else idleText()
         try {
             if (!coordinator.active && currentType != readyType()) promote(visible, readyType())
             else if (visible != lastText) {

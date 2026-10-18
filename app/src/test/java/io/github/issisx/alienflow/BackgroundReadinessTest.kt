@@ -19,6 +19,27 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33, 35], application = AlienApp::class)
 class BackgroundReadinessTest {
+    @Test fun notificationShowsApiWorkAndItsCancelActionEvenWhenDictationIsIdle() {
+        val app = org.robolectric.RuntimeEnvironment.getApplication() as AlienApp
+        val controller = Robolectric.buildService(CaptureService::class.java).create()
+        val service = controller.get()
+        val recovery = kotlinx.coroutines.Job()
+        app.coordinator.service = Robolectric.buildService(AlienAccessibilityService::class.java).create().get()
+        try {
+            service.onStartCommand(Intent(app, CaptureService::class.java).setAction(CaptureService.READY), 0, 1)
+            assertEquals("Paid API access paused", shadowOf(service).lastForegroundNotification!!.extras.getString(Notification.EXTRA_TEXT))
+            ReflectionHelpers.setField(app.coordinator, "recoveryJob", recovery)
+            service.refresh("Paid recovery upload in progress")
+            val notice = app.getSystemService(NotificationManager::class.java).activeNotifications.single { it.id == 1 }.notification
+            assertEquals("Paid recovery upload in progress", notice.extras.getString(Notification.EXTRA_TEXT))
+            assertEquals("Cancel", notice.actions.single().title.toString())
+            service.onStartCommand(Intent(app, CaptureService::class.java).setAction(CaptureService.CANCEL), 0, 2)
+            assertTrue(recovery.isCancelled)
+        } finally {
+            ReflectionHelpers.setField(app.coordinator, "recoveryJob", null)
+            app.coordinator.service = null; controller.destroy()
+        }
+    }
     @Test fun readyAndFinishingKeepOneForegroundNotificationWithoutStartingTheMicrophone() {
         val app = org.robolectric.RuntimeEnvironment.getApplication() as AlienApp
         val controller = Robolectric.buildService(CaptureService::class.java).create()
