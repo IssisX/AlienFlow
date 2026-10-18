@@ -1,37 +1,30 @@
-# AlienFlow — `claude/alienflow` branch
+# AlienFlow — `AlienFlow(chat)`
 
-Repository: IssisX/AlienFlow. Working branch: `claude/alienflow`, created from `AlienFlow(chat)` at `2b3455d` (0.1.25-chat.1). This branch writes only itself. `AlienFlow(chat)`, `AlienFlow2`, `build/first-apk` and `main` are untouched.
+Android dictation using the selected keyboard, a floating accessibility bubble, and inline text delivery. Application ID: `io.github.issisx.alienflow`. This branch incorporates Claude's .28 work at `b96e59cdbc8ba38d28e5da50666c4efad8ea1305`; `claude/alienflow` and the other development branches are unchanged.
 
-## Development update: 0.1.28-claude.1 (29)
+## Background spending repair: 0.1.29-chat.1 (30)
 
-- **Cleaner interface:** one neutral dark palette, a single blue accent, tighter spacing and plain wording.
-- **Lower OpenAI cost:** long silences are no longer uploaded, dictation stops after 15 seconds of quiet by default (Off to 60 seconds) and after a maximum length (default 15 minutes, 1 to 30), and polish no longer re-sends text that needed no change. AlienFlow only calls OpenAI while a dictation is running, when you tap Check connection, or when recovering a saved recording.
+The owner reported three unexpected balance drains. Source inspection and regression tests identified automatic saved-audio uploads after interrupted dictation and ineffective Stop/Cancel during those uploads. The previous claim that no work ran in the background was incorrect. Exact account charges have not been inspected.
 
-### 0.1.26-claude.1 (27)
+- Paid API access starts **paused**, including after upgrading. Account & setup has an explicit switch; opening the app does not start API work.
+- Interrupted audio stays on the phone. Recovery requires an explicit paid action; Stop, Cancel, screen lock and leaving the recovery screen cancel the actual request.
+- Home and Account expose **Pause all API activity**. Removing the key also pauses and cancels requests.
+- Quiet stop defaults to 15 seconds, with a maximum of 30; an old Off preference means 30. Sessions are limited to 1–5 minutes, default five, with independent capture and coordinator deadlines.
+- Connection loss permits local recording only, without automatic reconnect or re-upload. HTTP calls have a 45-second deadline and no automatic retry. Recovery has a two-minute total deadline.
+- Active work and its Cancel action remain visible in the foreground notification.
 
-- **Live text during speech:** words now reach the focused field while you speak. Since 0.1.24 they waited for each pause. When you switch fields, words that could belong to the previous field still wait for their own commit, so they never enter the new app.
-- **Light polish:** casing and punctuation are applied even when the model also proposes a word change that isn't allowed. Only that word keeps its recognized form. Near-miss misspellings of ordinary words can be corrected. Names, numbers, negation, uncertainty and other meaning words keep the recognized spelling.
-- **Real-audio evaluation:** [docs/EVALUATION.md](docs/EVALUATION.md) measures recognition and polish with your recordings.
-- **Keyboard overlap:** the alien no longer sits on top of the keyboard. On an Android 15 tablet emulator it covered keys and would take their taps, a supported explanation for Gboard's microphone key doing nothing.
-- **Android 11 and newer** (previously 13), including the Galaxy Note10+ (Android 12). On Android 11–12, dictation goes live into empty text fields. Fields with existing text and Termux need Android 13 or newer.
-- **Disclosures:** the switching and surrounding-text descriptions now match actual behavior.
+These controls bound activity; they are not an account spending cap or proof that every reported charge came from one defect. Cancellation cannot reverse processing already billed by the provider. See the [incident record](docs/BILLING_INCIDENT_2026-10-17.md) and [implementation evidence](docs/IMPLEMENTATION.md).
 
-Details, evidence and limits: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md).
+## Preserved behavior
 
-## Installing
+Live text follows eligible fields during an active session; old-field speech is not inserted into a new field. Light polish preserves user edits and guarded meaning-bearing words. Termux receives a final insertion after Stop and never Enter. The existing silence gate, keyboard overlap repair and interface work are retained.
 
-CI produces an **unsigned** APK inside the Actions bundle. An unsigned APK cannot be installed. Sign it with the existing permanent key, following the private signing steps in [docs/RELEASE.md](docs/RELEASE.md), and install over the current app without uninstalling or clearing data. Application ID `io.github.issisx.alienflow` and the original certificate are unchanged.
+Android 11 and newer are supported. Android 11–12 use the guarded empty-field route; existing drafts and Termux require Android 13 or newer. Target API remains 36. Development produces APKs, with no AAB or store submission.
 
-## Phone acceptance still needed
+## Installing and verification
 
-1. Dictate with natural pauses and confirm the words appear while you speak.
-2. Check that sentences continue across pauses without extra capitals.
-3. Switch apps mid-dictation and confirm that nothing from the earlier app appears in the new one.
-4. Insert mid-sentence and confirm that existing text stays intact.
-5. Confirm Termux still receives one final insertion without Enter.
+CI produces an **unsigned** APK inside the Actions bundle. Use the signed delivery APK, or follow the private signing process in [docs/RELEASE.md](docs/RELEASE.md). Updates retain the existing package and original signing certificate; uninstalling or clearing data is unnecessary.
 
-Emulator and unit tests use scripted recognition. They don't establish microphone accuracy or Fold6 behavior.
+The latest verification status, exact source, workflow and limitations are recorded in [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md). Tests use local HTTP servers, scripted recognition and emulators. No paid API test is required. Microphone accuracy, account billing attribution and physical Fold6 acceptance remain unverified; this is not a paid public release approval.
 
-## Release scope
-
-API 36 and APK-only development. No AAB, store submission, billing, new permissions, analytics or data migration.
+Routine device checks are limited to representative Android 12, 15 and 16 phones. Samsung Note10+ is explicitly in scope; its Android 12 emulator coverage does not replace physical Samsung/One UI acceptance. Note10+ and Fold6 are the physical-device priorities.

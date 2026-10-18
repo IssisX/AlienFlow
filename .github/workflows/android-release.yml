@@ -100,8 +100,9 @@ jobs:
           retention-days: 7
 
   device-matrix:
-    # Compatibility evidence beyond the Android 16 phone in the release job. Each entry is an
-    # isolated emulator; artifacts are per entry and nothing is published.
+    # Owner scope: common phones only, including Note10+ Android 12 OS coverage.
+    # Keep two representative phone images plus the Android 16 release job.
+    # An emulator is not a physical Samsung/One UI acceptance test.
     name: Android API ${{ matrix.api }} on ${{ matrix.device }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
@@ -109,16 +110,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - api: 30 # Android 11: oldest supported, no accessibility keyboard session
-            device: medium_phone
           - api: 31 # Android 12: Galaxy Note10+ class, no accessibility keyboard session
             device: pixel_6
-          - api: 33
-            device: small_phone
-          - api: 34 # The runner's avdmanager has no pixel_fold profile.
-            device: 7.6in Foldable
           - api: 35
-            device: pixel_tablet
+            device: pixel_6
     env:
       BUILD_TOOLS_VERSION: '36.0.0'
       COMPILE_SDK: '36'
