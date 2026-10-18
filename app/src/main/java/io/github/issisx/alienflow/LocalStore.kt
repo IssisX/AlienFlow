@@ -15,6 +15,10 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 class LocalStore(private val context: Context) {
+    companion object {
+        /** Live recognition stays on; optional polish runs once after Stop by default. */
+        const val DEFAULT_LIVE_CLEANUP = false
+    }
     val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
     val audioDir = File(context.filesDir, "pending-audio").apply { mkdirs() }
     private val historyFile = AtomicFile(File(context.filesDir, "history.json"))

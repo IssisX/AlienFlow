@@ -1,4 +1,4 @@
-> **Release blocker, 17 October 2026:** owner reports three unintended balance drains (~$25), latest on Claude’s build. Automatic recovery/idle-cancellation defects are repaired in 0.1.29-chat.1; physical acceptance and account attribution remain outstanding. Prior cost-control work does not establish billing safety. See [incident](BILLING_INCIDENT_2026-10-17.md); no paid public launch is certified.
+> **Background-drain fix confirmed, 18 October 2026:** Cory confirms 0.1.29-chat.1 no longer drains the account in the background. Preserve that release and its automatic-upload/cancellation repair. Historical account attribution and broader release acceptance remain outstanding. See [incident](BILLING_INCIDENT_2026-10-17.md); no paid public launch is certified.
 
 # Paid release readiness
 
@@ -8,7 +8,9 @@ The owner intends to charge for AlienFlow on Google Play. A development APK, pas
 
 The existing pipeline exercises Android 16 Chromium/WebView, native EditText, and installed official Termux. The input IPC and terminal echo are real; speech recognition and microphone-readiness events are fixtures. Exact source, counts and failures belong in each release verification record. The current build retains contextual cleanup, final-phrase cleanup, protected typo handling and mid-sentence boundaries.
 
-The 15 October download failure was addressed by restoring the stored 0.1.24 signed APK and checking its original SHA-256. User-side download success is not observable here. Deliver 0.1.29-chat.1 as an APK plus a ZIP containing byte-identical APK bytes.
+The 15 October download failure was addressed by restoring the stored 0.1.24 signed APK and checking its original SHA-256. User-side download success is not observable here. Preserve 0.1.29-chat.1 as the owner-confirmed billing baseline; deliver the efficiency update as 0.1.30-chat.1, with the original package and signing identity.
+
+The [18 October cost decision](COST_EFFICIENCY_2026-10-18.md) keeps live recognition and defaults to light polish after Stop. Trial pricing is an estimate, not measured account usage. Customer trial provisioning remains unimplemented under the service-model scope below.
 
 ## Required acceptance evidence before charging customers
 

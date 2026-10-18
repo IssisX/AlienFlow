@@ -1,5 +1,7 @@
 # Background spending incident — 17 October 2026
 
+**FIXED — confirmed by Cory on 18 October 2026 for AlienFlow-0.1.29-chat.1.apk: the app no longer drains the account in the background.** Preserve this release as the known working baseline. Its APK SHA-256 is `b666160c941aa1b5a59ee08cce026161520aa1f30d2a6f3a748713cb7f78425a`, built from `5dbb3c8d4dc30e450887125f4ec150f75cbc1458`. This owner confirmation supplements the original tests below; it is not an independent inspection of account charges.
+
 The owner reports three balance drains, approximately $25 total, while AlienFlow appeared idle. Treat this as a release blocker. Do not ask the owner to replenish API credit for testing. The owner confirms the latest incident used Claude’s newer build; the exact installed point release and account usage records have not been collected; a reproduced code defect does not by itself attribute every reported charge.
 
 ## Confirmed source defects and current baseline
@@ -30,4 +32,4 @@ These are concrete mechanisms for unintended/background API activity. The histor
 
 Additional tests cover idle Stop, screen lock, service loss, activity pause, persisted API pause, zero requests on launch with access disabled or enabled, actual connection-check socket cancellation, quiet-stop transport behavior, no automatic reconnection, and the five-minute coordinator watchdog. Historical editor, Termux, writing and Android 16 integration gates stay required.
 
-Delivered build verification is recorded in [IMPLEMENTATION.md](IMPLEMENTATION.md): source `5dbb3c8d4dc30e450887125f4ec150f75cbc1458`, 285 passing unit tests, zero lint errors, six successful emulator jobs, original signer and artifact hashes verified. No real API calls, billing-account inspection or physical Note10+/Fold6 acceptance have been performed. Future device coverage is limited to the owner’s requested common-phone scope. Public paid release remains blocked.
+Delivered build verification is recorded in [the 0.1.29 checkpoint](history/IMPLEMENTATION_CHAT_0.1.29-chat.1.md): source `5dbb3c8d4dc30e450887125f4ec150f75cbc1458`, 285 passing unit tests, zero lint errors, six successful emulator jobs, original signer and artifact hashes verified. That verification did not include real API calls, billing-account inspection or physical Note10+/Fold6 acceptance. The subsequent owner confirmation above establishes the reported fix on his installation. Future device coverage is limited to the owner’s requested common-phone scope. Public paid release remains blocked.

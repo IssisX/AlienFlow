@@ -64,7 +64,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
     private var keyTestJob: Job? = null
     private var recoveryFile: File? = null
     private var displayLive = true
-    private var cleanLive = true
+    private var cleanLive = LocalStore.DEFAULT_LIVE_CLEANUP
     private var correctionMode = "B"
     private var fillersEnabled = false
     private var continueLocal = true
@@ -137,7 +137,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         if (!bridge.begin()) { update(bridge.lastError); return }
         app.crashJournal.mark("editor.ready")
         terminalTarget = bridge.isTerminal
-        displayLive = store.prefs.getBoolean("live_display", true) && !terminalTarget; cleanLive = store.prefs.getBoolean("live_cleanup", true); correctionMode = store.mode(); fillersEnabled = store.prefs.getBoolean("fillers", false); continueLocal = store.prefs.getBoolean("continue_local", true)
+        displayLive = store.prefs.getBoolean("live_display", true) && !terminalTarget; cleanLive = store.prefs.getBoolean("live_cleanup", LocalStore.DEFAULT_LIVE_CLEANUP); correctionMode = store.mode(); fillersEnabled = store.prefs.getBoolean("fillers", false); continueLocal = store.prefs.getBoolean("continue_local", true)
         session++; ledger = TranscriptLedger(); cleanupMemo = CleanupMemo(); endCleanupDone = false; original = ""; result = ""; desired = ""; lastWritten = ""
         editorEpoch = 0; waitingForTarget = false; waitingAfterInputEpoch = -1; switchedTargets = false; stopNotice = null
         saved = false; liveFailed = false; userEdited = false; terminalReason = null; microphoneConfirmed = false; serverConnected = false; interrupted = false; finalizing = false; audioClosing = false; corrections.clear(); cleaned.clear(); writing = false; writeRetryScheduled = false; commits = 0; completeItems.clear(); committedItems.clear(); seenErrors.clear(); editor = bridge; captureTarget = bridge

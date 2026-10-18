@@ -314,7 +314,7 @@ class MainActivity : Activity() {
             Choice("A", "As spoken", "Keep the recognized words, without an extra editing pass."),
             Choice("B", "Light polish", "Tidy sentence case, punctuation and clear spelling errors. Connect phrases while keeping your voice."),
             Choice("C", "Clearer phrasing", "Allow wording changes for a more readable result.")), prefs.getString("correction", "B").orEmpty()) { prefs.edit().putString("correction", it).apply() }
-        toggle(writing, "Polish while I speak", "Turn off to apply your writing style only when you finish.", "live_cleanup", true)
+        toggle(writing, "Polish while I speak", "Off saves API usage by polishing once after you stop. Words can still appear live. Turn on for corrections during speech at a higher cost.", "live_cleanup", LocalStore.DEFAULT_LIVE_CLEANUP)
         toggle(writing, "Remove fillers & repeated words", "Remove obvious fillers such as “um” and accidental exact repetitions.", "fillers", false)
     }
     private data class Choice(val value: String, val title: String, val explanation: String)

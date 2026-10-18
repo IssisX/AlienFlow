@@ -41,7 +41,7 @@ class DiagnosticsUiTest {
         Robolectric.buildActivity(MainActivity::class.java).setup().use { controller ->
             val activity = controller.get(); val root = activity.window.decorView
             shadowOf(Looper.getMainLooper()).idle()
-            screenshot(root, "main-0.1.29-chat.1.png")
+            screenshot(root, "main-0.1.30-chat.1.png")
             assertFalse(descendants(root).filterIsInstance<TextView>().any { it.text.toString() == "Diagnostics / share report" })
             button(root, "Settings").performClick()
             descendants(root).single { it.contentDescription?.toString()?.startsWith("Help & about.") == true }.performClick()
@@ -60,7 +60,7 @@ class DiagnosticsUiTest {
             while (!copy.isEnabled && System.currentTimeMillis() < deadline) { shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(11) }
             shadowOf(Looper.getMainLooper()).idle()
             assertTrue("Report did not finish loading", copy.isEnabled)
-            screenshot(root, "diagnostics-0.1.29-chat.1.png")
+            screenshot(root, "diagnostics-0.1.30-chat.1.png")
             assertTrue(copy.performClick())
             val copied = activity.getSystemService(ClipboardManager::class.java).primaryClip!!.getItemAt(0).text.toString()
             assertTrue(copied.contains("ALIENFLOW DIAGNOSTIC REPORT"))

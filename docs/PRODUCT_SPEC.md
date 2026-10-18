@@ -1,10 +1,10 @@
 # AlienFlow — Product Design and Implementation Plan
 
-**Version:** 0.1.25-chat.1 contract · **Updated:** 15 October 2026 · **Stage:** Implemented Android client; exact verification and remaining device limits are in IMPLEMENTATION.md.
+**Version:** 0.1.30-chat.1 contract · **Updated:** 18 October 2026 · **Stage:** Implemented Android client; exact verification and remaining device limits are in IMPLEMENTATION.md.
 
 **Working product name:** AlienFlow. This is an Android dictation application inspired by the interaction of Wispr Flow, with a personal-key development client and a planned paid Google Play release. The name is provisional and has not been checked for publication or trademark use.
 
-**Goal:** Tap a small, translucent alien bubble while using an existing Android keyboard; speak naturally; see words and very light corrections appear in the focused input field; stop when finished. Use a personal OpenAI API key with no application word allowance or subscription gate.
+**Goal:** Tap a small, translucent alien bubble while using an existing Android keyboard; speak naturally; see words in the focused input field; stop to apply very light corrections. Live corrections remain optional. Use a personal OpenAI API key with no application word allowance or subscription gate.
 
 **Architecture:** A native Android application with a user-enabled accessibility service, a nonfocusable accessibility overlay, a microphone foreground service, a single dictation coordinator, direct OpenAI integration, and lightweight local storage. The existing keyboard remains selected.
 
@@ -24,7 +24,7 @@ The user has supplied enough information to finish planning. Routine choices sho
 | Appearance | 75% idle opacity (25% transparent) initially; adjustable size and opacity; remembered position. |
 | Keyboard | Continue using the currently selected keyboard, including Gboard. |
 | Text | Provisional words appear directly in the active input field during speech. |
-| Corrections | Very light correction, including live updates, is the default. |
+| Corrections | Very light correction after Stop is the default; live polish is optional and explicitly saved choices are retained. |
 | Consistency | One global behavior across apps; no per-app styles or special correction defaults. |
 | Controls | Tap to start and tap to stop; ordinary thinking pauses do not stop the session. |
 | Language | English initially; language selection and personal vocabulary available. |
@@ -64,7 +64,7 @@ The landing screen then shows readiness, a dictation test field, a short latest-
 2. The alien appears at its remembered position. Its initial visible diameter is 32 dp, adjustable to fit the user's actual screen and Gboard button size. The touch target is at least 48 dp and remains localized around the bubble.
 3. Tap the alien. Immediately show a starting state; show a listening state only after microphone capture has actually begun.
 4. As speech is recognized, update the owned text span at the insertion point. Show actual words in the field, without a separate preview requirement.
-5. As a short phrase becomes suitable for correction, apply only allowed changes to text the current dictation still owns. New recognition results and corrections may visibly revise those words.
+5. Recognition may revise provisional words. Optional live polish may apply allowed corrections during speech; by default polish waits until Stop to avoid repeated correction of growing prefixes.
 6. Tap again to stop capture. Finish processing already captured speech, mark the result complete, and save the configured history record.
 7. Resume ordinary typing. The application never presses Send, Enter, Search, or another submission action on the user's behalf.
 
@@ -110,7 +110,7 @@ The main screen shows the current choices in six groups. Related controls open o
 | Dictation | Text display: live in the field. | Live or insert when finished. The latter is an explicit preference, never a hidden fallback counted as live support. |
 | Dictation | Language: English. | Other supported languages or automatic detection; editable personal vocabulary. |
 | Corrections | Strength: B, Very light. | A, Faithful; B, Very light; C, Rewrite. Show examples before changing. |
-| Corrections | Timing: live, phrase by phrase. | Live or after stopping. With end-only text display, revisions stay internal until insertion. |
+| Corrections | Timing: one bounded pass after stopping. | Live polish is opt-in and uses more requests. With end-only text display, revisions stay internal until insertion. |
 | Corrections | Filler/repetition removal: off. | A single optional cleanup control for obvious filler and accidental repetition. |
 | History and recovery | Remember: text only for seven days. | Off; text; text plus audio. Retention presets: 1, 7, 30 days or until deleted. Delete entry / Clear history actions. |
 | History and recovery | On connection loss: keep recording locally and reconnect. | Continue with recovery, or stop recording immediately and preserve what was captured. Pending audio retention initially 24 hours; selectable 1 hour, 24 hours, 7 days, or until deleted. |
@@ -131,7 +131,7 @@ End-only dispatch contract: accessibility and selection events cannot dispatch t
 
 Completion contract: recognition and accepted corrections are preserved. Stop cancels unfinished live polish and does not drain a correction queue. One final whole-segment cleanup pass, including the last phrase in live-polish mode when not already polished, has one combined 2.5-second budget; late or failed cleanup keeps recognized words. Final audio drain, transcript acknowledgements and editor confirmation remain required.
 
-Efficiency contract: keep low-latency recognition and correction behavior intact; omit optional vocabulary unless explicitly enabled, use distinct literal keyword hints instead of a prose word-list prompt, keep cleanup instructions concise, disable unnecessary cleanup reasoning, and reuse only validated identical cleanup chunks within the current recording. Preserve the entire recognized input and lossless chunking. A sponsor-funded three-day trial requires server-held credentials and authoritative expiry/spend enforcement; it is separate from the current personal-key client.
+Efficiency contract: keep low-latency live recognition and default to one bounded correction pass after Stop; preserve explicitly saved live-polish choices. Omit optional vocabulary unless explicitly enabled, use distinct literal keyword hints instead of a prose word-list prompt, keep cleanup instructions concise, disable unnecessary cleanup reasoning, and reuse only validated identical cleanup chunks within the current recording. Preserve the entire recognized input and lossless chunking. A sponsor-funded trial requires server-held credentials and authoritative expiry/spend enforcement; it is separate from the current personal-key client. Three days with at most 30 billable audio minutes is the current cost-bounded proposal, not an implemented entitlement.
 
 Retain the latest stable recognition text separately from the current displayed result. History stores one stable original and one resulting text, not every interim hypothesis. A comparison or restore action can use these two versions without a large revision archive.
 
@@ -157,7 +157,7 @@ Mode A applies no additional editorial model pass. Mode C enables stronger rewri
 
 ### 4.3 Timing and cost control
 
-Do not invoke a second model for every incoming token. Render transcription immediately, then schedule small correction jobs for stable phrases. Keep at most one active cleanup job per dictation and coalesce superseded work. A short processing unit is not an app session limit: continuous speech continues through as many units as necessary.
+Do not invoke a second model for every incoming token. Render transcription immediately; by default perform one bounded correction pass after Stop. Optional live polish schedules correction jobs for stable speech. Keep at most one active cleanup job per dictation and coalesce superseded work. Processing chunks remain separate from the incident-driven session duration safeguard.
 
 A supported small text model is the proposed cleanup engine for explicit self-corrections that require interpretation. `gpt-6-luna` is the current initial candidate. Basic punctuation supplied by transcription should not be mechanically rewritten again. If cleanup fails or times out, preserve the recognized words and continue dictation. [S8]
 
@@ -398,7 +398,7 @@ The repository owner, URL, and branch have not been bound. `AlienFlow` and `main
 
 **Paths:** `CorrectionEngine`, `DictationCoordinator`, `EditorBridge`, focused tests.
 
-Implement the A/B/C policy and live/end timing, with B and live as defaults. Keep original recognition and displayed text distinct. Use phrase-based jobs with revision-checked patches. Ensure the speech pipeline stays responsive while correction requests are in flight.
+Implement the A/B/C policy and live/end timing, with B and after-Stop polish as defaults. Live text remains on. Keep original recognition and displayed text distinct. Optional live jobs use revision-checked patches. Ensure the speech pipeline stays responsive while correction requests are in flight.
 
 **Meaningful checks:** Run every fixture in section 4; include speech that literally contains a correction marker without intending a correction. Change focus, move the cursor, type manually, and receive out-of-order correction results. Test Unicode, multiline text, selection replacement, overlapping ASR revisions, and a correction arriving after Stop or Cancel.
 

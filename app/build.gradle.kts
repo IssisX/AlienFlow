@@ -46,8 +46,8 @@ android {
         applicationId = "io.github.issisx.alienflow"
         minSdk = 30
         targetSdk = 36
-        versionCode = 30
-        versionName = "0.1.29-chat.1"
+        versionCode = 31
+        versionName = "0.1.30-chat.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SOURCE_REVISION", "\"${System.getenv("GITHUB_SHA") ?: "local-unversioned"}\"")
     }

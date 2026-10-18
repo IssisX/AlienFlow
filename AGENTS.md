@@ -8,7 +8,7 @@ Repository: IssisX/AlienFlow. Working branch for this checkout: AlienFlow(chat).
 Read docs/PRODUCT_SPEC.md for the product requirements and docs/IMPLEMENTATION.md for actual implementation/evidence status. Requirements are not runtime evidence.
 
 - Keep the selected keyboard. The accessibility overlay is nonfocusable.
-- Default to live in-field text and very light live corrections. No per-app policies or application word quota.
+- Default to live in-field text and very light corrections after Stop. Preserve explicitly saved live-polish choices. No per-app policies or application word quota.
 - One coordinator owns dictation state; one editor bridge performs guarded edits and confirms outcomes.
 - Preserve unrelated text, user edits, negation, names, numbers, slang, and profanity. Never submit a field.
 - Phone-held OpenAI keys are encrypted at rest. Never put keys, recordings, dictated text, or signing private keys in source, logs, CI artifacts, or caches.
@@ -21,3 +21,5 @@ Read docs/PRODUCT_SPEC.md for the product requirements and docs/IMPLEMENTATION.m
 - 17 October billing incident: integrate the current Claude source (`b96e59cdbc8ba38d28e5da50666c4efad8ea1305`) into AlienFlow(chat) only, preserving its work and leaving claude/alienflow unchanged. Candidate 0.1.29-chat.1 (30) must start paid API access paused, remove automatic recovery uploads, cancel every idle API operation, and bound recording lifetime. No paid provider tests or API-credit replenishment. Retain imported API 30 minimum support and existing compatibility gates. See docs/BILLING_INCIDENT_2026-10-17.md.
 
 - 18 October owner override: limit device work to representative common phones, explicitly including Samsung Note10+. Do not expand toward exhaustive device coverage. Routine CI is Android 12/API 31 (Note10+ OS coverage), Android 15/API 35 phone, and the existing Android 16/API 36 release job. Emulator evidence does not certify Samsung hardware/One UI. Keep Note10+ and the owner's Fold6 as physical acceptance priorities. This supersedes the broader matrix requirement above; do not delay delivery of an already-tested APK to rerun only a coverage-configuration change.
+
+- 18 October efficiency request: the owner confirms 0.1.29-chat.1 no longer drains the account in the background. Preserve that APK and its billing repair. Version 0.1.30-chat.1 changes only the default timing of optional polish to one bounded pass after Stop; live recognition, paid-access consent, actual cancellation, deadlines, no automatic uploads/reconnects, and all editor safeguards remain. Keep the existing inexpensive correction model and meaning-preserving merge. No paid API evaluation or trial backend is authorized by this optimization.
