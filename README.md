@@ -8,6 +8,8 @@ Live words remain the default. Light polish now runs once after Stop by default,
 
 See [the cost decision](docs/COST_EFFICIENCY_2026-10-18.md) for the source-level cause, trial-cost assumptions and verification limits. This update does not provision customer trials or change audio models.
 
+The signed update is compiled from `ebd4e04ed438043ca239b6882de0fd95028cdc85`. [CI run 39135390672](https://github.com/IssisX/AlienFlow/actions/runs/39135390672) passed 293 unit tests, zero release lint errors, and the existing Android API 31/35/36 editor checks. [Delivery evidence](docs/IMPLEMENTATION.md) records the original signing identity and APK hashes. The controlled six-phrase fixture reduced correction requests from six to one; physical-phone behavior and actual billed savings are not measured by that fixture.
+
 ## Preserved background spending repair: 0.1.29-chat.1 (30)
 
 **FIXED — the owner confirmed on 18 October 2026 that 0.1.29-chat.1 no longer drains the account in the background.** The exact APK and a release note are preserved. This user confirmation is separate from the earlier automated evidence and does not supply an account-level breakdown of historical charges.

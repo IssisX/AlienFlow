@@ -4,7 +4,7 @@
 
 Keep live recognition and useful light corrections. Default to one bounded polish pass after Stop, retaining the user's explicit live-polish preference when present. Do not change the working audio/session lifecycle to optimize a smaller text bill.
 
-The fixed reference is AlienFlow 0.1.29-chat.1, source `5dbb3c8d4dc30e450887125f4ec150f75cbc1458`; Cory confirmed on 18 October that it no longer drains the account in the background. The efficiency candidate is 0.1.30-chat.1. The [incident contract](BILLING_INCIDENT_2026-10-17.md) remains mandatory.
+The fixed reference is AlienFlow 0.1.29-chat.1, source `5dbb3c8d4dc30e450887125f4ec150f75cbc1458`; Cory confirmed on 18 October that it no longer drains the account in the background. The signed efficiency update is 0.1.30-chat.1, compiled from `ebd4e04ed438043ca239b6882de0fd95028cdc85`. The [incident contract](BILLING_INCIDENT_2026-10-17.md) remains mandatory.
 
 ## What produced unnecessary work
 
@@ -44,6 +44,10 @@ The proposed offer is **three days with up to 30 billable audio minutes, whichev
 
 ## Evidence boundary
 
-The source proves removal of the default live-polish scheduling path. Request-count regression fixtures exercise the production coordinator and request builder, and must be labeled as controlled transcripts/HTTP. Those counts and payload bytes are not provider-billed tokens or a percentage reduction in the complete audio bill. The unchanged billing and editor regression gates remain required. No customer key, real recording or paid API call is needed for these checks.
+[CI run 39135390672](https://github.com/IssisX/AlienFlow/actions/runs/39135390672) passed all 293 unit tests, zero release lint errors, and the existing Android API 31/35/36 editor gates. The new eight-case cleanup suite exercised the production coordinator, request builder and cancellation adapter with controlled transcripts and HTTP callbacks.
+
+Its six-phrase comparison measured **one correction request and 812 request-body UTF-8 bytes** with the after-Stop default, versus **six requests and 4,537 bytes** with explicit live polish. Serialized input bytes were 113 versus 343; both fixture paths retained the same final text. The exact report is `reports/request-efficiency/balanced-cleanup-fixture.json` in the release bundle. [Implementation evidence](IMPLEMENTATION.md) records artifact identity and signed delivery hashes.
+
+These counts and payload bytes are not provider-billed tokens or a percentage reduction in the complete audio bill. The unchanged billing and editor regression gates passed. No customer key, real recording or paid API call was used for these checks.
 
 Real speech quality, actual token usage and provider stop-to-final latency remain unmeasured. This update does not claim that every possible optimization has been exhausted; it removes avoidable repeated work at a narrow, already-supported policy seam.
