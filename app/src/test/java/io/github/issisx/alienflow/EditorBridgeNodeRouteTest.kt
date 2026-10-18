@@ -262,7 +262,7 @@ class EditorBridgeNodeRouteTest {
     }
     @Test fun uncommittedLiveSpeechIsWrittenWhileAmbiguousOwnershipWaitsForItsCommit() = withField(keyboard = true) { service ->
         val app = service.application as AlienApp
-        app.store.prefs.edit().putString("correction", "A").commit()
+        app.store.prefs.edit().putBoolean("paid_api_enabled", true).putString("correction", "A").commit()
         val coordinator = DictationCoordinator(app, app.store, keyProvider = { "fixture-not-a-key" })
         org.robolectric.util.ReflectionHelpers.setField(app, "coordinator", coordinator)
         coordinator.service = service
