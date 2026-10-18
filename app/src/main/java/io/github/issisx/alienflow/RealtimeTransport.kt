@@ -42,7 +42,9 @@ class RealtimeTransport internal constructor(
     private val state = Any()
     private val controlScope = CoroutineScope(SupervisorJob() + controlDispatcher)
     private val captureScope = CoroutineScope(SupervisorJob() + captureDispatcher)
+    // One transport per dictation session: both start fresh with each session.
     private val vad = ClientSideVad()
+    private val gate = SilenceGate()
     private val coverage = AudioCoverage()
 
     @Volatile private var closed = false
@@ -75,6 +77,8 @@ class RealtimeTransport internal constructor(
     var silenceStopSeconds = 30
         set(value) { field = if (value <= 0) 30 else value.coerceAtMost(30) }
     var onSilenceStop: (() -> Unit)? = null
+    var maximumCaptureMillis = 300_000L
+        set(value) { field = value.coerceIn(60_000L, 300_000L) }
 
     fun connect(api: OpenAiClient, key: String, language: String, vocabulary: String) {
         this.api = api
@@ -148,9 +152,13 @@ class RealtimeTransport internal constructor(
                                 synchronized(state) { coverage.acknowledge(value.optString("item_id")) }
                             }
                             val item = value.optString("item_id", value.optJSONObject("item")?.optString("id").orEmpty())
-                            if (item.isNotBlank()) value.put("_editor_epoch", synchronized(state) {
-                                coverage.editorEpochFor(item) ?: -1L
-                            })
+                            // The live model streams a turn before its commit. Such words belong to the
+                            // current field only when no other field's commit is still in flight.
+                            if (item.isNotBlank()) synchronized(state) {
+                                val acknowledged = coverage.editorEpochFor(item)
+                                value.put("_editor_epoch", acknowledged ?: coverage.provisionalEpoch(editorEpoch) ?: -1L)
+                                if (acknowledged != null) value.put("_editor_epoch_acknowledged", true)
+                            }
                             if (type == "error") app.crashJournal.liveConnectionFailure(LiveConnectionProblem.event(value))
                             listener.event(value.put("_connection_generation", generation))
                         }
@@ -233,8 +241,8 @@ class RealtimeTransport internal constructor(
             val samples = ShortArray(RealtimeProtocol.CHUNK_SAMPLES)
             while (capturing && currentCoroutineContext().isActive) {
                 // The network cutoff must not depend solely on a responsive UI looper.
-                if (elapsedMillis() - captureStartedAt >= 300_000L) {
-                    postFailure("Five-minute safety limit reached; recording stopped and audio saved")
+                if (elapsedMillis() - captureStartedAt >= maximumCaptureMillis) {
+                    postFailure("Recording safety limit reached; microphone stopped and unfinished audio saved")
                     break
                 }
                 val count = current.read(samples)
@@ -245,8 +253,11 @@ class RealtimeTransport internal constructor(
                         firstSample = false
                         main.post { if (!closed && capturing) listener.captured() }
                     }
-                    sendAudio(pcm)
+                    // The WAV above stays complete. Long silence is held before sendAudio, so
+                    // startup buffering and commit coverage count only audio actually sent.
+                    // Audio for a turn is always sent before that turn's commit.
                     val decision = vad.inspect(pcm, elapsedMillis(), silenceStopSeconds)
+                    for (frame in gate.offer(pcm, decision.voiced, RealtimeProtocol.durationMs(pcm.size))) sendAudio(frame)
                     if (decision.commit) sendCommit()
                     if (decision.silenceStop) {
                         capturing = false

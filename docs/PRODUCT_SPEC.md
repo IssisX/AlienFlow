@@ -636,6 +636,34 @@ The candidate uses the documented balanced transcription delay (`medium`) instea
 
 Context is limited to up to 512 characters before and 256 after the insertion from the authoritative keyboard window. It is transient, sent only with an enabled cleanup request, excluded from diagnostic logs/history, and reset at binding changes. The privacy screen describes this use. No paid provider tests are authorized by this amendment.
 
+
+## Implementation change — 15 October 2026 / 0.1.26-claude.1 (branch `claude/alienflow`)
+
+This section supersedes the "small audited set" sentence above. The owner reported frequent incorrect or oddly spelled words and excessive capitalization.
+
+**Light polish:** the result is merged word by word instead of being accepted or rejected whole. Where the model's words align with the recognized words, its case and punctuation are used. Any other lexical edit reverts to the recognized words:
+- Polish never adds words.
+- Polish never drops recognized words, except fillers and exact repeats when that setting is on.
+- A substitution of the same length is accepted only as a near-miss spelling of an ordinary lowercase word:
+  - letters only, at least four letters, same first letter;
+  - edit distance 1, or 2 for words of seven or more letters;
+  - neither word is a negation, modal, uncertainty, quantity, time, direction or profanity word.
+
+Names, identifiers, numbers and paths keep the recognized spelling. Rewrite keeps its whole-output check.
+
+This is a bounded spelling repair, not general spelling correction. Recognition-level improvement must be measured with real audio (docs/EVALUATION.md).
+
+**Live text before a commit:** the live model streams a turn before its commit. Those words go into the current field only when no earlier field's commit is still unacknowledged. Ambiguous words wait for their commit, so they can never land in a newly focused app. An acknowledged commit always decides a turn's field.
+
+
+## Owner amendment — device support, 15 October 2026 / 0.1.26-claude.1
+
+Support as many Android devices as practical, explicitly including the Samsung Galaxy Note10+. Its last major update is Android 12 (One UI 4.1).
+
+- **Minimum version** is now Android 11 (API 30), because the app is to be sold on Google Play to as many devices as practical. Android 13 and newer keep the full behavior: the selected keyboard's session, live text anywhere, live polish and Termux.
+- **Android 10 is excluded.** Keeping the overlay off the keyboard depends on Android 11 window-inset APIs.
+- **Android 11 and 12 have no accessibility keyboard session.** AlienFlow therefore dictates live only into positively empty fields, using the existing guarded node-action path with read-back confirmation. Fields with existing text and Termux are refused with an explicit AF-E17 reason, and nothing is written. It never overwrites a whole draft or pastes through the clipboard.
+- **Compatibility evidence:** CI runs the real-editor emulator tests on Android 11, 12, 13, 14, 15 and 16 across phone, small-phone, foldable and tablet profiles. Emulators are not physical-device evidence.
 ## Owner incident — 17 October 2026: unintended background spending
 
 The owner reports three API balance drains totaling approximately $25 while the app appeared idle. Preventing further unintended spending takes priority over optional recovery automation. See [incident and repair contract](BILLING_INCIDENT_2026-10-17.md).

@@ -58,8 +58,44 @@ class RequestEfficiencyTest {
         assertEquals("Hello world.", clean()); assertEquals("Hello world.", clean()); assertEquals(1, requests)
         assertNull(memo.find("hello world", "C", false)); assertNull(memo.find("hello world", "B", true))
         assertNull(CleanupMemo().find("hello world", "B", false))
+        // A rejected unsafe answer is remembered only as "no edits needed": the source, never "$50".
         memo.remember("not $15", "$50", "B", false)
-        assertNull(memo.find("not $15", "B", false))
+        assertEquals("not $15", memo.find("not $15", "B", false))
+        memo.remember("keep this", "   ", "B", false)
+        assertNull("A blank answer carries no decision and is requested again", memo.find("keep this", "B", false))
+    }
+    @Test fun anUnchangedAnswerIsRequestedOnceAcrossRepeatedLiveTurns() = runBlocking {
+        val memo = CleanupMemo(); var requests = 0
+        val source = "Already fine, thanks."
+        repeat(2) {
+            val output = memo.cleanWithContext(source, "B", false, WritingContext()) { chunk, _ -> requests++; chunk }
+            assertEquals(source, output)
+        }
+        assertEquals(1, requests)
+        assertEquals(source, memo.find(source, "B", false))
+    }
+    @Test fun quietPauseStopDefaultsToFifteenSecondsAndOldOffHasASafetyCeiling() {
+        val store = LocalStore(org.robolectric.RuntimeEnvironment.getApplication())
+        store.prefs.edit().clear().commit()
+        assertEquals(15, DictationCoordinator.silenceStopSeconds(store.prefs))
+        store.prefs.edit().putInt("silence_stop", 0).commit()
+        assertEquals(30, DictationCoordinator.silenceStopSeconds(store.prefs))
+        store.prefs.edit().putInt("silence_stop", 45).commit()
+        assertEquals(30, DictationCoordinator.silenceStopSeconds(store.prefs))
+        store.prefs.edit().putInt("silence_stop", 600).commit()
+        assertEquals(30, DictationCoordinator.silenceStopSeconds(store.prefs))
+    }
+    @Test fun dictationLengthLimitDefaultsToFiveMinutesAndCannotBeTurnedOff() {
+        val store = LocalStore(org.robolectric.RuntimeEnvironment.getApplication())
+        store.prefs.edit().clear().commit()
+        assertEquals(5, DictationCoordinator.sessionMinutes(store.prefs))
+        store.prefs.edit().putInt("session_minutes", 5).commit()
+        assertEquals(5, DictationCoordinator.sessionMinutes(store.prefs))
+        store.prefs.edit().putInt("session_minutes", 0).commit()
+        assertEquals(1, DictationCoordinator.sessionMinutes(store.prefs))
+        store.prefs.edit().putInt("session_minutes", 500).commit()
+        assertEquals(5, DictationCoordinator.sessionMinutes(store.prefs))
+        assertEquals("Stopped after 1 minute to limit cost", DictationCoordinator.sessionCapStatus(1))
     }
     @Test fun memoBoundsAndEvictionDoNotChangeTheTranscript() {
         val memo = CleanupMemo(maxEntries = 2, maxCharacters = 100)

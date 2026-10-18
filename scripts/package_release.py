@@ -15,9 +15,9 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = "io.github.issisx.alienflow"
-VERSION_CODE = 27
-VERSION_NAME = "0.1.26-chat.1"
-MIN_SDK = 33
+VERSION_CODE = 30
+VERSION_NAME = "0.1.29-chat.1"
+MIN_SDK = 30
 TARGET_SDK = 36
 BUILD_TOOLS = "36.0.0"
 APPROVED_ARTWORK_SHA256 = "48d0ce0aacba2fd4264100fb1af1b6a73f54290f6c5296f4adc07d3974a50671"
@@ -67,7 +67,7 @@ def main() -> None:
     if bundle.exists():
         shutil.rmtree(bundle)
     (bundle / "reports").mkdir(parents=True)
-    apk = bundle / "AlienFlow-0.1.26-chat.1-unsigned.apk"
+    apk = bundle / "AlienFlow-0.1.29-chat.1-unsigned.apk"
     run(str(tools / "zipalign"), "-P", "16", "-f", "4", str(raw_apk), str(apk))
     run(str(tools / "zipalign"), "-c", "-P", "16", "4", str(apk))
 
@@ -162,10 +162,15 @@ def main() -> None:
             "Writing baseline was not reproduced")
     shutil.copytree(ROOT / "build/writing-baseline", reports / "writing-baseline")
     billing = json.loads((ROOT / "build/billing-baseline/reproduction.json").read_text())
-    require(billing["baseline_sha"] == "39a8e71bcbdff6397e056c211c053bf07b96da5c" and billing["candidate_sha"] == source_sha
+    require(billing["baseline_sha"] == "eff228559b8fc26e1a0ae7dbd15e903649d341eb" and billing["candidate_sha"] == source_sha
             and billing["tests"] == 2 and billing["errors"] == 0 and len(billing["failures"]) == 2,
             "Billing shutdown baseline was not reproduced")
     shutil.copytree(ROOT / "build/billing-baseline", reports / "billing-baseline")
+    live_polish = json.loads((ROOT / "build/live-polish-baseline/reproduction.json").read_text())
+    require(live_polish["baseline_sha"] == "2b3455d90e9cd443367b14652eb9dfdcf74a083c" and live_polish["candidate_sha"] == source_sha
+            and live_polish["actual_failures"] == live_polish["expected_failures"] and live_polish["errors"] == 0
+            and live_polish["tests"] == 2, "Shipped live-ownership and light-polish failures were not reproduced")
+    shutil.copytree(ROOT / "build/live-polish-baseline", reports / "live-polish-baseline")
     browser = json.loads((ROOT / "build/browser-editor/browser-proof/result.json").read_text())
     require(browser["source"] == source_sha and browser["api"] == 36 and
             all(browser.get(key) is True for key in ("real_bubble_tap", "delivered", "selected_replacement",
@@ -181,14 +186,14 @@ def main() -> None:
     shutil.copytree(ROOT / "app/build/reports/tests/testDebugUnitTest", reports / "unit-tests")
     ui_proof = ROOT / "app/build/reports/ui-proof"
     require(
-        (ui_proof / "main-0.1.26-chat.1.png").is_file()
-        and (ui_proof / "diagnostics-0.1.26-chat.1.png").is_file()
-        and (ui_proof / "indicator-light-0.1.26-chat.1.png").is_file()
-        and (ui_proof / "indicator-dark-0.1.26-chat.1.png").is_file(),
+        (ui_proof / "main-0.1.29-chat.1.png").is_file()
+        and (ui_proof / "diagnostics-0.1.29-chat.1.png").is_file()
+        and (ui_proof / "indicator-light-0.1.29-chat.1.png").is_file()
+        and (ui_proof / "indicator-dark-0.1.29-chat.1.png").is_file(),
         "Actual activity render evidence is missing",
     )
     for screen in ("settings", "bubble-settings", "dictation-settings", "privacy-settings", "history", "settings-small-large-text", "language-small-large-text", "bubble-small-large-text", "settings-unfolded"):
-        require((ui_proof / f"{screen}-0.1.26-chat.1.png").is_file(), f"Native {screen} render evidence is missing")
+        require((ui_proof / f"{screen}-0.1.29-chat.1.png").is_file(), f"Native {screen} render evidence is missing")
     shutil.copytree(ui_proof, reports / "ui-proof")
     for report in (ROOT / "app/build/reports").glob("lint-results-release.*"):
         shutil.copy2(report, reports / report.name)
@@ -223,9 +228,9 @@ def main() -> None:
         "The APK is deliberately unsigned. Never generate or store a private key in this bundle or repository.\n"
         "With Java 17, sign a COPY using an existing private keystore stored outside the repository:\n"
         "java -jar tooling/apksigner.jar sign --ks /private/path/release.jks --ks-key-alias alienflow "
-        "--out AlienFlow-0.1.26-chat.1.apk AlienFlow-0.1.26-chat.1-unsigned.apk\n"
+        "--out AlienFlow-0.1.29-chat.1.apk AlienFlow-0.1.29-chat.1-unsigned.apk\n"
         "Omit password options to use the private interactive password prompt.\n"
-        "java -jar tooling/apksigner.jar verify --verbose --print-certs AlienFlow-0.1.26-chat.1.apk\n"
+        "java -jar tooling/apksigner.jar verify --verbose --print-certs AlienFlow-0.1.29-chat.1.apk\n"
     )
 
     versions = tomllib.loads((ROOT / "gradle/libs.versions.toml").read_text())["versions"]
@@ -276,7 +281,7 @@ def main() -> None:
     }
     (bundle / "build-info.json").write_text(json.dumps(info, indent=2) + "\n")
 
-    zip_path = delivery / "AlienFlow-0.1.26-chat.1-unsigned-release-bundle.zip"
+    zip_path = delivery / "AlienFlow-0.1.29-chat.1-unsigned-release-bundle.zip"
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
         for path in sorted(bundle.rglob("*")):
             if path.is_file():

@@ -17,3 +17,5 @@ Read docs/PRODUCT_SPEC.md for the product requirements and docs/IMPLEMENTATION.m
 - Keep exact dependency versions in the build configuration. Tests must exercise actual state/ordering/ownership logic.
 
 - Current repair imports the reviewed 0.1.22 keyboard-coordinate fix from AlienFlow2 into this branch only. Preserve the chat terminal guard, all prior history and the source branch. Current phone baseline is 0.1.21 (22), source 5e248ee3a9c4c91a0c78580f0917d641e7035b15. API 36 and APK-only development remain required; no AAB work until final store preparation.
+
+- 17 October billing incident: integrate the current Claude source (`b96e59cdbc8ba38d28e5da50666c4efad8ea1305`) into AlienFlow(chat) only, preserving its work and leaving claude/alienflow unchanged. Candidate 0.1.29-chat.1 (30) must start paid API access paused, remove automatic recovery uploads, cancel every idle API operation, and bound recording lifetime. No paid provider tests or API-credit replenishment. Retain imported API 30 minimum support and existing compatibility gates. See docs/BILLING_INCIDENT_2026-10-17.md.

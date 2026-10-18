@@ -17,6 +17,9 @@ object RealtimeProtocol {
     const val MIN_COMMIT_BYTES = SAMPLE_RATE * BYTES_PER_SAMPLE / 10
     const val MAX_WEBSOCKET_QUEUE_BYTES = 2L * 1024 * 1024
     const val TRANSPORT_NAME = "Android AudioRecord + OpenAI Realtime WebSocket"
+    const val BYTES_PER_SECOND = SAMPLE_RATE * CHANNELS * BYTES_PER_SAMPLE
+
+    fun durationMs(pcmBytes: Int): Long = pcmBytes * 1_000L / BYTES_PER_SECOND
 
     fun sessionConfig(language: String, vocabulary: String): JSONObject {
         val transcription = JSONObject()
@@ -73,7 +76,8 @@ class ClientSideVad(
     private val minimumSpeechMs: Long = 120,
     private val trailingSilenceMs: Long = 850,
 ) {
-    data class Decision(val commit: Boolean, val silenceStop: Boolean)
+    /** [voiced] reports only this chunk: its RMS exceeded the speech threshold. */
+    data class Decision(val commit: Boolean, val silenceStop: Boolean, val voiced: Boolean)
 
     private var voiced = false
     private var speechMs = 0L
@@ -81,7 +85,7 @@ class ClientSideVad(
     private var lastVoiceMs: Long? = null
 
     fun inspect(pcm16: ByteArray, nowMs: Long, silenceStopSeconds: Int): Decision {
-        if (pcm16.isEmpty() || pcm16.size % 2 != 0) return Decision(false, false)
+        if (pcm16.isEmpty() || pcm16.size % 2 != 0) return Decision(false, false, false)
         if (lastVoiceMs == null) lastVoiceMs = nowMs
         var sum = 0.0
         var count = 0
@@ -91,9 +95,9 @@ class ClientSideVad(
             sum += value * value
             count++
         }
-        val durationMs = pcm16.size * 1_000L /
-            (RealtimeProtocol.SAMPLE_RATE * RealtimeProtocol.CHANNELS * RealtimeProtocol.BYTES_PER_SAMPLE)
-        if (count > 0 && sqrt(sum / count) > threshold) {
+        val durationMs = RealtimeProtocol.durationMs(pcm16.size)
+        val chunkVoiced = count > 0 && sqrt(sum / count) > threshold
+        if (chunkVoiced) {
             voiced = true
             speechMs += durationMs
             silenceMs = 0
@@ -109,6 +113,47 @@ class ClientSideVad(
         }
         val shouldStop = silenceStopSeconds > 0 && nowMs - lastVoiceMs!! >= silenceStopSeconds * 1_000L
         if (shouldStop) lastVoiceMs = nowMs
-        return Decision(shouldCommit, shouldStop)
+        return Decision(shouldCommit, shouldStop, chunkVoiced)
+    }
+}
+
+/**
+ * Keeps long silences off the paid realtime stream. It never decides commits or touches
+ * the local recovery WAV; it only chooses which captured frames are sent, in order.
+ *
+ * Speech and the first [idleAfterMs] of each pause pass through unchanged, so every
+ * VAD commit (850 ms trailing silence) still follows all of its turn's audio. After
+ * that, silence is held in a byte-bounded pre-roll; the next voiced chunk sends the
+ * most recent [preRollMs] first, so a soft word onset is not clipped. A voiced frame
+ * is never held or dropped. Frames are retained by reference: callers pass fresh arrays.
+ */
+class SilenceGate(private val idleAfterMs: Long = 2_000, preRollMs: Long = 500) {
+    private val preRollBytes = (RealtimeProtocol.BYTES_PER_SECOND * preRollMs / 1_000L).toInt() and 1.inv()
+    private val held = ArrayDeque<ByteArray>()
+    private var heldBytes = 0
+    /** Continuous silence since the last voiced chunk, saturated at [idleAfterMs]. */
+    private var silentMs = 0L
+
+    val heldPreRollBytes: Int get() = heldBytes
+
+    fun offer(pcm16: ByteArray, voiced: Boolean, durationMs: Long): List<ByteArray> {
+        if (voiced) {
+            silentMs = 0L
+            if (held.isEmpty()) return listOf(pcm16)
+            val frames = ArrayList<ByteArray>(held.size + 1)
+            frames.addAll(held); frames.add(pcm16)
+            held.clear(); heldBytes = 0
+            return frames
+        }
+        if (silentMs < idleAfterMs) {
+            silentMs = minOf(idleAfterMs, silentMs + durationMs)
+            return listOf(pcm16)
+        }
+        if (preRollBytes <= 0) return emptyList()
+        // Only the newest silence is useful context; keep at most preRollBytes of it.
+        val frame = if (pcm16.size > preRollBytes) pcm16.copyOfRange(pcm16.size - preRollBytes, pcm16.size) else pcm16
+        held.addLast(frame); heldBytes += frame.size
+        while (heldBytes > preRollBytes) heldBytes -= held.removeFirst().size
+        return emptyList()
     }
 }

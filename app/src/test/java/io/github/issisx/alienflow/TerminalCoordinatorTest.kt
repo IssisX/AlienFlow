@@ -100,7 +100,7 @@ class TerminalCoordinatorTest {
         shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMinutes(5))
         assertFalse(coordinator.active)
         complete(coordinator)
-        assertTrue(coordinator.status.contains("Five-minute safety limit"))
+        assertTrue(coordinator.status.contains("Stopped after 5 minutes"))
         assertEquals("existing draft ", terminal.toString()); assertEquals(0, commits())
     }
     @Test fun accessibilityEventsDuringSpeechKeepTheTerminalBoundAndFinalTextCommitsOnce() = withTerminal { coordinator, service, terminal, commits ->

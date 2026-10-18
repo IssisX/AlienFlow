@@ -7,6 +7,11 @@ PROOF="$ROOT/build/browser-editor"
 mkdir -p "$PROOF"
 exec > >(tee "$PROOF/driver.log") 2>&1
 set -x
+# API level and device profile are explicit so CI can cover Android 11 through 16 and several
+# screen classes. Android 11-12 have no accessibility keyboard session: they run NoKeyboardSessionEditorTest.
+API="${ALIENFLOW_EMULATOR_API:-36}"
+DEVICE="${ALIENFLOW_EMULATOR_DEVICE:-pixel_6}"
+AVD="alienflow-browser-api${API}"
 SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
 AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
 ADB="$ANDROID_HOME/platform-tools/adb"
@@ -19,7 +24,8 @@ mkdir -p "$ANDROID_AVD_HOME"
 # Retry setup only for interrupted SDK downloads, never a failing integration test.
 SDK_READY=false
 for attempt in 1 2 3; do
-  if timeout 360 "$SDKMANAGER" 'emulator' 'system-images;android-36;google_apis;x86_64'; then
+  # Older system images carry an SDK license prompt; answer it without a SIGPIPE'd `yes |` under pipefail.
+  if timeout 360 "$SDKMANAGER" 'emulator' "system-images;android-${API};google_apis;x86_64" < <(yes); then
     SDK_READY=true; break
   fi
   echo "SDK installation attempt $attempt failed; the actual integration test has not run."
@@ -28,11 +34,13 @@ done
 test "$SDK_READY" = true
 test -e /dev/kvm
 sudo chmod 666 /dev/kvm
-"$AVDMANAGER" create avd -n alienflow-browser-api36 -k 'system-images;android-36;google_apis;x86_64' --device pixel_6 --path "$ANDROID_AVD_HOME/alienflow-browser-api36.avd" --force
+"$AVDMANAGER" create avd -n "$AVD" -k "system-images;android-${API};google_apis;x86_64" --device "$DEVICE" --path "$ANDROID_AVD_HOME/$AVD.avd" --force
 "$AVDMANAGER" list avd
 "$ANDROID_HOME/emulator/emulator" -list-avds | tee "$PROOF/available-avds.txt"
-grep -Fx 'alienflow-browser-api36' "$PROOF/available-avds.txt"
-"$ANDROID_HOME/emulator/emulator" -avd alienflow-browser-api36 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > "$PROOF/emulator.log" 2>&1 &
+grep -Fx "$AVD" "$PROOF/available-avds.txt"
+# Large-screen images under software rendering starved the launcher into an ANR dialog that
+# covered every app (API 35 tablet, run 38786492968); give the guest the runner's resources.
+"$ANDROID_HOME/emulator/emulator" -avd "$AVD" -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -memory 4096 -cores 4 > "$PROOF/emulator.log" 2>&1 &
 EMULATOR_PID=$!
 cleanup() {
   # Preserve in-process geometry/session evidence even if an assertion fails.
@@ -57,6 +65,27 @@ test "$("$ADB" shell getprop ro.kernel.qemu | tr -d '\r')" = 1
 "$ADB" shell settings put global window_animation_scale 0
 "$ADB" shell settings put global transition_animation_scale 0
 "$ADB" shell settings put global animator_duration_scale 0
+# A system "isn't responding" dialog is emulator load, not the app under test; never let it own focus.
+"$ADB" shell settings put global hide_error_dialogs 1
+"$ADB" shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS
+if [ "$API" -lt 33 ]; then
+  "$ADB" install -r app/build/outputs/apk/debug/app-debug.apk
+  "$ADB" install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+  "$ADB" shell pm grant io.github.issisx.alienflow android.permission.RECORD_AUDIO
+  timeout 300 "$ADB" shell am instrument -w -r -e disableAnalytics true -e class io.github.issisx.alienflow.NoKeyboardSessionEditorTest io.github.issisx.alienflow.test/androidx.test.runner.AndroidJUnitRunner | tee "$PROOF/instrumentation.txt"
+  grep -F 'OK (1 test)' "$PROOF/instrumentation.txt"
+  python3 - "$PROOF" "$API" <<'PY'
+import json,sys,os,pathlib
+root=pathlib.Path(sys.argv[1])
+results=[json.loads(x.split('fixture_result=',1)[1]) for x in open(root/'instrumentation.txt') if x.startswith('INSTRUMENTATION_STATUS: fixture_result=')]
+assert len(results)==1,results
+r=results[0]
+assert r['source']==os.environ['GITHUB_SHA'] and r['api']==int(sys.argv[2]) and r['empty_field_live'] and r['existing_text_refused'],r
+path=root/'no-keyboard-session-proof/result.json';path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(r,indent=2))
+print(json.dumps(r,indent=2))
+PY
+  exit 0
+fi
 TERMUX_FILE='termux-app_v0.118.3+github-debug_x86_64.apk'
 cd "$PROOF"
 curl --fail --location --retry 2 'https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3%2Bgithub-debug_x86_64.apk' -o "$TERMUX_FILE"
@@ -75,15 +104,18 @@ cd "$ROOT"
 # the browser and Termux classes. Separate invocations force-stop the target app.
 timeout 300 "$ADB" shell am instrument -w -r -e disableAnalytics true -e class io.github.issisx.alienflow.BrowserEditorTest,io.github.issisx.alienflow.InstalledTermuxTest io.github.issisx.alienflow.test/androidx.test.runner.AndroidJUnitRunner | tee "$PROOF/instrumentation.txt"
 grep -F 'OK (2 tests)' "$PROOF/instrumentation.txt"
-python3 - "$PROOF" <<'PY'
+python3 - "$PROOF" "$API" <<'PY'
 import json,sys,os,pathlib
 root=pathlib.Path(sys.argv[1])
 results=[json.loads(x.split('fixture_result=',1)[1]) for x in open(root/'instrumentation.txt') if x.startswith('INSTRUMENTATION_STATUS: fixture_result=')]
 assert len(results)==2,results
 for kind in ('browser','termux'):
  r=next(x for x in results if ('initial_node' in x)==(kind=='browser'))
- assert r['source']==os.environ['GITHUB_SHA'] and r['api']==36,r
- if kind=='browser':assert r['delivered'] and r['selected_replacement'] and r['typing_continues_dictation'] and r['repeat_session'],r
+ assert r['source']==os.environ['GITHUB_SHA'] and r['api']==int(sys.argv[2]),r
+ if kind=='browser' and r.get('revision_blocked_by_keyboard_composition'):
+  # Specified safe outcome only on images with re-composing 2022-23 Gboard; never on 15+.
+  assert int(sys.argv[2])<35 and r['delivered'] and r['text_intact'],r
+ elif kind=='browser':assert r['delivered'] and r['selected_replacement'] and r['typing_continues_dictation'] and r['repeat_session'],r
  else:assert r['final_count']==1 and r['real_terminal_echo'] and r['ordinary_live_after_termux'],r
  path=root/f'{kind}-proof/result.json';path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(r,indent=2))
  print(json.dumps(r,indent=2))

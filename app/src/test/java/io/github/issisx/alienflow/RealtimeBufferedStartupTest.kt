@@ -42,6 +42,7 @@ class RealtimeBufferedStartupTest {
         override fun stop() { stopped = true }
         override fun release() { released = true }
         fun speech(count: Int = 5) { repeat(count) { frames.addLast(ShortArray(RealtimeProtocol.CHUNK_SAMPLES) { (1_000 + it).toShort() }) } }
+        fun silence(count: Int) { repeat(count) { frames.addLast(ShortArray(RealtimeProtocol.CHUNK_SAMPLES)) } }
     }
     private class Socket(private val req: Request) : WebSocket {
         val sent = mutableListOf<JSONObject>()
@@ -77,7 +78,10 @@ class RealtimeBufferedStartupTest {
             override fun interrupted() { interrupted++ }
             override fun reconnected() {}
             override fun failure(message: String) { failures += message }
-        }, { input }, dispatcher, dispatcher, { scope.testScheduler.currentTime })
+        }, { input }, dispatcher, dispatcher)
+        fun virtualClock(scope: TestScope) {
+            org.robolectric.util.ReflectionHelpers.setField(transport, "elapsedMillis", { scope.testScheduler.currentTime })
+        }
         init {
             val api = OpenAiClient(WebSocket.Factory { request, listener ->
                 connections++
@@ -107,6 +111,7 @@ class RealtimeBufferedStartupTest {
     }
     @Test fun quietMicrophoneActuallyStopsAtTheMandatoryIdleDeadline() = runTest {
         Boundary(this).use { b ->
+            b.virtualClock(this)
             b.open(); b.ready()
             var stopped = false
             b.transport.silenceStopSeconds = 0 // Migrated "Off" setting still has a safety ceiling.
@@ -125,13 +130,14 @@ class RealtimeBufferedStartupTest {
     }
     @Test fun captureThreadClosesTheSocketAtFiveMinutesWithoutPumpingUiCallbacks() = runTest {
         Boundary(this).use { b ->
+            b.virtualClock(this)
             b.open(); b.ready(); b.input.speech(); runCurrent(); b.pumpUi()
             advanceTimeBy(300_001); runCurrent()
             assertTrue(b.input.stopped); assertTrue(b.socket.cancelled); assertTrue(b.input.released)
             val count = b.socket.sent.size
             b.input.speech(); advanceTimeBy(10); runCurrent()
             assertEquals(count, b.socket.sent.size)
-            b.pumpUi(); assertTrue(b.failures.single().contains("Five-minute safety limit"))
+            b.pumpUi(); assertTrue(b.failures.single().contains("Recording safety limit"))
         }
     }
     @Test fun microphoneAndRecoveryCaptureStartBeforeNetworkIsOpen() = runTest {
@@ -148,6 +154,25 @@ class RealtimeBufferedStartupTest {
             advanceTimeBy(5); runCurrent(); b.pumpUi(); assertTrue(finished); b.audio.close()
             assertArrayEquals(uploaded, b.file.readBytes().drop(44).toByteArray())
             assertEquals(1, b.commits); assertFalse(b.transport.hasPendingCoverage)
+        }
+    }
+    @Test fun longSilenceIsHeldOffTheSocketWhileTheRecoveryWavStaysComplete() = runTest {
+        Boundary(this).use { b ->
+            b.open(); b.ready()
+            b.input.speech(10); b.input.silence(150); b.input.speech(10)
+            runCurrent(); b.pumpUi()
+            val append = "input_audio_buffer.append"; val commit = "input_audio_buffer.commit"
+            // 10 speech + 43 silence, VAD commit, rest of the 2 s idle period, then 25 pre-roll + 10 speech.
+            assertEquals(listOf("session.update") + List(53) { append } + listOf(commit) + List(57 + 25 + 10) { append },
+                b.socket.sent.map { it.getString("type") })
+            var finished = false; b.transport.finishCapture { finished = true }
+            advanceTimeBy(5); runCurrent(); b.pumpUi(); assertTrue(finished); b.audio.close()
+            assertEquals(commit, b.socket.sent.last().getString("type")); assertEquals(2, b.commits)
+            val frame = RealtimeProtocol.CHUNK_BYTES
+            val wav = b.file.readBytes().drop(44).toByteArray()
+            assertEquals(170 * frame, wav.size)
+            assertArrayEquals(wav.copyOfRange(0, 110 * frame) + wav.copyOfRange(135 * frame, 170 * frame), b.uploadedAudio())
+            assertFalse(b.transport.hasPendingCoverage); assertEquals(0, b.failures.size)
         }
     }
     @Test fun switchingBeforeHandshakePreservesAudioBoundariesAndLateResultDestinations() = runTest {
@@ -183,6 +208,23 @@ class RealtimeBufferedStartupTest {
             for (item in listOf("old", "new")) b.network.onMessage(b.socket,
                 JSONObject().put("type", "input_audio_buffer.committed").put("item_id", item).toString())
             b.pumpUi(); assertEquals(listOf(0L, 2L), b.events.map { it.getLong("_editor_epoch") })
+        }
+    }
+    @Test fun liveSpeechBeforeCommitBelongsToTheFocusedFieldUnlessAnotherFieldsCommitIsInFlight() = runTest {
+        Boundary(this).use { b ->
+            fun delta(item: String) = b.network.onMessage(b.socket, JSONObject()
+                .put("type", "conversation.item.input_audio_transcription.delta").put("item_id", item).put("delta", "words").toString())
+            fun committed(item: String) = b.network.onMessage(b.socket,
+                JSONObject().put("type", "input_audio_buffer.committed").put("item_id", item).toString())
+            b.open(); b.ready(); b.input.speech(); runCurrent(); b.pumpUi()
+            // The live model streams a turn before its commit; no earlier field can own it.
+            delta("first"); b.pumpUi()
+            b.transport.switchEditor(2); b.input.speech(); advanceTimeBy(5); runCurrent(); b.pumpUi()
+            // The old field's commit is unacknowledged: either field could own these words.
+            delta("first"); delta("second"); b.pumpUi()
+            committed("first"); delta("second"); b.pumpUi()
+            assertEquals(listOf(0L, -1L, -1L, 0L, 2L), b.events.map { it.getLong("_editor_epoch") })
+            assertEquals(listOf(false, false, false, true, false), b.events.map { it.optBoolean("_editor_epoch_acknowledged") })
         }
     }
     @Test fun stopBeforeHandshakeStillFlushesTheFirstWordsExactlyOnce() = runTest {

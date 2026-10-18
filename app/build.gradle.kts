@@ -44,10 +44,10 @@ android {
 
     defaultConfig {
         applicationId = "io.github.issisx.alienflow"
-        minSdk = 33
+        minSdk = 30
         targetSdk = 36
-        versionCode = 27
-        versionName = "0.1.26-chat.1"
+        versionCode = 30
+        versionName = "0.1.29-chat.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SOURCE_REVISION", "\"${System.getenv("GITHUB_SHA") ?: "local-unversioned"}\"")
     }
@@ -94,6 +94,8 @@ dependencies {
 
 
 tasks.withType<Test>().configureEach {
+    // Paid measurement with the owner's recordings runs only on explicit request (docs/EVALUATION.md).
+    if (!project.hasProperty("alienflowEval")) exclude("**/RealAudioEvaluation*")
     testLogging {
         events("failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL

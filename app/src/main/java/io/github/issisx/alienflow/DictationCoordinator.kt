@@ -2,6 +2,7 @@ package io.github.issisx.alienflow
 
 import android.Manifest
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
@@ -13,6 +14,24 @@ import java.io.File
 class DictationCoordinator(private val app: AlienApp, private val store: LocalStore,
                            private val api: OpenAiClient = OpenAiClient(allowed = { store.prefs.getBoolean("paid_api_enabled", false) }),
                            private val keyProvider: () -> String? = store::apiKey) : RealtimeTransport.Listener {
+    companion object {
+        /** Legacy Off becomes a 30-second safety ceiling; the newer 15-second default stays. */
+        const val DEFAULT_SILENCE_STOP_SECONDS = 15
+        const val MAX_SILENCE_STOP_SECONDS = 30
+        /** Hard bound on one session's realtime audio, independent of the quiet-pause setting. Never Off. */
+        const val DEFAULT_SESSION_MINUTES = 5
+        const val MIN_SESSION_MINUTES = 1
+        const val MAX_SESSION_MINUTES = 5
+        const val SESSION_CAP_MS = DEFAULT_SESSION_MINUTES * 60 * 1_000L
+        const val SESSION_CAP_STATUS = "Stopped after $DEFAULT_SESSION_MINUTES minutes to limit cost"
+        fun silenceStopSeconds(prefs: SharedPreferences): Int =
+            prefs.getInt("silence_stop", DEFAULT_SILENCE_STOP_SECONDS).let {
+                if (it <= 0) MAX_SILENCE_STOP_SECONDS else it.coerceAtMost(MAX_SILENCE_STOP_SECONDS)
+            }
+        fun sessionMinutes(prefs: SharedPreferences): Int =
+            prefs.getInt("session_minutes", DEFAULT_SESSION_MINUTES).coerceIn(MIN_SESSION_MINUTES, MAX_SESSION_MINUTES)
+        fun sessionCapStatus(minutes: Int) = "Stopped after $minutes ${if (minutes == 1) "minute" else "minutes"} to limit cost"
+    }
     private val main = Handler(Looper.getMainLooper())
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     var service: AlienAccessibilityService? = null
@@ -90,6 +109,8 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         recoveryJob?.cancel(); keyTestJob?.cancel()
         if (pending) update("API work canceled • saved recordings retained")
     }
+    /** Why this session stopped itself; kept visible through the finishing and final statuses. */
+    private var stopNotice: String? = null
     private fun update(value: String? = null) {
         val changed = value != null && value != status
         if (value != null) status = value
@@ -118,14 +139,11 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         terminalTarget = bridge.isTerminal
         displayLive = store.prefs.getBoolean("live_display", true) && !terminalTarget; cleanLive = store.prefs.getBoolean("live_cleanup", true); correctionMode = store.mode(); fillersEnabled = store.prefs.getBoolean("fillers", false); continueLocal = store.prefs.getBoolean("continue_local", true)
         session++; ledger = TranscriptLedger(); cleanupMemo = CleanupMemo(); endCleanupDone = false; original = ""; result = ""; desired = ""; lastWritten = ""
-        editorEpoch = 0; waitingForTarget = false; waitingAfterInputEpoch = -1; switchedTargets = false
+        editorEpoch = 0; waitingForTarget = false; waitingAfterInputEpoch = -1; switchedTargets = false; stopNotice = null
         saved = false; liveFailed = false; userEdited = false; terminalReason = null; microphoneConfirmed = false; serverConnected = false; interrupted = false; finalizing = false; audioClosing = false; corrections.clear(); cleaned.clear(); writing = false; writeRetryScheduled = false; commits = 0; completeItems.clear(); committedItems.clear(); seenErrors.clear(); editor = bridge; captureTarget = bridge
         active = true; finishing = false; update("Starting microphone and realtime connection…")
         captureStartedAt = SystemClock.elapsedRealtime()
-        val captureToken = session
-        main.postDelayed({
-            if (session == captureToken && active) failure("Five-minute safety limit reached; microphone stopped and unfinished audio saved. Tap again for a new session")
-        }, 300_000L)
+        scheduleSessionCap(session)
         app.crashJournal.mark("service.start-requested")
         try { app.startForegroundService(Intent(app, CaptureService::class.java).setAction(CaptureService.START)); app.crashJournal.mark("service.start-returned") }
         catch (e: Exception) { app.crashJournal.recordFailure("service.failure", e); active = false; editor = null; update("Android denied background microphone start. Open AlienFlow and start a test; bubble start is not available in this permission state") }
@@ -138,7 +156,8 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
             audio = PendingAudio(File(store.audioDir, "${System.currentTimeMillis()}.wav"))
             app.crashJournal.mark("transport.start")
             transport = RealtimeTransport(app, audio!!, this).also {
-                it.silenceStopSeconds = store.prefs.getInt("silence_stop", 30)
+                it.silenceStopSeconds = silenceStopSeconds(store.prefs)
+                it.maximumCaptureMillis = sessionMinutes(store.prefs) * 60_000L
                 it.onSilenceStop = { stop() }
                 it.connect(api, key, store.language(), store.vocabularyForSession())
             }
@@ -146,6 +165,15 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
             main.postDelayed({ if (session == token && active && !microphoneConfirmed) failure("Microphone/realtime startup timed out") }, 30000)
             monitorTarget(token)
         } catch (e: Exception) { failure(e.message ?: "Microphone setup failed") }
+    }
+    /** A normal Stop at the cap: captured speech is still finished, delivered and saved. */
+    private fun scheduleSessionCap(token: Long) {
+        val minutes = sessionMinutes(store.prefs)
+        main.postDelayed({
+            if (session != token || !active) return@postDelayed
+            stopNotice = sessionCapStatus(minutes)
+            stop()
+        }, minutes * 60_000L)
     }
     /**
      * A field losing focus is NOT a reason to shut off the microphone.
@@ -165,24 +193,14 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
      * eligible field has its own epoch and stays in history; it is not backfilled. */
     private fun followFocusedTarget() {
         val previous = editor ?: captureTarget
-        if (previous != null && !previous.sameTarget()) {
-            waitingAfterInputEpoch = previous.bindingInputEpoch
-            previous.invalidate()
-            editor = null; captureTarget = null
-            writing = false; writeRetryScheduled = false
-            waitingForTarget = true; switchedTargets = true
-            editorEpoch++; transport?.switchEditor(editorEpoch)
-            desired = ""; lastWritten = ""
-            app.crashJournal.mark("editor.detached")
-            update("Listening • select a text field for new speech")
-        }
+        if (previous != null && !previous.sameTarget()) releaseTarget(previous)
         if (!waitingForTarget || !active || finishing) return
         val bridge = service?.bridge ?: return
         val currentService = service ?: return
         // A new accessibility focus can precede onStartInput. The old connection
         // must never be bound to a second field in the same package.
-        if (currentService.inputMethod?.currentInputConnection != null &&
-            (currentService.inputMethod?.currentInputStarted != true || currentService.inputEpoch <= waitingAfterInputEpoch)) return
+        if (currentService.keyboardAttached &&
+            (!currentService.keyboardInputStarted || currentService.inputEpoch <= waitingAfterInputEpoch)) return
         if (bridge.focused() == null || !bridge.begin()) return
         editorEpoch++; transport?.switchEditor(editorEpoch)
         editor = bridge; captureTarget = bridge; waitingForTarget = false
@@ -191,6 +209,18 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         desired = ""; lastWritten = ""
         app.crashJournal.mark("editor.ready")
         update(if (terminalTarget) "Listening • Termux text inserts when you stop" else "Listening • tap the alien to stop")
+    }
+    /** The field is gone; capture continues and the next eligible field gets a new segment. */
+    private fun releaseTarget(previous: EditorBridge) {
+        waitingAfterInputEpoch = previous.bindingInputEpoch
+        previous.invalidate()
+        editor = null; captureTarget = null
+        writing = false; writeRetryScheduled = false
+        waitingForTarget = true; switchedTargets = true
+        editorEpoch++; transport?.switchEditor(editorEpoch)
+        desired = ""; lastWritten = ""
+        app.crashJournal.mark("editor.detached")
+        update("Listening • select a text field for new speech")
     }
     private fun monitorTarget(token: Long) {
         main.postDelayed({
@@ -247,13 +277,14 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         // Production attaches the epoch of the ACKNOWLEDGED audio commit. Missing
         // fixture metadata stays at the original epoch, never the current screen.
         val targetEpoch = if (value.has("_editor_epoch")) value.optLong("_editor_epoch", -1L) else 0L
+        val acknowledged = value.optBoolean("_editor_epoch_acknowledged")
         when (type) {
-            "conversation.item.created", "input_audio_buffer.committed" -> if (rawId.isNotBlank()) { if (type == "input_audio_buffer.committed") committedItems.add(id); ledger.event(value.optString("event_id"), id, previous, editorEpoch = targetEpoch); render(); tryFinish() }
+            "conversation.item.created", "input_audio_buffer.committed" -> if (rawId.isNotBlank()) { if (type == "input_audio_buffer.committed") committedItems.add(id); ledger.event(value.optString("event_id"), id, previous, editorEpoch = targetEpoch, epochAcknowledged = acknowledged); render(); tryFinish() }
             "conversation.item.input_audio_transcription.delta" -> if (rawId.isNotBlank()) {
-                ledger.event(value.optString("event_id"), id, previous, delta = value.optString("delta"), editorEpoch = targetEpoch); render()
+                ledger.event(value.optString("event_id"), id, previous, delta = value.optString("delta"), editorEpoch = targetEpoch, epochAcknowledged = acknowledged); render()
             }
             "conversation.item.input_audio_transcription.completed" -> if (rawId.isNotBlank()) {
-                ledger.event(value.optString("event_id"), id, previous, final = value.optString("transcript"), editorEpoch = targetEpoch); completeItems.add(id); render(); scheduleCleanup(); tryFinish()
+                ledger.event(value.optString("event_id"), id, previous, final = value.optString("transcript"), editorEpoch = targetEpoch, epochAcknowledged = acknowledged); completeItems.add(id); render(); scheduleCleanup(); tryFinish()
             }
             "conversation.item.input_audio_transcription.failed" -> failure("Recognition failed; pending audio preserved")
             "error" -> {
@@ -286,7 +317,13 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
             writing = false
             userEdited = userEdited || editor?.hasUserInteraction == true
             when (outcome) {
-                EditorWriteResult.USER_EDIT -> detachInlineEditor()
+                // A write that lost its field (the user switched apps mid-confirmation) is a field
+                // switch while recording, not the end of field following for this session.
+                EditorWriteResult.USER_EDIT -> {
+                    val lost = editor
+                    if (active && !finishing && !interrupted && lost != null) { releaseTarget(lost); followFocusedTarget() }
+                    else detachInlineEditor()
+                }
                 EditorWriteResult.RETRY -> {
                     userEdited = true
                     if (!writeRetryScheduled) {
@@ -363,7 +400,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
         try { val current = transport; if (current != null) current.finishCapture { closeAudio() } else closeAudio() }
         catch (_: Exception) { failure("Could not finalize capture; pending audio preserved"); return }
         // Release hardware capture before refresh can remove the microphone FGS type.
-        update("Finishing captured speech…")
+        update(stopNotice?.let { "$it • finishing captured speech…" } ?: "Finishing captured speech…")
         main.postDelayed({ if (session == token && finishing) { if (transport?.hasUnacknowledgedCommit == true || commits > completeItems.size || commits > committedItems.size || ledger.pending()) failure("Final transcription timed out; pending audio preserved") else tryFinish() } }, 15000)
     }
     private fun tryFinish() {
@@ -450,6 +487,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                     audio = null; cleanupMemo = CleanupMemo(); saved = storageOk; finalizing = false; finishing = false
                     val hasSpeechFile = captured?.file?.let { it.exists() && it.length() > 44 } == true
                     val recoveryLabel = if (hasSpeechFile) "Audio saved for recovery" else "No microphone audio captured"
+                    val notice = stopNotice
                     update(when {
                         !storageOk -> "Storage failed; audio retained if available. Copy the visible result"
                         reason != null -> "$reason • $recoveryLabel"
@@ -460,7 +498,7 @@ class DictationCoordinator(private val app: AlienApp, private val store: LocalSt
                         terminalTarget && delivered -> "Sent to Termux • press Enter yourself"
                         switchedTargets -> "Complete • text saved across apps"
                         else -> "Complete • ready for another dictation"
-                    })
+                    }.let { if (notice != null && storageOk && reason == null) "$notice • $it" else it })
                     // Recovery is a separate paid upload, never an automatic consequence
                     // of Stop, failure, reconnect, service loss, or opening the app.
                 }

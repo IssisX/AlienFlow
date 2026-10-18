@@ -190,7 +190,7 @@ class CrashJournal(private val application: Application) {
     }
     fun lastStage(): String = currentStage
     fun report(): String? = try {
-        crashFile.takeIf { it.exists() }?.inputStream()?.use { it.readNBytes(10000).toString(Charsets.UTF_8) }
+        crashFile.takeIf { it.exists() }?.inputStream()?.use { BoundedRead.bytes(it, 10000).toString(Charsets.UTF_8) }
     } catch (_: Exception) { null }
     fun diagnostic(): String = buildString {
         appendLine("SESSION EVENTS (metadata only)")

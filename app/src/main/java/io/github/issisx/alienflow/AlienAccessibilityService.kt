@@ -1,6 +1,8 @@
 package io.github.issisx.alienflow
 
 import android.accessibilityservice.AccessibilityService
+import android.annotation.TargetApi
+import android.os.Build
 import android.content.Intent
 import android.graphics.*
 import android.graphics.drawable.GradientDrawable
@@ -26,6 +28,10 @@ class AlienAccessibilityService : AccessibilityService() {
     private var hidden = false
     val backgroundEnabled: Boolean get() = !hidden
     private var imeBottom = 0
+    /** The keyboard's own window from the accessibility window list. An overlay stacked above the
+     * keyboard is not given IME insets (an Android 15 tablet emulator reported none while the alien
+     * sat on the keys), and an overlap would take taps meant for keys such as the microphone. */
+    private var keyboardRect: Rect? = null
     private var safeTop = 0
     private var safeBottom = 0
     var composing = false; private set
@@ -49,10 +55,18 @@ class AlienAccessibilityService : AccessibilityService() {
         if (!::bridge.isInitialized) return
         handler.removeCallbacks(availabilityRefresh)
         availabilityPass = 0
-        if (clearFocusCache) clearCache()
+        if (clearFocusCache && Build.VERSION.SDK_INT >= 33) clearCache()
         handler.post(availabilityRefresh)
     }
     fun confirmEmptyComposition() { composing = false }
+    /** Android 13 gives accessibility services the keyboard session. Earlier versions have none,
+     * so only positively empty fields can be edited, through node actions. */
+    val keyboardEditorInfo: android.view.inputmethod.EditorInfo? get() = if (Build.VERSION.SDK_INT >= 33) inputMethod?.currentInputEditorInfo else null
+    val keyboardInputStarted: Boolean get() = Build.VERSION.SDK_INT >= 33 && inputMethod?.currentInputStarted == true
+    val keyboardAttached: Boolean get() = Build.VERSION.SDK_INT >= 33 && inputMethod?.currentInputConnection != null
+    @TargetApi(33)
+    fun keyboardConnection(): android.accessibilityservice.InputMethod.AccessibilityInputConnection? = inputMethod?.currentInputConnection
+    @TargetApi(33)
     override fun onCreateInputMethod(): android.accessibilityservice.InputMethod = object : android.accessibilityservice.InputMethod(this) {
         override fun onStartInput(info: android.view.inputmethod.EditorInfo, restarting: Boolean) {
             inputEpoch++
@@ -105,7 +119,8 @@ class AlienAccessibilityService : AccessibilityService() {
                 val system = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()); safeTop = system.top; safeBottom = system.bottom
                 clamp(); insets
             }
-            wm.addView(view, p)
+            wm.addView(view, p); appliedY = p.y
+            view.viewTreeObserver.addOnGlobalLayoutListener { measureScreenOffset(view) }
         }
         restorePosition()
     }
@@ -129,7 +144,7 @@ class AlienAccessibilityService : AccessibilityService() {
         label.text = feedback
         val system = wm.currentWindowMetrics.windowInsets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
         val noticeWidth = dp(280).coerceAtMost((bounds().width() - system.left - system.right).coerceAtLeast(1))
-        val noticeBottom = max(safeTop + 1, bounds().height() - imeBottom - safeBottom)
+        val noticeBottom = max(safeTop + 1, minOf(bounds().height() - imeBottom - safeBottom, keyboardRect?.top ?: Int.MAX_VALUE))
         label.maxHeight = noticeBottom - safeTop
         label.measure(View.MeasureSpec.makeMeasureSpec(noticeWidth, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(label.maxHeight, View.MeasureSpec.AT_MOST))
@@ -169,6 +184,7 @@ class AlienAccessibilityService : AccessibilityService() {
         val insets = view.rootWindowInsets ?: wm.currentWindowMetrics.windowInsets
         imeBottom = insets.getInsets(WindowInsets.Type.ime()).bottom
         val system = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()); safeTop = system.top; safeBottom = system.bottom
+        readKeyboardWindow()
         clamp()
         val active = app.coordinator.active || app.coordinator.finishing
         val available = bridge.focused() != null
@@ -183,7 +199,7 @@ class AlienAccessibilityService : AccessibilityService() {
         }
         view.visibility = if (active || (!hidden && (app.store.prefs.getBoolean("always", false) || available))) View.VISIBLE else View.GONE
         app.crashJournal.bubbleAvailability(available, view.visibility == View.VISIBLE, hidden,
-            inputMethod?.currentInputStarted == true, bridge.isTerminal)
+            keyboardInputStarted, bridge.isTerminal)
         val touch = dp(max(48, app.store.prefs.getInt("size", 32)))
         if (params?.width != touch) { params?.width = touch; params?.height = touch; clamp() }
         val key = if (bounds().width() / resources.displayMetrics.density > 600) "unfolded" else "folded"
@@ -203,7 +219,33 @@ class AlienAccessibilityService : AccessibilityService() {
         val p = params ?: return; val view = bubble ?: return
         p.x = p.x.coerceIn(0, (bounds().width() - p.width).coerceAtLeast(0))
         p.y = p.y.coerceIn(safeTop, (safeTop + usableHeight() - p.height).coerceAtLeast(safeTop))
-        if (view.isAttachedToWindow) wm.updateViewLayout(view, p)
+        keyboardRect?.let { keyboard ->
+            // Overlay coordinates can start below the status bar (Android 11: 63 px); compare in
+            // screen coordinates using the offset measured at the alien's last layout.
+            if (Rect.intersects(keyboard, Rect(p.x, p.y + screenOffsetY, p.x + p.width, p.y + screenOffsetY + p.height)))
+                p.y = (keyboard.top - p.height - screenOffsetY).coerceAtLeast(safeTop)
+        }
+        if (view.isAttachedToWindow) { wm.updateViewLayout(view, p); appliedY = p.y }
+    }
+    private var appliedY: Int? = null
+    /** Screen y minus layout y, measured after the window has been laid out with [appliedY]. */
+    private var screenOffsetY = 0
+    private fun measureScreenOffset(view: View) {
+        val applied = appliedY ?: return
+        val xy = IntArray(2); view.getLocationOnScreen(xy)
+        screenOffsetY = xy[1] - applied
+    }
+    /** The keyboard's window bounds. Its touchable region is not used: on Android 16 it omits the
+     * top toolbar strip, where Gboard's microphone is. A window taller than three fifths of the
+     * display is a frame around an unknown key area, never moved for. */
+    private fun readKeyboardWindow() {
+        keyboardRect = try {
+            val display = bounds()
+            windows.filter { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+                .map { Rect().also(it::getBoundsInScreen) }
+                .filter { !it.isEmpty && it.height() < display.height() * 3 / 5 }
+                .reduceOrNull { all, next -> Rect(all).apply { union(next) } }
+        } catch (_: RuntimeException) { null }
     }
     private fun remember() { val p = params ?: return; app.store.prefs.edit().putFloat("x_$layoutKey", p.x.toFloat() / max(1, bounds().width() - p.width)).putFloat("y_$layoutKey", (p.y - safeTop).toFloat() / max(1, usableHeight() - p.height)).apply() }
     private fun openMenu() {

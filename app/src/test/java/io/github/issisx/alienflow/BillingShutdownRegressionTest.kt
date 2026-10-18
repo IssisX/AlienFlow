@@ -18,7 +18,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** Runs unchanged against shipped .25. HTTP is loopback; no API key/provider is used. */
+/** Runs unchanged against shipped .28 Claude. HTTP is loopback; no API key/provider is used. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = AlienApp::class)
 class BillingShutdownRegressionTest {

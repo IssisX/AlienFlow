@@ -1,5 +1,7 @@
 package io.github.issisx.alienflow
 
+import android.annotation.TargetApi
+import android.os.Build
 import android.text.Spanned
 import android.text.InputType
 import android.os.Bundle
@@ -44,7 +46,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
             return (type == InputType.TYPE_CLASS_TEXT && variation in setOf(InputType.TYPE_TEXT_VARIATION_PASSWORD, InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD, InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)) ||
                 (type == InputType.TYPE_CLASS_NUMBER && variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD)
         }
-        val info = service.inputMethod?.currentInputEditorInfo
+        val info = service.keyboardEditorInfo
         return node.isPassword || password(node.inputType) ||
             (info?.packageName == node.packageName?.toString() && password(info?.inputType ?: 0))
     }
@@ -54,8 +56,8 @@ class EditorBridge(private val service: AlienAccessibilityService) {
             { service.windows }, { (it.isEditable || supportsNodeActions(it) || terminalNode(it)) && !isProtected(it) }, ::isProtected)
         (service.application as? AlienApp)?.crashJournal?.editorFocus(found)
         (service.application as? AlienApp)?.crashJournal?.inputAvailability(found, direct,
-            service.inputMethod?.currentInputEditorInfo, service.inputMethod?.currentInputStarted == true,
-            service.inputMethod?.currentInputConnection != null)
+            service.keyboardEditorInfo, service.keyboardInputStarted,
+            service.keyboardAttached)
         return found.node
     }
 
@@ -80,14 +82,14 @@ class EditorBridge(private val service: AlienAccessibilityService) {
 
     private fun terminalNode(target: AccessibilityNodeInfo): Boolean = TerminalDictation.supported(
         target.className?.toString(), target.packageName?.toString(),
-        service.inputMethod?.currentInputEditorInfo?.packageName,
-        service.inputMethod?.currentInputEditorInfo?.inputType ?: -1)
+        service.keyboardEditorInfo?.packageName,
+        service.keyboardEditorInfo?.inputType ?: -1)
 
     private fun terminalValid(): Boolean {
         val target = node ?: return false
         return app.screenReady() && target.refresh() && focused() == target && terminalNode(target) &&
-            service.inputMethod?.currentInputEditorInfo?.fieldId == terminalFieldId &&
-            service.inputMethod?.currentInputConnection != null
+            service.keyboardEditorInfo?.fieldId == terminalFieldId &&
+            service.keyboardAttached
     }
 
     fun begin(): Boolean {
@@ -99,22 +101,22 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         node = focused() ?: return fail("[AF-E01] Tap inside a text box first. Password fields are excluded")
         if (!node!!.refresh()) return fail("[AF-E03] The original text box is no longer available")
         if (terminalNode(node!!)) {
-            if (service.inputMethod?.currentInputConnection == null)
-                return fail("[AF-E04] Tap the Termux terminal to attach its keyboard")
+            if (!service.keyboardAttached) return fail(if (Build.VERSION.SDK_INT < 33)
+                "[AF-E17] Termux dictation needs Android 13 or newer; the text is saved in AlienFlow"
+                else "[AF-E04] Tap the Termux terminal to attach its keyboard")
             isTerminal = true
-            terminalFieldId = service.inputMethod?.currentInputEditorInfo?.fieldId ?: 0
+            terminalFieldId = service.keyboardEditorInfo?.fieldId ?: 0
             terminalInsertion = TerminalInsertion()
             bound = true
             app.crashJournal.terminalStage("bound")
             return true
         }
-        val connection = service.inputMethod?.currentInputConnection
         // Accessibility identifies the field. Its visible text/selection can include
         // CSS placeholder content and are never coordinates for keyboard mutations.
-        if (connection != null) {
-            if (service.inputMethod?.currentInputEditorInfo?.packageName != node!!.packageName?.toString())
+        if (service.keyboardAttached) {
+            if (service.keyboardEditorInfo?.packageName != node!!.packageName?.toString())
                 return fail("[AF-E05] The keyboard is attached to another app; tap this text box again")
-            keyboardFieldId = service.inputMethod?.currentInputEditorInfo?.fieldId ?: 0
+            keyboardFieldId = service.keyboardEditorInfo?.fieldId ?: 0
             bindingSelection = service.imeSelection
             bindingPresentation = presentation()
             nodeActions = false
@@ -132,6 +134,8 @@ class EditorBridge(private val service: AlienAccessibilityService) {
             nodeActions, false)
         if (!nodeActions) return fail(if (ambiguousHint)
             "[AF-E16] This field’s placeholder cannot be separated from its text; no text was changed"
+            else if (Build.VERSION.SDK_INT < 33)
+                "[AF-E17] Before Android 13, AlienFlow dictates into empty text fields; existing text needs Android 13 or newer"
             else "[AF-E04] Can't safely edit the existing text; select the field again or start in an empty field")
         // Binding permits microphone startup during typing; writes use fresh
         // matching text/cursor evidence and finish composition before insertion.
@@ -148,7 +152,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         val current = focused() ?: return rejected("[AF-E03] The text box lost focus; tap inside it again")
         if (current != target) return rejected("[AF-E03] Focus moved to a different text box")
         if (isProtected(target)) return rejected("[AF-E01] Password fields are excluded")
-        val editorInfo = service.inputMethod?.currentInputEditorInfo
+        val editorInfo = service.keyboardEditorInfo
         if (!nodeActions && editorInfo?.packageName != null && editorInfo.packageName != target.packageName?.toString()) {
             return rejected("[AF-E05] The keyboard is attached to another app; tap this text box again")
         }
@@ -181,19 +185,22 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         if (isTerminal) return terminalValid()
         val target = node ?: return false
         return app.screenReady() && inputEpoch == service.inputEpoch && target.refresh() && focused() == target && !isProtected(target) &&
-            (nodeActions || (service.inputMethod?.currentInputConnection != null &&
-                service.inputMethod?.currentInputEditorInfo?.packageName == target.packageName?.toString() &&
-                service.inputMethod?.currentInputEditorInfo?.fieldId == keyboardFieldId))
+            (nodeActions || (service.keyboardAttached &&
+                service.keyboardEditorInfo?.packageName == target.packageName?.toString() &&
+                service.keyboardEditorInfo?.fieldId == keyboardFieldId))
     }
 
     fun write(value: String, completion: (EditorWriteResult) -> Unit) {
+        // Before Android 13 there is no keyboard session: begin() binds only node-action fields.
         if (!isTerminal) {
-            if (nodeActions) writeOwned(value, false, completion) else writeKeyboard(value, false, completion)
+            if (nodeActions) writeOwned(value, false, completion)
+            else if (Build.VERSION.SDK_INT >= 33) writeKeyboard(value, false, completion)
+            else completion(EditorWriteResult.FAILED)
             return
         }
-        if (!app.coordinator.finishing || app.coordinator.active) { completion(EditorWriteResult.FAILED); return }
+        if (Build.VERSION.SDK_INT < 33 || !app.coordinator.finishing || app.coordinator.active) { completion(EditorWriteResult.FAILED); return }
         try {
-            val connection = service.inputMethod?.currentInputConnection
+            val connection = service.keyboardConnection()
             val ok = terminalInsertion?.send(value, connection != null && terminalValid()) {
                 app.crashJournal.terminalStage("dispatched")
                 connection!!.commitText(it, 1, null)
@@ -211,6 +218,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         EditorEvidence.NodeText(it.text?.toString(), it.isShowingHintText, it.textSelectionStart, it.textSelectionEnd)
     }
 
+    @TargetApi(33)
     private fun writeKeyboard(value: String, restoring: Boolean, completion: (EditorWriteResult) -> Unit) {
         lastError = ""
         val writeGeneration = generation
@@ -227,7 +235,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
             var readComposing = false
             try {
                 if (!current()) return@launch
-                val connection = service.inputMethod?.currentInputConnection ?: return@launch
+                val connection = service.keyboardConnection() ?: return@launch
                 var owner = keyboardOwnership
                 val preview = if (restoring) value else continuation.tail(value)
                 val requested = owner?.replacement(preview)?.let {
@@ -250,19 +258,32 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                     return evidence?.let { KeyboardWindow.read(it, readComposing) }
                         .also { evidenceCode = if (it != null) "none" else if (evidence == null) "04" else "11" }
                 }
-                val rawInitial = withTimeoutOrNull(3_000L) { readRaw() } ?: run {
-                    outcome = EditorWriteResult.FAILED; return@launch
+                // A just-started keyboard session can answer nothing at first (Android 14: null 0.9 s
+                // after binding). Ask again within the same budget; silence for all of it still fails.
+                val initialRead = withTimeoutOrNull(3_000L) {
+                    var read = readRaw()
+                    while (read == null && current()) { delay(100); read = readRaw() }
+                    read
                 }
+                // A superseded keyboard session answers nothing; that is not evidence about the
+                // current one. Currency decides first, as for every later read.
                 if (!current()) return@launch
+                val rawInitial = initialRead ?: run { outcome = EditorWriteResult.FAILED; return@launch }
                 if (rawInitial.offset == -1 || relativeOwnership != null) {
                     if (!RelativeKeyboardOwnership.usable(rawInitial)) { outcome = EditorWriteResult.FAILED; return@launch }
                     if (relativeOwnership == null && keyboardOwnership != null) {
                         continuation.protectDispatched(); userInteracted = true; keyboardOwnership = null
                     }
                     var relative = relativeOwnership
+                    // This route deletes before the cursor. With a composing region, Android deletes
+                    // before the region's start instead (unit test: "Browser fixture speech" became
+                    // "Browspeech"), so any composition still ends revision of earlier words here.
                     if (relative == null || readComposing || !relative.matches(rawInitial)) {
                         if (restoring) return@launch
                         if (relative != null || readComposing || bindingPresentation != presentation()) {
+                            // Metadata only: why earlier dictated words stop being revisable here.
+                            app.crashJournal.keyboardObservation(if (readComposing) "adopt-composing"
+                                else if (relative != null) "adopt-mismatch" else "adopt-presentation", presentation(), evidence, "relative")
                             continuation.protectDispatched(); userInteracted = true
                         }
                         relative = RelativeKeyboardOwnership(rawInitial, writeGeneration, !userInteracted)
@@ -294,6 +315,9 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                     connection.commitText(edit.text, 1, null)
                     if (!restoring) continuation.dispatched(value)
                     phase = "after"
+                    // An editor may report a half-applied commit (new text, cursor not yet moved; Chromium
+                    // 109/113). Only a state still unexplained when confirmation ends counts as the user's.
+                    var unexplained = false
                     outcome = withTimeoutOrNull(3_000L) {
                         repeat(16) {
                             if (!current()) return@withTimeoutOrNull EditorWriteResult.USER_EDIT
@@ -302,12 +326,12 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                             if (observed != null) {
                                 if (relativeWriter.confirm(observed, inserted, edit.confirmationLength, readComposing))
                                     return@withTimeoutOrNull EditorWriteResult.APPLIED
-                                if (!relativeWriter.matches(observed)) return@withTimeoutOrNull EditorWriteResult.RETRY
+                                unexplained = !relativeWriter.matches(observed)
                             }
                             if (it < 15) delay(50)
                         }
-                        EditorWriteResult.FAILED
-                    } ?: EditorWriteResult.FAILED
+                        if (unexplained) EditorWriteResult.RETRY else EditorWriteResult.FAILED
+                    } ?: if (unexplained) EditorWriteResult.RETRY else EditorWriteResult.FAILED
                     return@launch
                 }
                 val initial = KeyboardWindow.read(rawInitial, readComposing) ?: run {
@@ -317,9 +341,13 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 val changedBeforeFirstRead = owner == null && (bindingPresentation != presentation() ||
                     (evidence?.offset == -1 && bindingSelection?.let { minOf(it.start, it.end) != initial.absoluteStart ||
                         maxOf(it.start, it.end) != initial.absoluteEnd } == true))
-                if (owner == null || initial.composing || !owner.matches(initial)) {
+                // This route selects the exact range and commits over it; Android finishes a composing
+                // region first, so a keyboard mark over text that is exactly ours is not user typing.
+                if (owner == null || !owner.matches(initial)) {
                     if (restoring) return@launch
                     if (owner != null || initial.composing || changedBeforeFirstRead) {
+                        app.crashJournal.keyboardObservation(if (initial.composing) "adopt-composing"
+                            else if (owner != null) "adopt-mismatch" else "adopt-presentation", presentation(), evidence, "absolute")
                         userInteracted = true; continuation.protectDispatched()
                     }
                     owner = KeyboardEditorOwnership(initial, writeGeneration, replaceSelection = !userInteracted)
@@ -349,6 +377,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 phase = "after"
                 // Confirm through the same API/coordinate system that performed the edit.
                 // No whole-field SET_TEXT, clipboard paste, or resend after a timeout.
+                var unexplained = false
                 outcome = withTimeoutOrNull(3_000L) {
                     repeat(16) {
                         if (!current()) return@withTimeoutOrNull EditorWriteResult.USER_EDIT
@@ -358,13 +387,12 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                             if (writer.confirm(observed, inserted)) return@withTimeoutOrNull EditorWriteResult.APPLIED
                             val staleSelection = evidence?.offset == -1 && evidence?.selection == selectionAtDispatch &&
                                 observed.absoluteEnd != writer.proposedCursor(inserted)
-                            if (!staleSelection && !writer.matches(observed))
-                                return@withTimeoutOrNull EditorWriteResult.RETRY
+                            unexplained = !staleSelection && !writer.matches(observed)
                         }
                         if (it < 15) delay(50)
                     }
-                    EditorWriteResult.FAILED
-                } ?: EditorWriteResult.FAILED
+                    if (unexplained) EditorWriteResult.RETRY else EditorWriteResult.FAILED
+                } ?: if (unexplained) EditorWriteResult.RETRY else EditorWriteResult.FAILED
             } catch (_: CancellationException) {
                 outcome = EditorWriteResult.USER_EDIT
             } catch (_: Exception) {
@@ -374,6 +402,8 @@ class EditorBridge(private val service: AlienAccessibilityService) {
                 if (outcome == EditorWriteResult.USER_EDIT && current()) outcome = EditorWriteResult.RETRY
                 if (outcome == EditorWriteResult.USER_EDIT && generation == writeGeneration && bound && sameTarget()) outcome = EditorWriteResult.RETRY
                 if (outcome == EditorWriteResult.RETRY) {
+                    // Metadata only (lengths, cursors, offset): why dictated words became the user's.
+                    app.crashJournal.keyboardObservation("$phase-retry", presentation(), evidence, evidenceCode)
                     continuation.protectDispatched(); userInteracted = true; keyboardOwnership = null; relativeOwnership = null
                 }
                 if (outcome == EditorWriteResult.FAILED && current()) {
@@ -476,6 +506,7 @@ class EditorBridge(private val service: AlienAccessibilityService) {
         if (isTerminal) { completion(terminalInsertion?.sent != true); return }
         if (userInteracted) { completion(false); return }
         if (!nodeActions) {
+            if (Build.VERSION.SDK_INT < 33) { completion(false); return }
             relativeOwnership?.let { owner ->
                 if (owner.first) { completion(true); return }
                 writeKeyboard(owner.originalSelection(), true) { completion(it == EditorWriteResult.APPLIED) }

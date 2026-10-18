@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Run unchanged shutdown tests against the shipped .25 source; no provider traffic."""
+"""Run unchanged shutdown tests against the shipped .28 Claude source; no provider traffic."""
 from pathlib import Path
 import json, os, shutil, subprocess, xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
-BASE = '39a8e71bcbdff6397e056c211c053bf07b96da5c'
+BASE = 'eff228559b8fc26e1a0ae7dbd15e903649d341eb'
 WORK = Path(os.environ['RUNNER_TEMP']) / 'alienflow-billing-baseline'
 REPORT = ROOT / 'build/billing-baseline'
 REPORT.mkdir(parents=True, exist_ok=True)

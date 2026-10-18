@@ -34,7 +34,7 @@ class DiagnosticsActivity : Activity() {
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 36, 48, 36)
-            setBackgroundColor(Color.rgb(15, 20, 26))
+            setBackgroundColor(Color.rgb(11, 13, 16))
         }
         val scroll = ScrollView(this).apply { addView(column) }
         setContentView(scroll)
