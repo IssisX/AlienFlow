@@ -9,13 +9,16 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.security.KeyStore
+import java.time.LocalDate
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-class LocalStore(private val context: Context) {
+class LocalStore(private val context: Context, today: () -> LocalDate = { LocalDate.now() }) {
     val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    /** Per-day usage counters (metadata only) in the same settings file; see [UsageMeter]. */
+    val usage = UsageMeter({ prefs.getString("usage_days", null) }, { prefs.edit().putString("usage_days", it).apply() }, today)
     val audioDir = File(context.filesDir, "pending-audio").apply { mkdirs() }
     private val historyFile = AtomicFile(File(context.filesDir, "history.json"))
     private fun key(): SecretKey {

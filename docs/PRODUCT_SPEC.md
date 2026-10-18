@@ -664,3 +664,7 @@ Support as many Android devices as practical, explicitly including the Samsung G
 - **Android 10 is excluded.** Keeping the overlay off the keyboard depends on Android 11 window-inset APIs.
 - **Android 11 and 12 have no accessibility keyboard session.** AlienFlow therefore dictates live only into positively empty fields, using the existing guarded node-action path with read-back confirmation. Fields with existing text and Termux are refused with an explicit AF-E17 reason, and nothing is written. It never overwrites a whole draft or pastes through the clipboard.
 - **Compatibility evidence:** CI runs the real-editor emulator tests on Android 11, 12, 13, 14, 15 and 16 across phone, small-phone, foldable and tablet profiles. Emulators are not physical-device evidence.
+
+## Owner amendment — cost safety, 18 October 2026 / 0.1.29-claude.1
+
+The owner lost prepaid OpenAI credit to dictation sessions running unnoticed. Cost bounds are now product behavior: a quiet-pause stop (default 15 s), a maximum dictation length (default 15 min, never Off), a stop 10 s after the field is released with no new field, and a user-adjustable daily dictation limit (default 30 min, Off allowed). These bound spending; they are not a word quota, and the user controls every value except the existence of the length limit.

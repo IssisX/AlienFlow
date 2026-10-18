@@ -200,7 +200,8 @@ class PendingAudio internal constructor(
 
     companion object {
         const val DEFAULT_UPLOAD_PAYLOAD_BYTES = 20L * 1024 * 1024
-        private const val HEADER_BYTES = 44L
+        /** Canonical PCM16 WAV header; everything after it is audio payload. */
+        internal const val HEADER_BYTES = 44L
         private const val MAX_DATA_BYTES = 0xffff_ffffL - 36L
         private const val PROVIDER_FILE_LIMIT_BYTES = 25_000_000L
         private const val QUEUE_CAPACITY = 256

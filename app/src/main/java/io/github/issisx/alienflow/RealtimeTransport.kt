@@ -73,6 +73,9 @@ class RealtimeTransport internal constructor(
     val hasUnacknowledgedCommit: Boolean get() = synchronized(state) { coverage.hasUnacknowledgedCommit }
     var silenceStopSeconds = 0
     var onSilenceStop: (() -> Unit)? = null
+    /** PCM bytes the socket accepted, commit padding included; held silence is never sent so
+     * never reported. Called under the transport lock on capture/network threads: must not block. */
+    var onAudioSent: ((Int) -> Unit)? = null
 
     fun connect(api: OpenAiClient, key: String, language: String, vocabulary: String) {
         this.api = api
@@ -289,6 +292,7 @@ class RealtimeTransport internal constructor(
         if (current.queueSize() + (pcm.size * 4L / 3L) + 128 > RealtimeProtocol.MAX_WEBSOCKET_QUEUE_BYTES ||
             !current.send(RealtimeProtocol.appendEvent(pcm))) return false
         remoteBufferedBytes += pcm.size
+        onAudioSent?.invoke(pcm.size)
         return true
     }
 

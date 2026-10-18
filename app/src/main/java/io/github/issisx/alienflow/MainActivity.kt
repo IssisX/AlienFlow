@@ -306,6 +306,9 @@ class MainActivity : Activity() {
         ui.text(delivery, "Ends the dictation after this much silence. Off keeps recording until you stop it or the time limit is reached.", 14, ui.muted)
         slider(delivery, "Maximum dictation length", "session_minutes", DictationCoordinator.DEFAULT_SESSION_MINUTES, DictationCoordinator.MIN_SESSION_MINUTES, DictationCoordinator.MAX_SESSION_MINUTES) { if (it == 1) "1 minute" else "$it minutes" }
         ui.text(delivery, "Always on. Limits what one forgotten dictation can cost.", 14, ui.muted)
+        slider(delivery, "Daily dictation limit", "daily_minutes", DictationCoordinator.DEFAULT_DAILY_MINUTES, DictationCoordinator.MIN_DAILY_MINUTES, DictationCoordinator.MAX_DAILY_MINUTES) { if (it == 0) "Off" else if (it == 1) "1 minute" else "$it minutes" }
+        ui.text(delivery, app.store.usage.summary(), 14, ui.muted).apply { tag = "usage-today" }
+        ui.text(delivery, "Counts audio sent to OpenAI today, including recovery. Resets at midnight.", 14, ui.muted)
         val writing = ui.card(body)
         ui.text(writing, "Writing style", 16, bold = true)
         choose(writing, "correction", listOf(

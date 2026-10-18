@@ -1,6 +1,17 @@
-# AlienFlow implementation — 0.1.28-claude.1 (29), branch `claude/alienflow`
+# AlienFlow implementation — 0.1.29-claude.1 (30), branch `claude/alienflow`
 
-This is a development APK built from `claude/alienflow`. 0.1.27-claude.1 and 0.1.28-claude.1 add the cost controls and interface changes below to 0.1.26-claude.1; everything else in this document is unchanged from 0.1.26-claude.1. The branch was created from `AlienFlow(chat)` at `2b3455d` (0.1.25-chat.1). It is **not signed off for a paid public launch**. [Paid release readiness](PAID_RELEASE_READINESS.md) lists the acceptance evidence still required. Previous checkpoint: [0.1.25-chat.1](history/IMPLEMENTATION_CHAT_0.1.25-chat.1.md).
+This is a development APK built from `claude/alienflow`. 0.1.27 through 0.1.29 add the cost controls and interface changes below to 0.1.26-claude.1; everything else in this document is unchanged from 0.1.26-claude.1. The branch was created from `AlienFlow(chat)` at `2b3455d` (0.1.25-chat.1). It is **not signed off for a paid public launch**. [Paid release readiness](PAID_RELEASE_READINESS.md) lists the acceptance evidence still required. Previous checkpoint: [0.1.25-chat.1](history/IMPLEMENTATION_CHAT_0.1.25-chat.1.md).
+
+## Unattended spend (0.1.29-claude.1)
+
+The owner reported three prepaid OpenAI balances drained while not knowingly dictating, with the app the only user of the key. Every paid call needs an active session (a tap on the floating alien, which sits just above the keyboard, or the in-app Start button), a Check connection tap, or a recovery upload; no code starts a session by itself. But an active session kept capturing after its field was released or the user switched apps, waiting for a new field with nowhere to write, and live polish ran after every turn. An accidental or forgotten session could therefore transcribe room, TV or video audio until the screen turned off. Before 0.1.27 nothing else stopped it.
+
+1. **No-field stop:** a session whose field is released stops after 10 seconds without an eligible field, through the normal Stop path; its words are saved to History. Live polish does not run while no field is attached. This also applies when leaving Termux and when the field changes during a connection outage.
+2. **Daily dictation limit:** realtime and recovery audio sent per local day is limited, default 30 minutes, adjustable from Off to 120. At the limit a session stops, a new one is refused, and a recovery longer than the remaining allowance is refused with its recording kept.
+3. **Visible usage:** the Dictation settings show today's audio and polish requests; the diagnostic report lists the last 7 days (realtime audio, recovery audio, polish requests, connection checks). These are local counts, not an OpenAI bill, and can trail by a few seconds after a crash.
+4. **Polish cap:** at most 120 polish requests per session, including the pass after Stop.
+
+Not tested on a phone or against OpenAI. The actual cause of the owner's charges is not confirmed by provider records; the mechanism above is the one the code allows.
 
 ## Cost controls (0.1.27–0.1.28)
 

@@ -36,6 +36,7 @@ object DiagnosticReport {
         appendLine("Text contents and credentials are not included. No automatic upload.")
         appendLine()
         appendLine(app.crashJournal.diagnostic())
+        appendLine(app.store.usage.diagnostic(DictationCoordinator.dailyMinutes(app.store.prefs)))
         appendLine("ANDROID RECORDED PROCESS EXITS (may include update/permission changes)")
         try {
             val manager = app.getSystemService(ActivityManager::class.java)
