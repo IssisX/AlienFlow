@@ -94,6 +94,8 @@ It can compare recognition delay, commit silence and a transcription prompt with
 
 ## Verification
 
+**0.1.29-claude.1 (30):** compiled source `c573ca5f94d39fbb7e4c9f09ad3f939bd2cfe5df`. [Actions run 39130187215](https://github.com/IssisX/AlienFlow/actions/runs/39130187215) passed every job on attempt 2: 287 unit tests with no failures, errors or skips; release lint 0 errors; the shipped-source replays; the Android 16 emulator; and the Android 11–15 device matrix. Attempt 1 failed once in the Android 16 Termux-to-native switch with AF-E09: the emulator keyboard returned no field text within the 3 s read budget (`ime_length=null`), in code this version does not change; the re-run passed. Unsigned APK SHA-256 `743399ba590a2e7b81daf9b1be22b33b4c4b704b1dd2197ade7f316e4b34409a` (bundle digest `sha256:237380051789e6cbf66ef8b12096bfb8ebc41c325c6cf7727c9183763ea689bb`). Not tested on a physical phone or with a real provider.
+
 **0.1.28-claude.1 (29):** compiled source `eff228559b8fc26e1a0ae7dbd15e903649d341eb`. [Actions run 38921042130](https://github.com/IssisX/AlienFlow/actions/runs/38921042130) passed every job: 268 unit tests with no failures, errors or skips; release lint 0 errors; the shipped-source replays; the Android 16 emulator; and the Android 11–15 device matrix. Unsigned APK SHA-256 `e21047c06a9013fa031c36f7bd8f4e8adec0b9f7004aa13618e44aaf108b28d6` (bundle digest `sha256:270e9462228d9cedf4e75fd7b2580d6fe52764087128dc39c7e3c789c305f0e9`). The cost controls and the interface were not tested on a physical phone or with a real provider.
 
 **0.1.26-claude.1 (27):**
